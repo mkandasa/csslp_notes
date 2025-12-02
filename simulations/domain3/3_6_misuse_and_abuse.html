@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 3: Misuse & Abuse Case Modeling</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f8fafc;
+            --accent: #f472b6; /* Pink */
+            --req: #38bdf8;    /* Blue */
+            --abuse: #ef4444;  /* Red */
+            --story: #10b981;  /* Green */
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1000px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); height: fit-content; margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- Misuse Case Styles --- */
+        .diagram-container {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+            background: #000; padding: 20px; border-radius: 8px; border: 1px dashed #555;
+        }
+        .actor { text-align: center; }
+        .actor-icon { font-size: 2rem; display: block; }
+        .use-case-oval {
+            border: 2px solid #aaa; border-radius: 50%; padding: 20px; width: 150px; text-align: center;
+            background: #222; font-size: 0.9rem;
+        }
+        .misuse-oval {
+            border: 2px dashed var(--abuse); border-radius: 50%; padding: 20px; width: 150px; text-align: center;
+            background: #2a1111; color: var(--abuse); display: none; font-size: 0.9rem;
+        }
+        .arrow { font-size: 2rem; color: #555; }
+
+        /* --- Abuse Modeling Styles --- */
+        .model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .feature-box { background: #111; padding: 15px; border-radius: 6px; border: 1px solid #444; }
+        .abuse-path {
+            background: #222; padding: 10px; margin-top: 10px; border-left: 3px solid var(--abuse);
+            cursor: pointer; transition: background 0.2s;
+        }
+        .abuse-path:hover { background: #333; }
+        .abuse-path.selected { background: #450a0a; border-color: var(--abuse); }
+        
+        .control-list { margin-top: 10px; }
+        .control-item {
+            display: flex; align-items: center; gap: 10px; padding: 8px; cursor: pointer;
+            border-bottom: 1px solid #333;
+        }
+        .control-item:hover { color: var(--req); background: #1a1a1a; }
+
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; width: 100%; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--req); color: #000; }
+        .btn-abuse { background: var(--abuse); color: white; }
+
+        /* --- Logs --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem; margin-top: 20px; width: 100%; box-sizing: border-box;
+        }
+        .log-err { color: var(--abuse); }
+        .log-ok { color: var(--story); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Misuse & Abuse Case Modeling</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('misuse')">1. Use vs. Misuse Case</button>
+        <button class="tab-btn" onclick="switchTab('model')">2. Abuse Case Modeling</button>
+    </div>
+
+    <!-- TAB 1: MISUSE CASE -->
+    <div id="misuse" class="tab-content active">
+        <div class="card">
+            <h3>Use Case vs. Misuse Case</h3>
+            <p><strong>Goal:</strong> Identify how the "File Upload" feature can be abused by a malicious actor.</p>
+
+            <div class="diagram-container">
+                <div class="actor"><span class="actor-icon">👤</span>User</div>
+                <div class="arrow">➜</div>
+                <div class="use-case-oval"><strong>Upload Photo</strong><br>(Valid Action)</div>
+                <div class="arrow" id="abuseArrow" style="display:none; color:var(--abuse)">⬅</div>
+                <div class="misuse-oval" id="misuseOval"><strong>Upload Web Shell</strong><br>(Abuse Case)</div>
+                <div class="actor" id="attacker" style="display:none; color:var(--abuse)"><span class="actor-icon">🥷</span>Attacker</div>
+            </div>
+            
+            <button class="btn-abuse" onclick="revealMisuse()">Reveal Abuse Case</button>
+            
+            <div id="mitigationBox" style="margin-top:20px; display:none; border-top:1px solid #444; padding-top:10px;">
+                <strong>Derived Requirement:</strong><br>
+                "The system must enforce file type allow-listing (images only) and store uploads outside the web root."
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: ABUSE MODELING -->
+    <div id="model" class="tab-content">
+        <div class="card">
+            <h3>From Abuse to Control</h3>
+            <p>Select an abuse vector for the "Shopping Cart" feature, then identify the correct mitigation.</p>
+            
+            <div class="model-grid">
+                <!-- Features / Abuse -->
+                <div class="feature-box">
+                    <strong>Abuse Scenarios</strong>
+                    <div class="abuse-path" onclick="selectAbuse(this, 'param')">
+                        <strong>1. Parameter Tampering</strong><br>
+                        <small>Attacker changes "price=100" to "price=1" in POST.</small>
+                    </div>
+                    <div class="abuse-path" onclick="selectAbuse(this, 'race')">
+                        <strong>2. Race Condition</strong><br>
+                        <small>Double-spending a coupon by clicking fast.</small>
+                    </div>
+                    <div class="abuse-path" onclick="selectAbuse(this, 'hoard')">
+                        <strong>3. Inventory Hoarding</strong><br>
+                        <small>Script adds all items to cart to block others, then abandons.</small>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="feature-box">
+                    <strong>Select Mitigating Control:</strong>
+                    <div id="controlOptions" class="control-list">
+                        <div style="color:#aaa; font-style:italic; padding:10px;">Select an abuse case on the left...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn-action" onclick="verifyControl()">Verify Mitigation</button>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> Requirements Engine Ready.</div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'misuse':0, 'model':1};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : '');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- MISUSE LOGIC --- */
+        function revealMisuse() {
+            document.getElementById('abuseArrow').style.display = 'block';
+            document.getElementById('misuseOval').style.display = 'block';
+            document.getElementById('attacker').style.display = 'block';
+            document.getElementById('mitigationBox').style.display = 'block';
+            log("Misuse Case Identified: RCE via File Upload.", 'err');
+        }
+
+        /* --- ABUSE MODELING LOGIC --- */
+        let selectedAbuse = null;
+
+        function selectAbuse(el, type) {
+            document.querySelectorAll('.abuse-path').forEach(d => d.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedAbuse = type;
+            
+            const list = document.getElementById('controlOptions');
+            list.innerHTML = `
+                <div class="control-item"><input type="radio" name="ctrl" value="encrypt"> <strong>Encrypt Database</strong> (Data Protection)</div>
+                <div class="control-item"><input type="radio" name="ctrl" value="server_valid"> <strong>Server-Side Validation</strong> (Re-calc Price)</div>
+                <div class="control-item"><input type="radio" name="ctrl" value="lock"> <strong>Atomic Transactions / DB Locks</strong></div>
+                <div class="control-item"><input type="radio" name="ctrl" value="firewall"> <strong>WAF / IP Blocking</strong></div>
+                <div class="control-item"><input type="radio" name="ctrl" value="timeout"> <strong>Cart Reservation Timeout</strong> (Business Logic)</div>
+            `;
+        }
+
+        function verifyControl() {
+            const radios = document.getElementsByName('ctrl');
+            let val = null;
+            for(let r of radios) if(r.checked) val = r.value;
+
+            if (!selectedAbuse) { log("Select an abuse case first.", 'err'); return; }
+            if (!val) { log("Select a control.", 'err'); return; }
+
+            if (selectedAbuse === 'param') {
+                if (val === 'server_valid') log("✅ CORRECT: Trust boundary enforcement. Server must validate price.", 'ok');
+                else log("❌ WRONG: That control does not stop parameter tampering.", 'err');
+            } 
+            else if (selectedAbuse === 'race') {
+                if (val === 'lock') log("✅ CORRECT: Atomic transactions prevent race conditions.", 'ok');
+                else log("❌ WRONG: Validation/WAFs usually miss timing attacks.", 'err');
+            }
+            else if (selectedAbuse === 'hoard') {
+                if (val === 'timeout') log("✅ CORRECT: Releasing inventory after X minutes stops hoarding denial of service.", 'ok');
+                else if (val === 'firewall') log("⚠ PARTIAL: WAF might block bot IPs, but logic fix (Timeout) is better.", 'err');
+                else log("❌ WRONG: Encryption or Locks won't stop logic abuse.", 'err');
+            }
+        }
+
+    </script>
+</body>
+</html>

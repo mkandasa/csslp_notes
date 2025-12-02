@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 3: Data Security Suite</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f8fafc;
+            --accent: #8b5cf6; /* Violet */
+            --pii: #f43f5e;    /* Rose (Restricted) */
+            --conf: #f59e0b;   /* Amber (Confidential) */
+            --pub: #10b981;    /* Green (Public) */
+            --struct: #a78bfa; /* Purple (Structured) */
+            --unstruct: #facc15; /* Yellow (Unstructured) */
+            --life: #22d3ee;   /* Cyan (Lifecycle) */
+            --handle: #ec4899; /* Pink (Handling) */
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .container {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            width: 100%; max-width: 1100px;
+        }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); height: fit-content; margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- TABS --- */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1100px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- BUTTONS --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; width: 100%; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-label { width: auto; margin: 5px; background: transparent; border: 2px solid #555; color: #fff; }
+        .btn-action { background: var(--accent); color: #000; font-size: 1rem; padding: 12px; }
+        .btn-life { background: var(--life); color: #000; }
+        .btn-risk { background: var(--pii); color: white; }
+        .btn-struct { background: var(--struct); color: #000; }
+        .btn-unstruct { background: var(--unstruct); color: #000; }
+        .btn-handle { background: var(--handle); color: white; }
+
+        /* --- MODULE 1: LIFECYCLE --- */
+        .lifecycle-track {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: relative;
+        }
+        .lifecycle-track::before {
+            content: ''; position: absolute; top: 25px; left: 20px; right: 20px; height: 4px;
+            background: #333; z-index: 0;
+        }
+        .lc-node {
+            width: 50px; height: 50px; border-radius: 50%; background: #111; border: 4px solid #555;
+            display: flex; align-items: center; justify-content: center; position: relative; z-index: 1;
+            font-size: 0.8rem; cursor: pointer; transition: all 0.3s; font-weight: bold;
+        }
+        .lc-node.active { border-color: var(--life); background: #083344; color: var(--life); transform: scale(1.1); box-shadow: 0 0 10px var(--life); }
+        .lc-node.done { border-color: var(--pub); background: #064e3b; color: var(--pub); }
+        .lc-label { position: absolute; top: 55px; font-size: 0.7rem; width: 80px; text-align: center; color: #aaa; }
+
+        .file-visual {
+            width: 60px; height: 80px; background: #fff; color: #000; display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; font-size: 2rem; margin: 0 auto 20px; position: relative; transition: all 0.5s;
+        }
+        .file-visual.encrypted { background: #333; color: var(--life); border: 2px solid var(--life); }
+        .file-visual.destroyed { background: #000; border: 2px dashed #333; opacity: 0.3; color: transparent; }
+        .file-visual::after { content: 'DOC'; font-size: 0.6rem; position: absolute; bottom: 2px; }
+
+        .forensic-tool {
+            background: #000; border: 1px solid var(--pii); padding: 10px; margin-top: 10px;
+            font-family: monospace; color: var(--pii); display: none;
+        }
+
+        /* --- MODULE 2: DATA TYPES --- */
+        .type-box {
+            background: #111; padding: 15px; border-radius: 8px; margin-bottom: 15px;
+            border-left: 4px solid #555; cursor: pointer;
+        }
+        .type-box.struct { border-left-color: var(--struct); }
+        .type-box.unstruct { border-left-color: var(--unstruct); }
+        
+        .db-table { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 0.8rem; margin-top: 10px; }
+        .db-table th { text-align: left; color: #aaa; border-bottom: 1px solid #444; }
+        .db-table td { padding: 5px; color: #ccc; }
+        
+        .doc-viewer {
+            background: #fff; color: #000; padding: 10px; border-radius: 4px; font-family: serif; 
+            min-height: 80px; position: relative; overflow: hidden;
+        }
+        .watermark {
+            position: absolute; top: 20px; left: 20px; transform: rotate(-30deg);
+            font-size: 2rem; color: rgba(255,0,0,0.2); font-weight: bold; display: none;
+        }
+        .ocr-highlight { background: yellow; color: black; }
+
+        /* --- MODULE 3: LABELING & IMPACT --- */
+        .file-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .file-card {
+            background: #111; padding: 15px; border-radius: 8px; border: 1px solid #444;
+            text-align: center; position: relative; cursor: pointer; transition: all 0.2s;
+        }
+        .file-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .file-card.selected { border-color: var(--accent); background: #1e293b; box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
+        .file-icon { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+        .label-badge {
+            position: absolute; top: -10px; right: -5px; padding: 2px 8px; border-radius: 10px;
+            font-size: 0.7rem; font-weight: bold; display: none; background: #000; border: 1px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .impact-container { margin-top: 20px; padding: 15px; background: #111; border-radius: 8px; border: 1px dashed #444; }
+        .impact-meter { height: 12px; background: #333; border-radius: 6px; margin-top: 10px; overflow: hidden; }
+        .impact-fill { height: 100%; width: 0%; background: #555; transition: width 0.5s, background 0.5s; }
+        .impact-val { text-align: right; font-size: 0.8rem; margin-top: 5px; font-weight: bold; min-height: 1.2em; }
+
+        .dlp-scanner {
+            border: 2px dashed #555; padding: 20px; border-radius: 8px; text-align: center;
+            margin-top: 20px; background: #0f172a; position: relative; overflow: hidden; height: 100px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .dlp-packet {
+            width: 50px; height: 60px; background: #222; border: 2px solid #fff;
+            position: absolute; top: 20px; left: -60px; display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; font-size: 1.5rem; z-index: 10;
+        }
+        .gate-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; background: #444; z-index: 5; }
+        .gate-label {
+            position: absolute; left: 50%; top: 5px; transform: translateX(-50%); 
+            background: #0f172a; padding: 0 5px; font-size: 0.7rem; color: #aaa; z-index: 6;
+        }
+
+        /* --- MODULE 4: DATA HANDLING (NEW) --- */
+        .pii-scanner {
+            background: #111; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444;
+        }
+        .scan-input {
+            width: 100%; background: #222; color: #eee; border: 1px solid #555; padding: 10px;
+            font-family: monospace; border-radius: 4px; resize: vertical; min-height: 80px;
+        }
+        .scan-result { margin-top: 10px; min-height: 30px; font-size: 0.9rem; }
+        .tag-detected { background: rgba(244, 63, 94, 0.2); color: var(--pii); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--pii); margin-right: 5px; }
+
+        .public-site {
+            background: #fff; color: #000; padding: 20px; border-radius: 8px; position: relative;
+            text-align: center; height: 150px; display: flex; flex-direction: column; justify-content: center;
+        }
+        .public-site h2 { color: #000; border: none; margin: 0; }
+        .defaced { background: #000; color: #0f0; font-family: monospace; }
+        
+        .integrity-seal {
+            position: absolute; bottom: 10px; right: 10px; width: 30px; height: 30px;
+            border-radius: 50%; background: var(--pub); color: white; font-size: 1.2rem;
+            display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* --- LOGS --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: var(--accent); font-size: 0.9rem; margin-top: 20px; width: 100%; box-sizing: border-box;
+        }
+        .log-err { color: var(--pii); }
+        .log-ok { color: var(--pub); }
+        .log-warn { color: var(--conf); }
+        .log-info { color: var(--life); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Data Security Suite</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('life')">1. Data Lifecycle</button>
+        <button class="tab-btn" onclick="switchTab('types')">2. Data Types</button>
+        <button class="tab-btn" onclick="switchTab('label')">3. Labeling & Impact</button>
+        <button class="tab-btn" onclick="switchTab('handle')">4. Data Handling (PII)</button>
+    </div>
+
+    <!-- TAB 1: DATA LIFECYCLE -->
+    <div id="life" class="tab-content active">
+        <div class="container">
+            <div class="card" style="grid-column: span 2;">
+                <h3>The Lifecycle Manager</h3>
+                <div class="lifecycle-track">
+                    <div class="lc-node active" id="lc-gen">1<span class="lc-label">Generate</span></div>
+                    <div class="lc-node" id="lc-store">2<span class="lc-label">Store</span></div>
+                    <div class="lc-node" id="lc-use">3<span class="lc-label">Use</span></div>
+                    <div class="lc-node" id="lc-share">4<span class="lc-label">Transfer</span></div>
+                    <div class="lc-node" id="lc-archive">5<span class="lc-label">Archive</span></div>
+                    <div class="lc-node" id="lc-kill">6<span class="lc-label">Dispose</span></div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; align-items:center;">
+                    <div style="text-align:center; border-right:1px solid #444; padding-right:20px;">
+                        <div id="fileVisual" class="file-visual">📄</div>
+                        <div id="fileStatus" style="color:#aaa; font-size:0.9rem">Status: New File</div>
+                    </div>
+                    <div id="actionPanel">
+                        <h4 id="phaseTitle" style="margin-top:0; color:var(--life)">Phase 1: Generation</h4>
+                        <p id="phaseDesc" style="font-size:0.9rem">Data is created. It must be classified immediately.</p>
+                        <div id="btnGroup">
+                            <button class="btn-life" onclick="lifecycleAction('classify')">🏷️ Classify & Tag</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="forensic-tool" id="forensicBox">
+                    [FORENSIC RECOVERY TOOL v2.0]<br>Scanning Disk Sectors...<br><span id="recoveryResult">Scanning...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: DATA TYPES -->
+    <div id="types" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <h3>Structured Data (SQL)</h3>
+                <p>Fixed Schema. Control: <strong>Column-Level Encryption</strong>.</p>
+                <div class="type-box struct">
+                    <strong>Users Table (DB)</strong>
+                    <table class="db-table">
+                        <tr><th>ID</th><th>Name</th><th>SSN</th></tr>
+                        <tr><td>101</td><td>Alice</td><td id="cell-ssn">999-00-1234</td></tr>
+                        <tr><td>102</td><td>Bob</td><td id="cell-ssn-2">888-00-5678</td></tr>
+                    </table>
+                </div>
+                <div style="margin-top:10px;">
+                    <button class="btn-struct" onclick="encryptColumn()">🔒 Encrypt 'SSN' Column</button>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Unstructured Data (Files)</h3>
+                <p>No Schema. Control: <strong>DRM / Watermarking</strong>.</p>
+                <div class="type-box unstruct">
+                    <strong>Contract_Scan.jpg</strong>
+                    <div class="doc-viewer" id="docViewer">
+                        <div class="watermark" id="docWatermark">CONFIDENTIAL</div>
+                        <p>Contract Agreement...</p>
+                        <p>Signatory: Alice Smith</p>
+                        <p>ID: <span id="ocrTarget">999-00-1234</span></p>
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-unstruct" onclick="runOCR()">🔍 OCR Scan (Find PII)</button>
+                    <button class="btn-unstruct" style="background:var(--conf); color:black" onclick="applyDRM()">🛡️ Apply DRM</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: LABELING & IMPACT -->
+    <div id="label" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <h3>Apply Labels</h3>
+                <p>Select a data asset to classify.</p>
+                <div class="file-grid">
+                    <div class="file-card" onclick="selectFile(this, 'marketing')">
+                        <span class="file-icon">📄</span>Marketing.pdf<span class="label-badge" id="badge-marketing"></span>
+                    </div>
+                    <div class="file-card" onclick="selectFile(this, 'payroll')">
+                        <span class="file-icon">📊</span>Payroll.xlsx<span class="label-badge" id="badge-payroll"></span>
+                    </div>
+                    <div class="file-card" onclick="selectFile(this, 'source')">
+                        <span class="file-icon">💻</span>Source.zip<span class="label-badge" id="badge-source"></span>
+                    </div>
+                </div>
+                <div style="margin-top:20px; text-align:center; display:none;" id="labelActions">
+                    <strong>Select Classification Label:</strong><br>
+                    <div style="display:flex; justify-content:center; flex-wrap:wrap;">
+                        <button class="btn-label" style="border-color:var(--pub); color:var(--pub)" onclick="applyLabel('PUBLIC')">PUBLIC</button>
+                        <button class="btn-label" style="border-color:var(--conf); color:var(--conf)" onclick="applyLabel('CONFIDENTIAL')">CONFIDENTIAL</button>
+                        <button class="btn-label" style="border-color:var(--pii); color:var(--pii)" onclick="applyLabel('RESTRICTED')">RESTRICTED</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Impact Analysis & DLP</h3>
+                <div class="impact-container">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#aaa; margin-bottom:5px;">
+                        <span>Impact Potential</span>
+                    </div>
+                    <div class="impact-meter"><div class="impact-fill" id="impactBar"></div></div>
+                    <div class="impact-val" id="impactText">Select a file...</div>
+                </div>
+                <div class="dlp-scanner">
+                    <div class="gate-line"></div><div class="gate-label">DLP GATEWAY</div><div id="dlpPacket" class="dlp-packet">📄</div>
+                </div>
+                <button class="btn-action" onclick="runDLP()">🚀 Simulate Exfiltration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: DATA HANDLING (NEW) -->
+    <div id="handle" class="tab-content">
+        <div class="container">
+            <!-- PII Handling -->
+            <div class="card">
+                <h3>PII Handling (Privacy)</h3>
+                <p>Scan input for sensitive data and apply Anonymization.</p>
+                
+                <div class="pii-scanner">
+                    <label style="font-size:0.8rem; color:#aaa">USER INPUT STREAM:</label>
+                    <textarea id="piiInput" class="scan-input">User Alice (alice@example.com) requested refund for Order #991.</textarea>
+                    
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <button class="btn-handle" onclick="scanPII()">🔍 Scan for PII</button>
+                        <button class="btn-action" onclick="anonymizePII()">🕶️ Anonymize</button>
+                    </div>
+                    
+                    <div id="piiResult" class="scan-result"></div>
+                </div>
+            </div>
+
+            <!-- Public Data Handling -->
+            <div class="card">
+                <h3>Public Data Handling (Integrity)</h3>
+                <p>Public data needs Integrity protection against Defacement.</p>
+                
+                <div id="publicSite" class="public-site">
+                    <h2>Welcome to Our Corp</h2>
+                    <p>Trust us with your data.</p>
+                    <div id="integritySeal" class="integrity-seal" title="Integrity Verified">✓</div>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-risk" onclick="defaceSite()">😈 Simulate Defacement</button>
+                    <button class="btn-struct" onclick="verifyIntegrity()">🛡️ Verify Hash (Restore)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> Data Security Suite Ready.</div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'life':0, 'types':1, 'label':2, 'handle':3};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : (type === 'warn' ? 'log-warn' : 'log-info'));
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- MODULE 1: LIFECYCLE LOGIC --- */
+        let currentPhase = 0;
+        const phases = ['gen', 'store', 'use', 'share', 'archive', 'kill'];
+        let isEncrypted = false;
+        let isWiped = false;
+
+        function lifecycleAction(action) {
+            const vis = document.getElementById('fileVisual');
+            const status = document.getElementById('fileStatus');
+            
+            if (action === 'classify') {
+                log("Phase 1: Data Classified as 'Confidential'.", 'ok');
+                advancePhase(1, "Phase 2: Storage", "Data moving to DB. Ensure Encryption at Rest.", 
+                    `<button class="btn-life" onclick="lifecycleAction('encrypt')">🔒 Encrypt & Store</button>`);
+            }
+            else if (action === 'encrypt') {
+                isEncrypted = true;
+                vis.classList.add('encrypted');
+                vis.innerHTML = "🔒";
+                status.innerText = "Status: Encrypted (AES-256)";
+                log("Phase 2: Data Encrypted at Rest.", 'ok');
+                advancePhase(2, "Phase 3: Usage", "User editing file. Decryption required in RAM.", 
+                    `<button class="btn-life" onclick="lifecycleAction('access')">🔓 Access (Memory)</button>`);
+            }
+            else if (action === 'access') {
+                vis.classList.remove('encrypted');
+                vis.innerHTML = "📝";
+                status.innerText = "Status: Decrypted in RAM";
+                log("Phase 3: Data accessed. Memory scrubbing planned.", 'ok');
+                advancePhase(3, "Phase 4: Transfer", "Sending to partner API. Ensure TLS.", 
+                    `<button class="btn-life" onclick="lifecycleAction('send')">📡 Send (TLS 1.3)</button>`);
+            }
+            else if (action === 'send') {
+                vis.classList.add('encrypted');
+                vis.innerHTML = "✈️";
+                log("Phase 4: Data sent via Encrypted Tunnel.", 'ok');
+                advancePhase(4, "Phase 5: Retention", "Project over. Move to Cold Storage.", 
+                    `<button class="btn-life" onclick="lifecycleAction('archive')">📦 Archive (WORM)</button>`);
+            }
+            else if (action === 'archive') {
+                vis.innerHTML = "📦";
+                vis.classList.add('encrypted');
+                status.innerText = "Status: Archived";
+                log("Phase 5: Data Archived. Retention timer started.", 'ok');
+                advancePhase(5, "Phase 6: Disposal", "Retention expired. Destroy data.", 
+                    `<button class="btn-risk" onclick="lifecycleAction('delete')">❌ Simple Delete</button>
+                     <button class="btn-life" onclick="lifecycleAction('wipe')">♻️ Secure Wipe</button>`);
+            }
+            else if (action === 'delete') {
+                isWiped = false;
+                vis.style.display = 'none';
+                log("Phase 6: 'rm file.txt'. Testing Forensics...", 'warn');
+                testForensics();
+            }
+            else if (action === 'wipe') {
+                isWiped = true;
+                vis.classList.add('destroyed');
+                log("Phase 6: DoD 3-Pass Wipe. Testing Forensics...", 'ok');
+                testForensics();
+            }
+        }
+
+        function advancePhase(idx, title, desc, buttons) {
+            document.getElementById(`lc-${phases[idx-1]}`).classList.remove('active');
+            document.getElementById(`lc-${phases[idx-1]}`).classList.add('done');
+            if(idx < phases.length) document.getElementById(`lc-${phases[idx]}`).classList.add('active');
+            document.getElementById('phaseTitle').innerText = title;
+            document.getElementById('phaseDesc').innerText = desc;
+            document.getElementById('btnGroup').innerHTML = buttons;
+        }
+
+        function testForensics() {
+            const box = document.getElementById('forensicBox');
+            const res = document.getElementById('recoveryResult');
+            box.style.display = 'block';
+            setTimeout(() => {
+                if (!isWiped) {
+                    res.innerHTML = `<span style="color:var(--pii)">SUCCESS! Recovered.</span><br>Simple Delete failed.`;
+                    log("FORENSIC ALERT: Data recovered!", 'err');
+                } else {
+                    res.innerHTML = `<span style="color:var(--pub)">FAILED. Overwritten.</span><br>Data irretrievable.`;
+                    log("FORENSIC RESULT: Data destroyed.", 'ok');
+                }
+            }, 1500);
+        }
+
+        /* --- MODULE 2: DATA TYPES LOGIC --- */
+        function encryptColumn() {
+            const c1 = document.getElementById('cell-ssn');
+            const c2 = document.getElementById('cell-ssn-2');
+            if (c1.innerText.includes('***')) { log("Already encrypted.", 'warn'); return; }
+            c1.innerText = "XXX-XX-1234"; c2.innerText = "XXX-XX-5678";
+            c1.style.color = "var(--struct)"; c2.style.color = "var(--struct)";
+            log("Structured Data: Column 'SSN' encrypted.", 'ok');
+        }
+
+        function runOCR() {
+            document.getElementById('ocrTarget').classList.add('ocr-highlight');
+            log("Unstructured Data: OCR found PII in image.", 'warn');
+        }
+
+        function applyDRM() {
+            document.getElementById('docWatermark').style.display = "block";
+            log("Unstructured Data: DRM Watermark applied.", 'ok');
+        }
+
+        /* --- MODULE 3: LABELING LOGIC --- */
+        let selectedFile = null;
+        const fileLabels = {'marketing': null, 'payroll': null, 'source': null};
+        const fileIcons = {'marketing': '📄', 'payroll': '📊', 'source': '💻'};
+
+        function selectFile(el, id) {
+            document.querySelectorAll('.file-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected'); selectedFile = id;
+            document.getElementById('labelActions').style.display = 'block';
+            document.getElementById('dlpPacket').style.left = '-60px';
+            document.getElementById('dlpPacket').innerHTML = fileIcons[id];
+            updateImpact();
+            log(`Selected: ${id.toUpperCase()}`);
+        }
+
+        function applyLabel(label) {
+            if (!selectedFile) return;
+            fileLabels[selectedFile] = label;
+            const badge = document.getElementById(`badge-${selectedFile}`);
+            badge.innerText = label; badge.style.display = 'block';
+            let color = label === 'PUBLIC' ? 'var(--pub)' : (label === 'CONFIDENTIAL' ? 'var(--conf)' : 'var(--pii)');
+            badge.style.color = color; badge.style.borderColor = color;
+            log(`Labeled ${selectedFile} as [${label}].`, 'info');
+            updateImpact();
+        }
+
+        function updateImpact() {
+            const bar = document.getElementById('impactBar');
+            const txt = document.getElementById('impactText');
+            if (!selectedFile || !fileLabels[selectedFile]) { bar.style.width = "0%"; txt.innerText = "Select a file..."; return; }
+            const label = fileLabels[selectedFile];
+            if (!label) { bar.style.width = "0%"; bar.style.background = "#333"; txt.innerText = "Unlabeled"; return; }
+            
+            if (label === 'PUBLIC') { bar.style.width = "15%"; bar.style.background = "var(--pub)"; txt.innerText = "LOW IMPACT"; txt.style.color = "var(--pub)"; }
+            else if (label === 'CONFIDENTIAL') { bar.style.width = "60%"; bar.style.background = "var(--conf)"; txt.innerText = "MODERATE IMPACT"; txt.style.color = "var(--conf)"; }
+            else { bar.style.width = "100%"; bar.style.background = "var(--pii)"; txt.innerText = "HIGH IMPACT"; txt.style.color = "var(--pii)"; }
+        }
+
+        function runDLP() {
+            if (!selectedFile) { alert("Select a file first."); return; }
+            const pkt = document.getElementById('dlpPacket');
+            const label = fileLabels[selectedFile];
+            
+            pkt.style.transition = 'none'; pkt.style.left = '-60px'; pkt.style.borderColor = "#fff";
+            log(`DLP Agent scanning...`);
+
+            setTimeout(() => {
+                pkt.style.transition = 'left 1s linear'; pkt.style.left = '45%';
+                setTimeout(() => {
+                    if (label === 'RESTRICTED') { pkt.style.borderColor = "var(--pii)"; log("BLOCK: Restricted data.", 'err'); }
+                    else if (label === 'CONFIDENTIAL') { pkt.style.left = '120%'; log("WARN: Confidential export.", 'warn'); }
+                    else if (label === 'PUBLIC') { pkt.style.left = '120%'; log("ALLOW: Public data.", 'ok'); }
+                    else { pkt.style.left = '120%'; log("ALLOW (DEFAULT): Unlabeled data. Risk!", 'warn'); }
+                }, 1000);
+            }, 100);
+        }
+
+        /* --- MODULE 4: HANDLING LOGIC (NEW) --- */
+        function scanPII() {
+            const txt = document.getElementById('piiInput').value;
+            const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+            const res = document.getElementById('piiResult');
+            
+            if (emailRegex.test(txt)) {
+                res.innerHTML = `<span class="tag-detected">PII Detected (Email)</span>`;
+                log("Scanner: PII Found! Data requires privacy controls.", 'warn');
+            } else {
+                res.innerHTML = `<span style="color:#aaa">No PII Found.</span>`;
+                log("Scanner: Clean.", 'ok');
+            }
+        }
+
+        function anonymizePII() {
+            const txt = document.getElementById('piiInput');
+            if (txt.value.includes("REDACTED")) { log("Already anonymized.", 'warn'); return; }
+            
+            const newVal = txt.value.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[REDACTED]');
+            txt.value = newVal;
+            log("Privacy Action: PII Anonymized.", 'ok');
+        }
+
+        function defaceSite() {
+            const site = document.getElementById('publicSite');
+            const seal = document.getElementById('integritySeal');
+            
+            site.className = "public-site defaced";
+            site.innerHTML = `<h1>HACKED BY ZERO_COOL</h1><p>Your security is weak.</p>`;
+            seal.style.display = "none";
+            log("INTEGRITY FAILURE: Public site defaced!", 'err');
+        }
+
+        function verifyIntegrity() {
+            const site = document.getElementById('publicSite');
+            if (site.classList.contains('defaced')) {
+                log("Hash Mismatch! Restoring from Backup...", 'warn');
+                setTimeout(() => {
+                    site.className = "public-site";
+                    site.innerHTML = `<h2>Welcome to Our Corp</h2><p>Trust us with your data.</p><div id="integritySeal" class="integrity-seal" title="Integrity Verified">✓</div>`;
+                    log("Restoration Complete. Integrity Verified.", 'ok');
+                }, 1000);
+            } else {
+                log("Integrity Check Passed. Hashes match.", 'ok');
+            }
+        }
+
+    </script>
+</body>
+</html>

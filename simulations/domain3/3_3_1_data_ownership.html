@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 3: Data Classification & Ownership</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f8fafc;
+            --accent: #8b5cf6; /* Violet */
+            --pii: #f43f5e;    /* Rose (Private) */
+            --conf: #f59e0b;   /* Amber (Confidential) */
+            --pub: #10b981;    /* Green (Public) */
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1000px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); height: fit-content; margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- Dictionary Styles --- */
+        .data-grid { display: grid; grid-template-columns: 1fr 100px 100px 1fr; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .data-header { font-weight: bold; color: #94a3b8; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        
+        .data-row {
+            background: #111; padding: 10px; border-radius: 4px; display: contents;
+        }
+        .field-name { font-family: monospace; color: #ccc; padding: 10px; background: #111; border-radius: 4px; }
+        
+        select { background: #222; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; }
+        
+        .tag { padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; text-align: center; }
+        .tag-pii { background: rgba(244, 63, 94, 0.2); color: var(--pii); border: 1px solid var(--pii); }
+        .tag-conf { background: rgba(245, 158, 11, 0.2); color: var(--conf); border: 1px solid var(--conf); }
+        .tag-pub { background: rgba(16, 185, 129, 0.2); color: var(--pub); border: 1px solid var(--pub); }
+        .tag-none { background: #333; color: #777; border: 1px dashed #555; }
+
+        /* --- Role Styles --- */
+        .role-box {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #111; padding: 15px; margin-bottom: 10px; border-radius: 6px;
+            border-left: 4px solid #555;
+        }
+        .role-box.correct { border-left-color: var(--pub); }
+        .role-box.wrong { border-left-color: var(--pii); }
+
+        /* --- Controls Visualizer --- */
+        .db-view {
+            font-family: monospace; background: #000; padding: 15px; border-radius: 6px;
+            color: #ccc; overflow-x: auto;
+        }
+        .masked { background: #333; color: #333; text-shadow: 0 0 5px #ccc; cursor: help; }
+        .encrypted { color: var(--conf); font-style: italic; }
+
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; width: 100%; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--accent); color: #000; }
+        .btn-check { background: var(--pub); color: #000; }
+
+        /* --- Logs --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem; margin-top: 20px;
+        }
+        .log-err { color: var(--pii); }
+        .log-ok { color: var(--pub); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Data Classification & Ownership</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('dict')">1. Data Dictionary</button>
+        <button class="tab-btn" onclick="switchTab('roles')">2. Ownership Roles</button>
+        <button class="tab-btn" onclick="switchTab('controls')">3. Applying Controls</button>
+    </div>
+
+    <!-- TAB 1: DATA DICTIONARY -->
+    <div id="dict" class="tab-content active">
+        <div class="card">
+            <h3>Build the Data Dictionary</h3>
+            <p>Review the database schema and assign the correct classification level.</p>
+            
+            <div class="data-grid">
+                <div class="data-header">Field Name</div>
+                <div class="data-header">Example</div>
+                <div class="data-header">Classify</div>
+                <div class="data-header">Status</div>
+
+                <!-- Row 1 -->
+                <div class="field-name">user_email</div>
+                <div>alice@co.com</div>
+                <select id="cls-email">
+                    <option value="none">--</option>
+                    <option value="public">Public</option>
+                    <option value="pii">Private (PII)</option>
+                    <option value="conf">Confidential</option>
+                </select>
+                <div id="tag-email" class="tag tag-none">Pending</div>
+
+                <!-- Row 2 -->
+                <div class="field-name">prod_desc</div>
+                <div>"Blue Widget"</div>
+                <select id="cls-desc">
+                    <option value="none">--</option>
+                    <option value="public">Public</option>
+                    <option value="pii">Private (PII)</option>
+                    <option value="conf">Confidential</option>
+                </select>
+                <div id="tag-desc" class="tag tag-none">Pending</div>
+
+                <!-- Row 3 -->
+                <div class="field-name">api_secret</div>
+                <div>sk_live_89...</div>
+                <select id="cls-key">
+                    <option value="none">--</option>
+                    <option value="public">Public</option>
+                    <option value="pii">Private (PII)</option>
+                    <option value="conf">Confidential</option>
+                </select>
+                <div id="tag-key" class="tag tag-none">Pending</div>
+            </div>
+
+            <button class="btn-check" onclick="checkDict()">Validate Classification</button>
+        </div>
+    </div>
+
+    <!-- TAB 2: ROLES -->
+    <div id="roles" class="tab-content">
+        <div class="card">
+            <h3>Assign Roles</h3>
+            <p>Who is responsible for what? Match the Role to the Description.</p>
+            
+            <div class="role-box" id="role1">
+                <div>
+                    <strong>Scenario A:</strong> "I decide that 'Customer Emails' are classified as Private."
+                </div>
+                <select id="sel-role1" style="width:150px">
+                    <option>-- Select --</option>
+                    <option value="owner">Data Owner</option>
+                    <option value="custodian">Data Custodian</option>
+                    <option value="user">Data User</option>
+                </select>
+            </div>
+
+            <div class="role-box" id="role2">
+                <div>
+                    <strong>Scenario B:</strong> "I configure the database backup schedule to run nightly."
+                </div>
+                <select id="sel-role2" style="width:150px">
+                    <option>-- Select --</option>
+                    <option value="owner">Data Owner</option>
+                    <option value="custodian">Data Custodian</option>
+                    <option value="user">Data User</option>
+                </select>
+            </div>
+
+            <button class="btn-action" onclick="checkRoles()">Verify Roles</button>
+        </div>
+    </div>
+
+    <!-- TAB 3: CONTROLS -->
+    <div id="controls" class="tab-content">
+        <div class="card">
+            <h3>Apply Security Controls</h3>
+            <p>Based on your classification, apply the correct protection mechanism.</p>
+            
+            <div style="display:flex; gap:20px; margin-bottom:20px;">
+                <div style="flex:1">
+                    <label>PII Control:</label>
+                    <select id="ctrl-pii">
+                        <option value="none">None (Plaintext)</option>
+                        <option value="mask">Data Masking (*****)</option>
+                        <option value="hash">Hashing (One-way)</option>
+                    </select>
+                </div>
+                <div style="flex:1">
+                    <label>Confidential Control:</label>
+                    <select id="ctrl-conf">
+                        <option value="none">None (Plaintext)</option>
+                        <option value="mask">Masking</option>
+                        <option value="enc">Encryption (AES)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="db-view">
+                <div>// DATABASE PREVIEW</div>
+                <div>--------------------------------</div>
+                <div id="view-email">user_email: <span id="val-email">alice@co.com</span></div>
+                <div id="view-desc">prod_desc: "Blue Widget"</div>
+                <div id="view-key">api_secret: <span id="val-key">sk_live_8923a...</span></div>
+            </div>
+
+            <button class="btn-check" onclick="applyControls()">Deploy Controls</button>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> Data Governance Module Loaded.</div>
+    </div>
+
+    <script>
+        /* --- TABS --- */
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'dict':0, 'roles':1, 'controls':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : '');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- DICTIONARY LOGIC --- */
+        function checkDict() {
+            const email = document.getElementById('cls-email').value;
+            const desc = document.getElementById('cls-desc').value;
+            const key = document.getElementById('cls-key').value;
+            
+            let score = 0;
+
+            // Email -> PII
+            const tEmail = document.getElementById('tag-email');
+            if (email === 'pii') { 
+                tEmail.className = "tag tag-pii"; tEmail.innerText = "PRIVATE"; score++; 
+            } else { tEmail.className = "tag tag-none"; tEmail.innerText = "WRONG"; }
+
+            // Desc -> Public
+            const tDesc = document.getElementById('tag-desc');
+            if (desc === 'public') { 
+                tDesc.className = "tag tag-pub"; tDesc.innerText = "PUBLIC"; score++; 
+            } else { tDesc.className = "tag tag-none"; tDesc.innerText = "WRONG"; }
+
+            // Key -> Confidential
+            const tKey = document.getElementById('tag-key');
+            if (key === 'conf') { 
+                tKey.className = "tag tag-conf"; tKey.innerText = "CONFIDENTIAL"; score++; 
+            } else { tKey.className = "tag tag-none"; tKey.innerText = "WRONG"; }
+
+            if (score === 3) log("Classification Complete. All fields correctly tagged.", 'ok');
+            else log("Classification Errors Found. Review PII vs Public vs Confidential.", 'err');
+        }
+
+        /* --- ROLE LOGIC --- */
+        function checkRoles() {
+            const r1 = document.getElementById('sel-role1').value;
+            const r2 = document.getElementById('sel-role2').value;
+            
+            const box1 = document.getElementById('role1');
+            const box2 = document.getElementById('role2');
+
+            if (r1 === 'owner') {
+                box1.classList.add('correct'); box1.classList.remove('wrong');
+                log("Scenario A: Correct. Owners define classification.", 'ok');
+            } else {
+                box1.classList.add('wrong');
+                log("Scenario A: Incorrect. Only Owners can classify data.", 'err');
+            }
+
+            if (r2 === 'custodian') {
+                box2.classList.add('correct'); box2.classList.remove('wrong');
+                log("Scenario B: Correct. Custodians manage technical implementation.", 'ok');
+            } else {
+                box2.classList.add('wrong');
+                log("Scenario B: Incorrect. SysAdmins are Custodians.", 'err');
+            }
+        }
+
+        /* --- CONTROLS LOGIC --- */
+        function applyControls() {
+            const pii = document.getElementById('ctrl-pii').value;
+            const conf = document.getElementById('ctrl-conf').value;
+            
+            const vEmail = document.getElementById('val-email');
+            const vKey = document.getElementById('val-key');
+
+            // Apply PII Control
+            if (pii === 'mask') {
+                vEmail.innerText = "al***@co.com";
+                vEmail.className = "masked";
+                log("PII Control: Data Masking applied.", 'ok');
+            } else if (pii === 'hash') {
+                vEmail.innerText = "7a8b9c...";
+                vEmail.className = "";
+                log("PII Control: Hashing applied (Warning: Irreversible).", 'ok');
+            } else {
+                vEmail.innerText = "alice@co.com";
+                vEmail.className = "";
+                log("PII Alert: Email exposed in plaintext.", 'err');
+            }
+
+            // Apply Confidential Control
+            if (conf === 'enc') {
+                vKey.innerText = "[AES-256-GCM Encrypted Blob]";
+                vKey.className = "encrypted";
+                log("Confidential Control: Strong Encryption applied.", 'ok');
+            } else if (conf === 'mask') {
+                vKey.innerText = "sk_live_****";
+                vKey.className = "masked";
+                log("Confidential Warning: Masking allows usage but hides value.", 'ok');
+            } else {
+                vKey.innerText = "sk_live_8923a...";
+                vKey.className = "";
+                log("CRITICAL: API Secret exposed!", 'err');
+            }
+        }
+
+    </script>
+</body>
+</html>

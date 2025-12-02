@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 3: Non-Functional Requirements</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f1f5f9;
+            --accent: #8b5cf6; /* Violet */
+            --perf: #38bdf8;   /* Blue */
+            --sec: #f43f5e;    /* Rose */
+            --avail: #10b981;  /* Green */
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1000px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); height: fit-content; margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- Trade-off Simulator --- */
+        .slider-group { margin-bottom: 20px; }
+        .slider-group label { display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: bold; }
+        input[type=range] { width: 100%; }
+        
+        .metric-box {
+            background: #111; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #333;
+        }
+        .metric-val { font-size: 1.5rem; font-weight: bold; margin: 5px 0; }
+        
+        /* --- Availability Sim --- */
+        .server-rack { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+        .server {
+            width: 60px; height: 100px; background: #333; border: 2px solid #555; border-radius: 4px;
+            position: relative; transition: all 0.3s;
+        }
+        .server::after { content: ''; position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: #555; }
+        .server.up { border-color: var(--avail); box-shadow: 0 0 10px rgba(16, 185, 129, 0.2); }
+        .server.up::after { background: var(--avail); box-shadow: 0 0 5px var(--avail); }
+        .server.down { border-color: var(--sec); opacity: 0.5; background: #2a1111; }
+        .server.down::after { background: var(--sec); }
+
+        .uptime-display { font-family: monospace; font-size: 2rem; color: var(--avail); text-align: center; }
+
+        /* --- NFR Writer --- */
+        .nfr-row {
+            display: grid; grid-template-columns: 100px 1fr 100px; gap: 10px; align-items: center;
+            background: #111; padding: 10px; margin-bottom: 5px; border-radius: 4px;
+        }
+        .nfr-input { background: #222; border: 1px solid #444; color: white; padding: 5px; border-radius: 4px; width: 100%; }
+        
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; width: 100%; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--perf); color: #000; }
+        .btn-kill { background: var(--sec); color: white; }
+
+        /* --- Logs --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem; margin-top: 20px;
+        }
+        .log-warn { color: var(--warning); }
+        .log-err { color: var(--sec); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Non-Functional Requirements (NFRs)</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('tradeoff')">1. Security vs. Performance</button>
+        <button class="tab-btn" onclick="switchTab('avail')">2. Availability & Continuity</button>
+        <button class="tab-btn" onclick="switchTab('write')">3. Writing NFRs</button>
+    </div>
+
+    <!-- TAB 1: TRADEOFFS -->
+    <div id="tradeoff" class="tab-content active">
+        <div class="card">
+            <h3>Architectural Trade-offs</h3>
+            <p>Adjust the security controls. Watch the impact on Performance (TPS) and Latency.</p>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                <div>
+                    <div class="slider-group">
+                        <label>Encryption Strength <span>(None -> AES-256)</span></label>
+                        <input type="range" min="0" max="3" value="1" id="sl-enc" oninput="updatePerf()">
+                        <small id="lbl-enc" style="color:#aaa">AES-128 (Standard)</small>
+                    </div>
+                    <div class="slider-group">
+                        <label>Hashing Work Factor <span>(Fast -> Slow)</span></label>
+                        <input type="range" min="1" max="15" value="10" id="sl-hash" oninput="updatePerf()">
+                        <small id="lbl-hash" style="color:#aaa">Bcrypt Cost 10</small>
+                    </div>
+                    <div class="slider-group">
+                        <label>Logging Detail <span>(Errors -> Full Debug)</span></label>
+                        <input type="range" min="0" max="2" value="1" id="sl-log" oninput="updatePerf()">
+                        <small id="lbl-log" style="color:#aaa">Info Level</small>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div class="metric-box">
+                        <div class="metric-val" id="val-tps" style="color:var(--perf)">1,200</div>
+                        <small>Transactions / Sec</small>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-val" id="val-lat" style="color:var(--sec)">85ms</div>
+                        <small>Latency</small>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-val" id="val-score" style="color:var(--avail)">B+</div>
+                        <small>Overall Security Rating</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: AVAILABILITY -->
+    <div id="avail" class="tab-content">
+        <div class="card">
+            <h3>High Availability Simulation</h3>
+            <p><strong>NFR:</strong> "System must maintain 99.9% uptime."<br>
+            Current Config: Active/Passive Cluster.</p>
+
+            <div class="server-rack">
+                <div class="server up" id="srv1"></div>
+                <div class="server up" id="srv2"></div>
+                <div class="server up" id="srv3"></div>
+                <div class="server up" id="srv4"></div>
+            </div>
+
+            <div class="uptime-display" id="uptimeVal">100.00%</div>
+            <div style="text-align:center; color:#aaa; margin-bottom:20px;">SLA Status: <span id="slaStatus" style="color:var(--avail)">COMPLIANT</span></div>
+
+            <button class="btn-kill" onclick="killRandomServer()">🔥 Simulate Server Failure</button>
+            <button class="btn-action" onclick="recoverServers()">🚑 Recover Infrastructure</button>
+        </div>
+    </div>
+
+    <!-- TAB 3: WRITING NFRS -->
+    <div id="write" class="tab-content">
+        <div class="card">
+            <h3>Defining SMART NFRs</h3>
+            <p>Transform vague desires into testable requirements.</p>
+            
+            <div class="nfr-row">
+                <div style="font-weight:bold; color:var(--perf)">Performance</div>
+                <div>"The login page must load quickly." (Vague) -></div>
+                <input type="text" class="nfr-input" value="Login < 500ms for 95% of users" readonly style="color:var(--avail)">
+            </div>
+
+            <div class="nfr-row">
+                <div style="font-weight:bold; color:var(--sec)">Security</div>
+                <div>"Passwords must be safe." (Vague) -></div>
+                <input type="text" class="nfr-input" placeholder="Type SMART requirement..." id="inp-sec">
+                <button style="width:auto; padding:5px 10px; margin:0" onclick="checkNFR()">Check</button>
+            </div>
+
+            <div class="nfr-row">
+                <div style="font-weight:bold; color:var(--accent)">Recoverability</div>
+                <div>"Backups should happen often." (Vague) -></div>
+                <input type="text" class="nfr-input" value="RPO < 15 mins, RTO < 4 hours" readonly style="color:var(--avail)">
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> NFR Analysis Engine Ready.</div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'tradeoff':0, 'avail':1, 'write':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'warn' ? 'log-warn' : '');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- TRADEOFF LOGIC --- */
+        function updatePerf() {
+            const enc = parseInt(document.getElementById('sl-enc').value);
+            const hash = parseInt(document.getElementById('sl-hash').value);
+            const logging = parseInt(document.getElementById('sl-log').value);
+
+            // Labels
+            const encLabels = ["None (Plaintext)", "AES-128", "AES-256", "AES-256 + HSM"];
+            const logLabels = ["Errors Only", "Info Level", "Debug (Verbose)"];
+            document.getElementById('lbl-enc').innerText = encLabels[enc];
+            document.getElementById('lbl-hash').innerText = `Bcrypt Cost ${hash}`;
+            document.getElementById('lbl-log').innerText = logLabels[logging];
+
+            // Calc Impact
+            // Base TPS = 2000. Base Latency = 20ms.
+            // Enc impact: -10% per level
+            // Hash impact: Exponential decay on TPS
+            // Log impact: -5% per level
+            
+            let tps = 2000;
+            let lat = 20;
+            let score = 0;
+
+            // Encryption Impact
+            tps -= (enc * 200);
+            lat += (enc * 10);
+            score += enc * 3;
+
+            // Hash Impact (Heavy)
+            tps -= (hash * 50); 
+            lat += (hash * 5);
+            score += (hash > 8) ? 4 : 1;
+
+            // Log Impact
+            tps -= (logging * 100);
+            lat += (logging * 15);
+            if(logging === 2) score -= 2; // Debug logs in prod reduce security score (info leak risk)
+            else score += 2;
+
+            // Bounds
+            tps = Math.max(0, tps);
+            
+            // Grading
+            let grade = "C";
+            if (score > 12) grade = "A+";
+            else if (score > 10) grade = "A";
+            else if (score > 8) grade = "B";
+            else if (score > 5) grade = "C";
+            else grade = "F (Insecure)";
+
+            if (tps < 500) {
+                grade += " (Unusable)";
+                document.getElementById('val-tps').style.color = "var(--sec)";
+                log("Warning: NFR Violation. Throughput < 500 TPS.", 'warn');
+            } else {
+                document.getElementById('val-tps').style.color = "var(--perf)";
+            }
+
+            document.getElementById('val-tps').innerText = Math.floor(tps);
+            document.getElementById('val-lat').innerText = Math.floor(lat) + "ms";
+            document.getElementById('val-score').innerText = grade;
+        }
+
+        /* --- AVAILABILITY LOGIC --- */
+        let uptime = 100.00;
+        let servers = [true, true, true, true];
+
+        function killRandomServer() {
+            const idx = Math.floor(Math.random() * 4);
+            if(servers[idx]) {
+                servers[idx] = false;
+                document.getElementById(`srv${idx+1}`).className = "server down";
+                log(`Alert: Server ${idx+1} crashed!`, 'err');
+                dropUptime();
+            }
+        }
+
+        function dropUptime() {
+            uptime -= 0.5;
+            updateUptimeDisplay();
+        }
+
+        function recoverServers() {
+            servers = [true, true, true, true];
+            for(let i=1; i<=4; i++) document.getElementById(`srv${i}`).className = "server up";
+            log("Infrastructure healed. Load Balancer normalized.");
+        }
+
+        function updateUptimeDisplay() {
+            const el = document.getElementById('uptimeVal');
+            el.innerText = uptime.toFixed(2) + "%";
+            
+            const sla = document.getElementById('slaStatus');
+            if (uptime < 99.9) {
+                el.style.color = "var(--sec)";
+                sla.innerText = "SLA BREACHED";
+                sla.style.color = "var(--sec)";
+            } else {
+                el.style.color = "var(--avail)";
+                sla.innerText = "COMPLIANT";
+                sla.style.color = "var(--avail)";
+            }
+        }
+
+        /* --- WRITING LOGIC --- */
+        function checkNFR() {
+            const val = document.getElementById('inp-sec').value.toLowerCase();
+            if (val.includes("encrypt") || val.includes("hash") || val.includes("mfa") || val.includes("aes")) {
+                log("Good! Requirement is specific and uses standard controls.", 'success');
+                document.getElementById('inp-sec').style.borderColor = "var(--avail)";
+            } else {
+                log("Too vague. Mention a specific technology (AES, Bcrypt, MFA).", 'warn');
+                document.getElementById('inp-sec').style.borderColor = "var(--sec)";
+            }
+        }
+
+    </script>
+</body>
+</html>

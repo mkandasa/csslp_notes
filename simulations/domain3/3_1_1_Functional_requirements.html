@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 3: Functional Security Requirements</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f8fafc;
+            --accent: #f472b6; /* Pink */
+            --req: #38bdf8;    /* Blue */
+            --abuse: #ef4444;  /* Red */
+            --story: #10b981;  /* Green */
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1000px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); height: fit-content; margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- Derivation Styles --- */
+        .biz-need {
+            background: #333; padding: 15px; border-radius: 6px; margin-bottom: 20px;
+            border-left: 4px solid #fff; font-style: italic;
+        }
+        .req-option {
+            background: #111; padding: 15px; margin-bottom: 10px; border-radius: 6px;
+            border: 1px solid #444; cursor: pointer; transition: all 0.2s; display: flex; align-items: center;
+        }
+        .req-option:hover { border-color: var(--req); transform: translateX(5px); }
+        .req-option.correct { border-color: var(--story); background: #064e3b; }
+        .req-option.wrong { border-color: var(--abuse); opacity: 0.5; }
+
+        /* --- Misuse Case Styles --- */
+        .diagram-container {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+            background: #000; padding: 20px; border-radius: 8px; border: 1px dashed #555;
+        }
+        .actor { text-align: center; }
+        .actor-icon { font-size: 2rem; display: block; }
+        .use-case-oval {
+            border: 2px solid #aaa; border-radius: 50%; padding: 20px; width: 150px; text-align: center;
+            background: #222; font-size: 0.9rem;
+        }
+        .misuse-oval {
+            border: 2px dashed var(--abuse); border-radius: 50%; padding: 20px; width: 150px; text-align: center;
+            background: #2a1111; color: var(--abuse); display: none; font-size: 0.9rem;
+        }
+        .arrow { font-size: 2rem; color: #555; }
+
+        /* --- User Story Styles --- */
+        .story-builder {
+            display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center;
+            background: #111; padding: 20px; border-radius: 8px;
+        }
+        select, input {
+            background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; width: 100%; box-sizing: border-box;
+        }
+        
+        .story-preview {
+            margin-top: 20px; padding: 15px; background: #064e3b; border-radius: 6px;
+            font-family: monospace; border: 1px solid var(--story); display: none;
+        }
+
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; width: 100%; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--req); color: #000; }
+        .btn-abuse { background: var(--abuse); color: white; }
+        .btn-story { background: var(--story); color: #000; }
+
+        /* --- Logs --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem; margin-top: 20px; width: 100%; box-sizing: border-box;
+        }
+        .log-err { color: var(--abuse); }
+        .log-ok { color: var(--story); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Functional Security Requirements</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('derive')">1. Requirement Derivation</button>
+        <button class="tab-btn" onclick="switchTab('misuse')">2. Misuse Case Modeling</button>
+        <button class="tab-btn" onclick="switchTab('story')">3. User Story Builder</button>
+    </div>
+
+    <!-- TAB 1: DERIVATION -->
+    <div id="derive" class="tab-content active">
+        <div class="card">
+            <h3>Translate Business Need to Security Requirement</h3>
+            <div class="biz-need">
+                <strong>Business Stakeholder says:</strong><br>
+                "We want customers to be able to upload profile pictures so the site feels more personal."
+            </div>
+            
+            <p>Select the correct <strong>Functional Security Requirement</strong> derived from this:</p>
+
+            <div class="req-option" onclick="checkReq(this, false)">
+                <div>"The system shall allow users to upload any file type."</div>
+            </div>
+            <div class="req-option" onclick="checkReq(this, true)">
+                <div>"The system shall validate that uploaded files are images (JPG/PNG) and do not contain executable code."</div>
+            </div>
+            <div class="req-option" onclick="checkReq(this, false)">
+                <div>"The system shall scan the file for viruses every 30 days." (Non-Functional/Operational)</div>
+            </div>
+            <div class="req-option" onclick="checkReq(this, false)">
+                <div>"The system shall display the image immediately."</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: MISUSE CASE -->
+    <div id="misuse" class="tab-content">
+        <div class="card">
+            <h3>Use Case vs. Misuse Case</h3>
+            <p>Identify how the "File Upload" feature can be abused.</p>
+
+            <div class="diagram-container">
+                <div class="actor">
+                    <span class="actor-icon">👤</span>
+                    User
+                </div>
+                <div class="arrow">➜</div>
+                <div class="use-case-oval">
+                    <strong>Upload Photo</strong><br>
+                    (Valid Action)
+                </div>
+                
+                <!-- The twist -->
+                <div class="arrow" id="abuseArrow" style="display:none; color:var(--abuse)">⬅</div>
+                <div class="misuse-oval" id="misuseOval">
+                    <strong>Upload Web Shell</strong><br>
+                    (Abuse Case)
+                </div>
+                <div class="actor" id="attacker" style="display:none; color:var(--abuse)">
+                    <span class="actor-icon">🥷</span>
+                    Attacker
+                </div>
+            </div>
+
+            <button class="btn-abuse" onclick="revealMisuse()">Reveal Abuse Case</button>
+            
+            <div id="mitigationBox" style="margin-top:20px; display:none; border-top:1px solid #444; padding-top:10px;">
+                <strong>Derived Requirement:</strong><br>
+                "The system must enforce file type allow-listing and store uploads outside the web root."
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: USER STORY -->
+    <div id="story" class="tab-content">
+        <div class="card">
+            <h3>Agile Security Story Builder</h3>
+            <p>Construct a formal User Story for the mitigation.</p>
+            
+            <div class="story-builder">
+                <label>As a:</label>
+                <select id="role">
+                    <option value="System Admin">System Admin</option>
+                    <option value="User">User</option>
+                    <option value="Developer">Developer</option>
+                </select>
+
+                <label>I want to:</label>
+                <select id="action">
+                    <option value="see pretty pictures">see pretty pictures</option>
+                    <option value="sanitize all file uploads">sanitize all file uploads</option>
+                    <option value="delete the database">delete the database</option>
+                </select>
+
+                <label>So that:</label>
+                <select id="benefit">
+                    <option value="the UI looks good">the UI looks good</option>
+                    <option value="malicious scripts cannot execute">malicious scripts cannot execute</option>
+                    <option value="I can go home early">I can go home early</option>
+                </select>
+                
+                <label>Acceptance Criteria:</label>
+                <input type="text" id="criteria" value="Verify .php files are rejected.">
+            </div>
+
+            <button class="btn-story" onclick="buildStory()">Generate Story Card</button>
+
+            <div class="story-preview" id="storyCard">
+                <!-- Injected JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> Requirements Engine Ready.</div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'derive':0, 'misuse':1, 'story':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : '');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- DERIVATION LOGIC --- */
+        function checkReq(el, isCorrect) {
+            // Reset styles
+            document.querySelectorAll('.req-option').forEach(d => d.className = 'req-option');
+            
+            if (isCorrect) {
+                el.classList.add('correct');
+                log("Correct! This is a Functional Security Requirement (Behavioral).", 'ok');
+            } else {
+                el.classList.add('wrong');
+                log("Incorrect. Either too vague, non-functional, or insecure.", 'err');
+            }
+        }
+
+        /* --- MISUSE LOGIC --- */
+        function revealMisuse() {
+            document.getElementById('abuseArrow').style.display = 'block';
+            document.getElementById('misuseOval').style.display = 'block';
+            document.getElementById('attacker').style.display = 'block';
+            document.getElementById('mitigationBox').style.display = 'block';
+            
+            log("Misuse Case Identified: Unrestricted File Upload -> Remote Code Execution (RCE).", 'err');
+        }
+
+        /* --- USER STORY LOGIC --- */
+        function buildStory() {
+            const r = document.getElementById('role').value;
+            const a = document.getElementById('action').value;
+            const b = document.getElementById('benefit').value;
+            const c = document.getElementById('criteria').value;
+            
+            const card = document.getElementById('storyCard');
+            card.style.display = 'block';
+            
+            let quality = "POOR";
+            let color = "var(--abuse)";
+            
+            if (r === 'System Admin' && a === 'sanitize all file uploads' && b === 'malicious scripts cannot execute') {
+                quality = "EXCELLENT";
+                color = "var(--story)";
+                log("Story Generated: High Quality Security Story.", 'ok');
+            } else {
+                log("Story Generated: Logic flaw. Ensure the Goal aligns with the Benefit.", 'err');
+            }
+
+            card.style.borderColor = color;
+            card.innerHTML = `
+                <strong>User Story (${quality})</strong><br>
+                "As a <u>${r}</u>, I want to <u>${a}</u>, so that <u>${b}</u>."<br><br>
+                <strong>Acceptance Criteria:</strong><br>
+                - ${c}
+            `;
+        }
+
+    </script>
+</body>
+</html>

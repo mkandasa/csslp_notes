@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 3: Access Provisioning</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f8fafc;
+            --accent: #8b5cf6; /* Violet */
+            --iam: #38bdf8;    /* Sky Blue (Identity) */
+            --svc: #f59e0b;    /* Amber (Service Accts) */
+            --audit: #10b981;  /* Green (Audit) */
+            --danger: #ef4444;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .container {
+            display: grid; grid-template-columns: 1fr; gap: 20px;
+            width: 100%; max-width: 1000px;
+        }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- TABS --- */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- BUTTONS --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-iam { background: var(--iam); color: #000; }
+        .btn-svc { background: var(--svc); color: #000; }
+        .btn-audit { background: var(--audit); color: #000; }
+        .btn-deny { background: var(--danger); color: white; }
+
+        /* --- JML Visuals --- */
+        .user-profile {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #111; padding: 15px; border-radius: 8px; border: 1px solid #444;
+        }
+        .role-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+        .tag { padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; background: #333; color: #ccc; }
+        .tag-eng { border: 1px solid var(--iam); color: var(--iam); }
+        .tag-sales { border: 1px solid var(--svc); color: var(--svc); }
+        .tag-admin { border: 1px solid var(--danger); color: var(--danger); }
+
+        .timeline { display: flex; justify-content: space-between; margin-top: 20px; position: relative; }
+        .timeline::before { content: ''; position: absolute; top: 15px; left: 0; right: 0; height: 2px; background: #444; z-index: 0; }
+        .t-node {
+            width: 30px; height: 30px; border-radius: 50%; background: #222; border: 2px solid #555;
+            position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .t-node.active { border-color: var(--iam); background: var(--iam); color: #000; transform: scale(1.2); }
+
+        /* --- Service Account Visuals --- */
+        .svc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .cred-box {
+            background: #111; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.9rem;
+            border: 1px dashed #555; margin-bottom: 10px; word-break: break-all;
+        }
+        .hacked { border-color: var(--danger); color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+        .secure { border-color: var(--audit); color: var(--audit); }
+
+        /* --- Recertification Table --- */
+        .audit-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        .audit-table th { text-align: left; color: #aaa; border-bottom: 1px solid #444; padding: 5px; }
+        .audit-table td { padding: 10px 5px; border-bottom: 1px solid #333; }
+        .row-revoked { opacity: 0.4; text-decoration: line-through; background: #221111; }
+
+        /* --- Logs --- */
+        .log-terminal {
+            background: #000; height: 150px; padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: var(--iam); font-size: 0.9rem; width: 100%; box-sizing: border-box;
+        }
+        .log-err { color: var(--danger); }
+        .log-ok { color: var(--audit); }
+        .log-warn { color: var(--svc); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Data Access Provisioning</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('jml')">1. User Lifecycle (JML)</button>
+        <button class="tab-btn" onclick="switchTab('svc')">2. Service Accounts</button>
+        <button class="tab-btn" onclick="switchTab('review')">3. Access Reapproval</button>
+    </div>
+
+    <!-- TAB 1: USER PROVISIONING (JML) -->
+    <div id="jml" class="tab-content active">
+        <div class="card">
+            <h3>Identity Lifecycle: Alice</h3>
+            <p>Manage Alice's permissions as she Joins, Moves, and Leaves.</p>
+            
+            <div class="timeline">
+                <div class="t-node active" id="node-join" onclick="jmlAction('join')">1</div>
+                <div class="t-node" id="node-move" onclick="jmlAction('move')">2</div>
+                <div class="t-node" id="node-creep" onclick="jmlAction('creep')">2b</div>
+                <div class="t-node" id="node-leave" onclick="jmlAction('leave')">3</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-top:5px; font-size:0.8rem; color:#aaa">
+                <span>Join (Eng)</span>
+                <span>Move (Sales)</span>
+                <span>Wait...</span>
+                <span>Leave</span>
+            </div>
+
+            <div style="margin-top:20px;">
+                <div class="user-profile">
+                    <div>
+                        <strong>Alice</strong><br>
+                        <small id="alice-dept">Department: Unassigned</small>
+                    </div>
+                    <div class="role-tags" id="alice-roles">
+                        <span class="tag">No Access</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top:20px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <button class="btn-iam" onclick="jmlAction('join')">New Hire (Engineering)</button>
+                <button class="btn-svc" onclick="jmlAction('move')">Transfer to Sales (Secure)</button>
+                <button class="btn-deny" onclick="jmlAction('creep')">Transfer (Lazy/Creep)</button>
+                <button class="btn-audit" onclick="jmlAction('leave')">Terminate User</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: SERVICE ACCOUNTS -->
+    <div id="svc" class="tab-content">
+        <div class="card">
+            <h3>Service Account Security</h3>
+            <p>Compare "Static Keys" (High Risk) vs. "Managed Identity" (Low Risk).</p>
+            
+            <div class="svc-grid">
+                <!-- Bad Practice -->
+                <div style="background:#1a1a1a; padding:15px; border-radius:8px;">
+                    <h4 style="margin-top:0; color:var(--danger)">Method A: Hardcoded Key</h4>
+                    <p style="font-size:0.8rem">App uses a long-term API key.</p>
+                    <div class="cred-box" id="staticKey">AKIA_STATIC_KEY_12345</div>
+                    <button class="btn-deny" onclick="leakKey()">😈 Leak Key to Github</button>
+                    <div id="staticStatus" style="margin-top:10px; font-size:0.8rem">Status: Active</div>
+                </div>
+
+                <!-- Good Practice -->
+                <div style="background:#1a1a1a; padding:15px; border-radius:8px;">
+                    <h4 style="margin-top:0; color:var(--audit)">Method B: Managed Identity</h4>
+                    <p style="font-size:0.8rem">Platform rotates key automatically.</p>
+                    <div class="cred-box" id="dynamicKey">TOKEN_ROTATING_EVERY_HR</div>
+                    <button class="btn-svc" onclick="rotateKey()">🔄 Auto-Rotate</button>
+                    <div id="dynamicStatus" style="margin-top:10px; font-size:0.8rem">Status: Active</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: REAPPROVAL (AUDIT) -->
+    <div id="review" class="tab-content">
+        <div class="card">
+            <h3>Quarterly Access Review (Recertification)</h3>
+            <p>You are the Data Owner. Review access rights and revoke unnecessary privileges.</p>
+            
+            <table class="audit-table">
+                <thead>
+                    <tr><th>User</th><th>Role</th><th>Last Login</th><th>Action</th></tr>
+                </thead>
+                <tbody id="auditRows">
+                    <tr id="row1">
+                        <td>Bob</td>
+                        <td><span class="tag tag-eng">Engineer</span></td>
+                        <td>Today</td>
+                        <td><button class="btn-audit" style="margin:0; padding:5px" onclick="certify('row1', true)">Approve</button></td>
+                    </tr>
+                    <tr id="row2">
+                        <td>Charlie</td>
+                        <td><span class="tag tag-admin">Domain Admin</span></td>
+                        <td>30 Days Ago</td>
+                        <td>
+                            <button class="btn-audit" style="margin:0; padding:5px" onclick="certify('row2', true)">Approve</button>
+                            <button class="btn-deny" style="margin:0; padding:5px" onclick="certify('row2', false)">Revoke</button>
+                        </td>
+                    </tr>
+                    <tr id="row3">
+                        <td>Dave (Intern)</td>
+                        <td><span class="tag tag-sales">Sales Lead</span></td>
+                        <td>Never</td>
+                        <td>
+                            <button class="btn-audit" style="margin:0; padding:5px" onclick="certify('row3', true)">Approve</button>
+                            <button class="btn-deny" style="margin:0; padding:5px" onclick="certify('row3', false)">Revoke</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div id="auditResult" style="margin-top:20px; text-align:center; font-weight:bold;"></div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> IAM System Ready.</div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'jml':0, 'svc':1, 'review':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : (type === 'warn' ? 'log-warn' : 'log-info'));
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- JML LOGIC --- */
+        function jmlAction(action) {
+            // Update Nodes
+            document.querySelectorAll('.t-node').forEach(n => n.classList.remove('active'));
+            
+            const dept = document.getElementById('alice-dept');
+            const roles = document.getElementById('alice-roles');
+
+            if (action === 'join') {
+                document.getElementById('node-join').classList.add('active');
+                dept.innerText = "Department: Engineering";
+                roles.innerHTML = `<span class="tag tag-eng">Code Repo (R/W)</span>`;
+                log("Provisioning: Alice created. Assigned Engineering Baseline.", 'ok');
+            }
+            else if (action === 'move') {
+                document.getElementById('node-move').classList.add('active');
+                dept.innerText = "Department: Sales";
+                // Secure Move: Revoke old, Add new
+                roles.innerHTML = `<span class="tag tag-sales">CRM Access</span>`;
+                log("Mover (Secure): Engineering rights revoked. Sales rights granted.", 'ok');
+            }
+            else if (action === 'creep') {
+                document.getElementById('node-creep').classList.add('active');
+                dept.innerText = "Department: Sales";
+                // Insecure Move: Accumulation
+                roles.innerHTML = `<span class="tag tag-eng">Code Repo (R/W)</span> <span class="tag tag-sales">CRM Access</span> <span style="color:var(--danger)">(Toxic Combo!)</span>`;
+                log("Mover (Insecure): Privilege Creep detected! Alice retains code access.", 'err');
+            }
+            else if (action === 'leave') {
+                document.getElementById('node-leave').classList.add('active');
+                dept.innerText = "Department: Terminated";
+                roles.innerHTML = `<span class="tag">No Access</span>`;
+                log("Leaver: Immediate Kill Switch activated. All tokens revoked.", 'warn');
+            }
+        }
+
+        /* --- SERVICE ACCOUNTS LOGIC --- */
+        function leakKey() {
+            const box = document.getElementById('staticKey');
+            const stat = document.getElementById('staticStatus');
+            box.classList.add('hacked');
+            stat.innerHTML = "<span style='color:var(--danger)'>BREACHED by Hackers</span>";
+            log("ALERT: Static Key leaked! Attackers have persistent access.", 'err');
+        }
+
+        function rotateKey() {
+            const box = document.getElementById('dynamicKey');
+            const stat = document.getElementById('dynamicStatus');
+            const newKey = "TOKEN_" + Math.floor(Math.random() * 9999) + "_SECURE";
+            box.innerText = newKey;
+            stat.innerHTML = "<span style='color:var(--audit)'>Secure (Auto-Rotated)</span>";
+            log(`Identity System: Credential rotated to ${newKey}. Old tokens invalid.`, 'ok');
+        }
+
+        /* --- REAPPROVAL LOGIC --- */
+        let auditScore = 0;
+        let auditActions = 0;
+
+        function certify(rowId, approve) {
+            const row = document.getElementById(rowId);
+            const btns = row.querySelectorAll('button');
+            btns.forEach(b => b.disabled = true);
+            auditActions++;
+
+            if (approve) {
+                // Logic check: Charlie (Admin) hasn't logged in 30 days -> Should be revoked or questioned
+                // Logic check: Dave (Intern) has Sales Lead -> Should be revoked
+                
+                if (rowId === 'row3') { // Dave
+                    log("Audit Error: Why does an Intern have Sales Lead? Excessive Privilege approved.", 'err');
+                } else if (rowId === 'row2') { // Charlie
+                    log("Audit Warning: Admin account dormant for 30 days. Should verify utility.", 'warn');
+                    auditScore++;
+                } else {
+                    log("Access Re-certified.", 'ok');
+                    auditScore++;
+                }
+            } else {
+                row.classList.add('row-revoked');
+                if (rowId === 'row3') {
+                    log("Audit Success: Revoked excessive privilege for Intern.", 'ok');
+                    auditScore++;
+                } else {
+                    log("Access Revoked.", 'ok');
+                    auditScore++;
+                }
+            }
+
+            if (auditActions === 3) {
+                const res = document.getElementById('auditResult');
+                if (auditScore >= 2) {
+                    res.innerHTML = "<span style='color:var(--audit)'>CAMPAIGN COMPLETE: Good Governance.</span>";
+                } else {
+                    res.innerHTML = "<span style='color:var(--danger)'>CAMPAIGN COMPLETE: Rubber Stamping Detected.</span>";
+                }
+            }
+        }
+
+    </script>
+</body>
+</html>
