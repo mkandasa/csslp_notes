@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 2: Application Decommissioning & Data Disposition</title>
+    <style>
+        :root {
+            --bg: #18181b;
+            --panel: #27272a;
+            --text: #f4f4f5;
+            --accent: #ef4444; /* Red for Danger/Stop */
+            --safe: #10b981;   /* Green */
+            --warn: #f59e0b;   /* Amber */
+            --info: #3b82f6;
+            --data: #8b5cf6;   /* Purple for Data */
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid #3f3f46; padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #3f3f46; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1100px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .container {
+            display: grid; grid-template-columns: 1fr 2fr; gap: 20px;
+            width: 100%; max-width: 1100px;
+        }
+
+        .card {
+            background: var(--panel); padding: 20px; border-radius: 12px;
+            border: 1px solid #3f3f46; height: fit-content;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid #3f3f46; padding-bottom: 10px; }
+
+        /* --- Dashboard Status (Decom Tab) --- */
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .stat-box { background: #000; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid #333; }
+        .stat-val { font-size: 1.5rem; font-weight: bold; }
+        .risk-high { color: var(--accent); }
+        .risk-low { color: var(--safe); }
+
+        /* --- Checklist Items --- */
+        .task-list { list-style: none; padding: 0; }
+        .task-item {
+            background: #333; padding: 15px; margin-bottom: 10px; border-radius: 6px;
+            border-left: 4px solid #777; display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.3s;
+        }
+        .task-item.completed { border-left-color: var(--safe); opacity: 0.6; text-decoration: line-through; }
+        .task-item.alert { border-left-color: var(--accent); border: 1px solid var(--accent); }
+
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--info); color: white; }
+        .btn-kill { background: var(--accent); color: white; }
+        .btn-archive { background: var(--warn); color: black; }
+        .btn-shred { background: var(--data); color: white; }
+
+        /* --- Infrastructure Map --- */
+        .infra-map {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;
+            background: #000; padding: 20px; border-radius: 8px; border: 1px dashed #555;
+        }
+        .node {
+            background: #1e1e1e; padding: 10px; border: 1px solid #555; border-radius: 4px;
+            text-align: center; font-size: 0.8rem; position: relative;
+        }
+        .node.active { border-color: var(--safe); box-shadow: 0 0 10px rgba(16, 185, 129, 0.2); }
+        .node.offline { border-color: #555; opacity: 0.3; }
+        .node-icon { font-size: 1.5rem; display: block; margin-bottom: 5px; }
+
+        /* --- Disposition Visuals (New Tab) --- */
+        .data-record {
+            background: #111; border: 1px solid #444; padding: 10px; margin-bottom: 5px;
+            border-radius: 4px; display: flex; justify-content: space-between; align-items: center;
+            font-family: monospace; font-size: 0.85rem;
+        }
+        .data-record.encrypted { border-color: var(--data); background: #1e1b2e; }
+        .data-record.shredded { text-decoration: line-through; opacity: 0.4; border-color: #333; background: #000; }
+        
+        .dependency-line { height: 2px; background: #555; width: 20px; display: inline-block; vertical-align: middle; margin: 0 5px; }
+
+        .policy-selector { background: #333; color: white; padding: 5px; border-radius: 4px; border: 1px solid #555; }
+
+        /* --- Logs --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 150px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid #3f3f46; color: #a6e3a1; font-size: 0.9rem; margin-top: 20px;
+        }
+        .log-err { color: var(--accent); }
+        .log-warn { color: var(--warn); }
+        .log-info { color: var(--info); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Decommissioning & Data Disposition</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('decom')">1. Decommissioning Console</button>
+        <button class="tab-btn" onclick="switchTab('dispo')">2. Data Disposition Lab</button>
+    </div>
+
+    <!-- TAB 1: DECOMMISSIONING (Existing) -->
+    <div id="decom" class="tab-content active">
+        <div class="container">
+            <div class="card">
+                <h3>System Status</h3>
+                <div class="status-grid">
+                    <div class="stat-box">
+                        <div class="stat-val risk-high" id="riskScore">CRITICAL</div>
+                        <small>Risk Exposure</small>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val" id="costVal">$5,400/mo</div>
+                        <small>Burn Rate</small>
+                    </div>
+                </div>
+                <p style="font-size:0.9rem; color:#aaa">
+                    <strong>Project:</strong> FinCorp Legacy<br>
+                    <strong>Goal:</strong> Fully decommission without leaks.
+                </p>
+            </div>
+
+            <div class="card">
+                <h3>Decommissioning Checklist</h3>
+                <ul class="task-list">
+                    <li class="task-item" id="task-data">
+                        <div><strong>1. Data Disposition</strong><br><small>DB contains 5M Records.</small></div>
+                        <div style="display:flex; gap:5px">
+                            <button class="btn-action btn-kill" onclick="handleData('delete')">Delete All</button>
+                            <button class="btn-action btn-archive" onclick="handleData('archive')">Archive</button>
+                        </div>
+                    </li>
+                    <li class="task-item" id="task-creds">
+                        <div><strong>2. Credential Revocation</strong><br><small>AWS Keys, Service Accounts.</small></div>
+                        <button class="btn-action" onclick="revokeCreds()">Revoke Access</button>
+                    </li>
+                    <li class="task-item" id="task-infra">
+                        <div><strong>3. Infrastructure Teardown</strong><br><small>Servers, DNS, LBs.</small></div>
+                        <button class="btn-action btn-kill" onclick="killInfra()">Destroy</button>
+                    </li>
+                    <li class="task-item" id="task-sla">
+                        <div><strong>4. Legal/SLA Termination</strong><br><small>Notify clients.</small></div>
+                        <button class="btn-action" onclick="terminateLegal()">Terminate</button>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card" style="grid-column: span 2">
+                <h3>Infrastructure Map</h3>
+                <div class="infra-map">
+                    <div class="node active" id="node-dns"><span class="node-icon">🌐</span><strong>DNS Entry</strong></div>
+                    <div class="node active" id="node-lb"><span class="node-icon">⚖️</span><strong>Load Balancer</strong></div>
+                    <div class="node active" id="node-web"><span class="node-icon">🖥️</span><strong>Web Server</strong></div>
+                    <div class="node active" id="node-db"><span class="node-icon">🛢️</span><strong>Database</strong></div>
+                    <div class="node active" id="node-s3"><span class="node-icon">📦</span><strong>Backup Bucket</strong></div>
+                    <div class="node active" id="node-iam"><span class="node-icon">🔑</span><strong>IAM Role</strong></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: DATA DISPOSITION (New) -->
+    <div id="dispo" class="tab-content">
+        <div class="container">
+            <!-- Left: Policy Config -->
+            <div class="card">
+                <h3>Retention Policies</h3>
+                <p>Define how different data types are handled.</p>
+                
+                <div style="margin-bottom:15px; border-bottom:1px solid #444; padding-bottom:10px;">
+                    <label style="color:#aaa; font-size:0.8rem">TYPE: FINANCIAL (TAX RECORDS)</label><br>
+                    <select id="pol-fin" class="policy-selector">
+                        <option value="keep">Retain 7 Years (Legal)</option>
+                        <option value="del">Delete Immediately (Violation)</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom:15px; border-bottom:1px solid #444; padding-bottom:10px;">
+                    <label style="color:#aaa; font-size:0.8rem">TYPE: PII (USER PROFILES)</label><br>
+                    <select id="pol-pii" class="policy-selector">
+                        <option value="del">Delete (Right to be Forgotten)</option>
+                        <option value="keep">Retain Forever (GDPR Violation)</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom:15px;">
+                    <label style="color:#aaa; font-size:0.8rem">DESTRUCTION METHOD</label><br>
+                    <select id="method-destruct" class="policy-selector">
+                        <option value="soft">Soft Delete (Recoverable)</option>
+                        <option value="wipe">Secure Overwrite (DoD 3-pass)</option>
+                        <option value="crypto">Crypto-Shredding (Cloud)</option>
+                    </select>
+                </div>
+
+                <button class="btn-kill" onclick="executeDisposition()">EXECUTE DISPOSITION</button>
+            </div>
+
+            <!-- Right: Data Visualizer -->
+            <div class="card">
+                <h3>Data Inventory (Live View)</h3>
+                <p>Visualizing records and dependencies.</p>
+                
+                <div id="dataStore">
+                    <!-- Encryption Key -->
+                    <div class="data-record encrypted" id="rec-key">
+                        <span>🔑 MASTER_KEY_AES256</span>
+                        <small style="color:var(--data)">Required to read data</small>
+                    </div>
+
+                    <!-- Records -->
+                    <div class="data-record" id="rec-fin1">
+                        <span>💰 Inv #1001 (Tax Data)</span>
+                        <small>Status: Active</small>
+                    </div>
+                    
+                    <div class="data-record" id="rec-user1">
+                        <span>👤 User: Alice (PII)</span>
+                        <small>Status: Active</small>
+                    </div>
+
+                    <!-- Dependency -->
+                    <div class="data-record" id="rec-log1">
+                        <span>📝 Log: "Alice paid #1001"</span>
+                        <small>⚠ Depends on User & Inv</small>
+                    </div>
+                </div>
+
+                <div id="dispoResult" style="margin-top:20px; font-weight:bold;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> System Ready.</div>
+    </div>
+
+    <script>
+        /* --- TABS --- */
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'decom':0, 'dispo':1};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const color = type === 'err' ? 'var(--accent)' : (type === 'warn' ? 'var(--warn)' : 'var(--info)');
+            term.innerHTML += `<div style="color:${color}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- DECOMMISSIONING LOGIC (Existing) --- */
+        let dataHandled = false;
+        let credsRevoked = false;
+        let infraKilled = false;
+        let legalDone = false;
+
+        function checkComplete() {
+            let risk = 0;
+            if(!dataHandled) risk += 40;
+            if(!credsRevoked) risk += 30;
+            if(!infraKilled) risk += 20;
+            if(!legalDone) risk += 10;
+
+            const rEl = document.getElementById('riskScore');
+            if (risk === 0) {
+                rEl.innerText = "SECURE"; rEl.className = "stat-val risk-low";
+                document.getElementById('costVal').innerText = "$0/mo";
+                log("✅ DECOMMISSIONING COMPLETE.", 'info');
+            } else if (risk < 50) {
+                rEl.innerText = "MEDIUM"; rEl.style.color = "var(--warn)";
+            }
+        }
+
+        function handleData(action) {
+            const task = document.getElementById('task-data');
+            if (action === 'delete') {
+                log("⚠️ VIOLATION: Deleted legally required financial records!", 'err');
+                task.classList.add('alert');
+            } else {
+                log("Data Disposition: Financials Archived (WORM). Active DB purged.", 'info');
+                document.getElementById('node-db').classList.add('offline');
+                document.getElementById('node-db').classList.remove('active');
+                document.getElementById('node-s3').innerHTML += "<br>(Archived)";
+                task.classList.add('completed');
+                dataHandled = true; checkComplete();
+            }
+        }
+
+        function revokeCreds() {
+            log("IAM: Service Accounts deleted. Keys disabled.", 'info');
+            document.getElementById('node-iam').classList.add('offline');
+            document.getElementById('node-iam').classList.remove('active');
+            document.getElementById('task-creds').classList.add('completed');
+            credsRevoked = true; checkComplete();
+        }
+
+        function killInfra() {
+            if (!dataHandled) { log("❌ ERROR: Handle Data first!", 'err'); return; }
+            ['node-web', 'node-lb'].forEach(id => {
+                document.getElementById(id).classList.add('offline');
+                document.getElementById(id).classList.remove('active');
+            });
+            setTimeout(() => {
+                log("Auto-Fix: Removing Dangling DNS...", 'warn');
+                document.getElementById('node-dns').classList.add('offline');
+                document.getElementById('node-dns').classList.remove('active');
+                document.getElementById('task-infra').classList.add('completed');
+                infraKilled = true; document.getElementById('costVal').innerText = "$50/mo"; checkComplete();
+            }, 1000);
+        }
+
+        function terminateLegal() {
+            if (!infraKilled) log("⚠️ WARNING: Terminating SLA while server runs is risky.", 'warn');
+            log("Legal: Contracts terminated.", 'info');
+            document.getElementById('task-sla').classList.add('completed');
+            legalDone = true; checkComplete();
+        }
+
+        /* --- DATA DISPOSITION LOGIC (New) --- */
+        function executeDisposition() {
+            const polFin = document.getElementById('pol-fin').value;
+            const polPii = document.getElementById('pol-pii').value;
+            const method = document.getElementById('method-destruct').value;
+            const res = document.getElementById('dispoResult');
+
+            // Reset visual state
+            document.querySelectorAll('.data-record').forEach(el => {
+                el.className = 'data-record';
+                el.style.opacity = 1;
+                el.querySelector('small').innerText = "Status: Active";
+            });
+            document.getElementById('rec-key').classList.add('encrypted');
+
+            log("Executing Disposition Policy...", 'info');
+
+            // 1. Process PII (User)
+            if (polPii === 'del') {
+                if (method === 'soft') {
+                    log("PII: Soft Delete. Data hidden but recoverable (Risky).", 'warn');
+                    document.getElementById('rec-user1').style.opacity = 0.5;
+                    document.getElementById('rec-user1').querySelector('small').innerText = "Status: Hidden (Soft)";
+                } else if (method === 'wipe') {
+                    log("PII: Secure Overwrite. Data destroyed.", 'info');
+                    document.getElementById('rec-user1').classList.add('shredded');
+                    document.getElementById('rec-user1').querySelector('small').innerText = "Status: Overwritten";
+                } else if (method === 'crypto') {
+                    log("PII: Crypto-Shredding Key...", 'info');
+                    // Crypto shredding implies destroying the key makes ALL encrypted data unreadable
+                    // But typically we have granular keys. For simplicity, we destroy the master key here.
+                }
+            } else {
+                log("❌ VIOLATION: Keeping PII without reason violates GDPR.", 'err');
+            }
+
+            // 2. Process Financial (Tax)
+            if (polFin === 'keep') {
+                log("Financial: Retained for 7 Years (Compliance Met).", 'info');
+                document.getElementById('rec-fin1').style.border = "1px solid var(--safe)";
+                document.getElementById('rec-fin1').querySelector('small').innerText = "Status: Archived (Legal Hold)";
+            } else {
+                log("❌ VIOLATION: Deleted Tax Records! Expect Audit Fines.", 'err');
+                document.getElementById('rec-fin1').classList.add('shredded');
+            }
+
+            // 3. Process Crypto Shredding (The Nuclear Option)
+            if (method === 'crypto') {
+                log("Method: Crypto-Shredding Selected.", 'warn');
+                const key = document.getElementById('rec-key');
+                key.classList.add('shredded');
+                key.querySelector('small').innerText = "Status: DESTROYED";
+                
+                // If key is gone, EVERYTHING encrypted is gone
+                setTimeout(() => {
+                    log("RESULT: Master Key Destroyed. All encrypted data is now unrecoverable gibberish.", 'info');
+                    // Visual effect: make records look like garbage
+                    if(polPii === 'del' || polPii === 'keep') { // If PII was encrypted
+                         document.getElementById('rec-user1').querySelector('span').innerText = "X9#bL";
+                         document.getElementById('rec-user1').style.opacity = 0.5;
+                    }
+                    if(polFin === 'del' || polFin === 'keep') { // If Fin was encrypted
+                         document.getElementById('rec-fin1').querySelector('span').innerText = "aZ1";
+                         document.getElementById('rec-fin1').style.opacity = 0.5;
+                    }
+                }, 1000);
+            }
+
+            // 4. Dependency Check (Orphaned Logs)
+            if (polPii === 'del' && polFin === 'keep') {
+                // If we deleted User but kept Invoice... what about the Log linking them?
+                // "Alice paid #1001" -> If "Alice" is gone, this log might break or leak PII
+                const logRec = document.getElementById('rec-log1');
+                logRec.style.border = "1px dashed var(--warn)";
+                logRec.querySelector('small').innerText = "⚠ Warning: Orphaned Reference";
+                log("INTEGRITY WARN: Log references deleted User 'Alice'. Anonymize logs required.", 'warn');
+            }
+        }
+
+    </script>
+</body>
+</html>

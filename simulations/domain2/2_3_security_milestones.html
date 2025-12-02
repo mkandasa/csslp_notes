@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 2: Gates & Break/Build Criteria</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f1f5f9;
+            --accent: #f43f5e; /* Rose */
+            --pass: #10b981;   /* Green */
+            --fail: #ef4444;   /* Red */
+            --warn: #f59e0b;   /* Amber */
+            --run: #3b82f6;    /* Blue */
+            --disabled: #475569;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1100px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .container {
+            display: grid; grid-template-columns: 1fr 2fr; gap: 20px;
+            width: 100%; max-width: 1100px;
+        }
+
+        .card {
+            background: var(--panel); padding: 20px; border-radius: 12px;
+            border: 1px solid var(--border); height: fit-content;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; margin-top: 10px; width: 100%;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { cursor: not-allowed; opacity: 0.5; background: var(--disabled) !important; color: #aaa !important; }
+        .btn-run { background: var(--run); color: white; }
+        .btn-approve { background: var(--pass); color: white; }
+        .btn-reject { background: var(--fail); color: white; }
+        .btn-small { width: auto; font-size: 0.8rem; padding: 4px 8px; margin: 0; }
+
+        /* --- Gate Stepper --- */
+        .stepper {
+            display: flex; justify-content: space-between; margin-bottom: 20px; position: relative;
+        }
+        .stepper::before {
+            content: ''; position: absolute; top: 20px; left: 0; right: 0; height: 4px;
+            background: #333; z-index: 0;
+        }
+        .step-node {
+            width: 40px; height: 40px; border-radius: 50%; background: #111; border: 4px solid #555;
+            display: flex; align-items: center; justify-content: center; font-weight: bold;
+            position: relative; z-index: 1; cursor: pointer; transition: all 0.3s;
+        }
+        .step-node.active { border-color: var(--run); background: #1e1e2e; color: var(--run); transform: scale(1.1); box-shadow: 0 0 10px var(--run); }
+        .step-node.completed { border-color: var(--pass); background: var(--pass); color: #000; }
+        .step-node.locked { cursor: not-allowed; opacity: 0.5; }
+        .step-label { position: absolute; top: 45px; font-size: 0.8rem; width: 100px; text-align: center; }
+
+        /* --- Checklists --- */
+        .gate-view { display: none; }
+        .gate-view.active { display: block; animation: fadeIn 0.3s; }
+
+        .checklist-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #111; padding: 10px; margin-bottom: 5px; border-radius: 4px;
+            border-left: 4px solid #555; transition: all 0.3s;
+        }
+        .checklist-item.met { border-left-color: var(--pass); }
+        .checklist-item.missing { border-left-color: var(--fail); }
+        
+        .doc-status { font-size: 0.8rem; color: #aaa; }
+
+        /* --- Automated Pipeline Styles --- */
+        .criteria-box {
+            background: #111; padding: 10px; margin-bottom: 10px; border-radius: 6px;
+        }
+        .slider-container { margin-top: 5px; display: flex; justify-content: space-between; font-size: 0.8rem; color: #aaa; }
+        input[type=range] { width: 100%; }
+
+        .pipeline-track {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 20px; padding: 20px 10px; background: #000; border-radius: 8px;
+            border: 1px solid var(--border); position: relative;
+        }
+        .pipe-stage {
+            width: 80px; height: 80px; border-radius: 8px; background: #333;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: 2px solid #555; font-size: 0.8rem; text-align: center; position: relative; z-index: 2;
+            transition: all 0.3s;
+        }
+        .pipe-stage small { font-size: 0.65rem; color: #aaa; margin-top: 2px; }
+        
+        .pipe-line { position: absolute; height: 4px; background: #333; width: 90%; z-index: 1; top: 50%; left: 5%; }
+        
+        .pipe-stage.running { border-color: var(--run); color: var(--run); box-shadow: 0 0 10px var(--run); }
+        .pipe-stage.pass { border-color: var(--pass); background: #064e3b; color: var(--pass); }
+        .pipe-stage.fail { border-color: var(--fail); background: #450a0a; color: var(--fail); }
+
+        /* --- Logs --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 150px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem;
+        }
+        .log-fail { color: var(--fail); }
+        .log-warn { color: var(--warn); }
+        .log-pass { color: var(--pass); }
+        .log-info { color: #aaa; }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Security Gates & Break Criteria</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('gov')">1. Governance Control Gates</button>
+        <button class="tab-btn" onclick="switchTab('auto')">2. Automated Break/Build</button>
+    </div>
+
+    <!-- TAB 1: GOVERNANCE CONTROL GATES (Sequential) -->
+    <div id="gov" class="tab-content active">
+        <div class="container">
+            <div class="card">
+                <h3>Governance Lifecycle</h3>
+                
+                <div class="stepper">
+                    <div class="step-node active" id="step-req" onclick="loadGate('req')">1<span class="step-label">Requirements Gate</span></div>
+                    <div class="step-node locked" id="step-design" onclick="loadGate('design')">2<span class="step-label">Design Gate</span></div>
+                    <div class="step-node locked" id="step-release" onclick="loadGate('release')">3<span class="step-label">Release Gate</span></div>
+                </div>
+
+                <div style="margin-top:40px; border-top:1px solid #333; padding-top:20px;">
+                    
+                    <!-- GATE 1: REQUIREMENTS -->
+                    <div id="view-req" class="gate-view active">
+                        <h4 style="color:var(--run)">Gate 1: Security Requirements</h4>
+                        <p style="font-size:0.9rem">Verify that security expectations are defined before design begins.</p>
+                        
+                        <div class="checklist-item missing" id="art-req-doc">
+                            <div><strong>Security Requirements Doc</strong><br><span class="doc-status">Status: Missing</span></div>
+                            <button class="btn-small btn-run" onclick="uploadArtifact('req', 'doc')">Upload</button>
+                        </div>
+                        <div class="checklist-item missing" id="art-req-abuse">
+                            <div><strong>Abuse Cases Defined</strong><br><span class="doc-status">Status: Missing</span></div>
+                            <button class="btn-small btn-run" onclick="uploadArtifact('req', 'abuse')">Create</button>
+                        </div>
+                        <div class="checklist-item missing" id="art-req-pia">
+                            <div><strong>Privacy Impact Assessment</strong><br><span class="doc-status">Status: Missing</span></div>
+                            <button class="btn-small btn-run" onclick="uploadArtifact('req', 'pia')">Review</button>
+                        </div>
+                    </div>
+
+                    <!-- GATE 2: DESIGN -->
+                    <div id="view-design" class="gate-view">
+                        <h4 style="color:var(--run)">Gate 2: Architecture & Design</h4>
+                        <p style="font-size:0.9rem">Verify that the architecture is secure before coding begins.</p>
+                        
+                        <div class="checklist-item missing" id="art-design-threat">
+                            <div><strong>Threat Model (STRIDE)</strong><br><span class="doc-status">Status: Missing</span></div>
+                            <button class="btn-small btn-run" onclick="uploadArtifact('design', 'threat')">Upload</button>
+                        </div>
+                        <div class="checklist-item missing" id="art-design-surface">
+                            <div><strong>Attack Surface Analysis</strong><br><span class="doc-status">Status: Missing</span></div>
+                            <button class="btn-small btn-run" onclick="uploadArtifact('design', 'surface')">Analyze</button>
+                        </div>
+                        <div class="checklist-item missing" id="art-design-arch">
+                            <div><strong>Secure Architecture Review</strong><br><span class="doc-status">Status: Missing</span></div>
+                            <button class="btn-small btn-run" onclick="uploadArtifact('design', 'arch')">Review</button>
+                        </div>
+                    </div>
+
+                    <!-- GATE 3: RELEASE -->
+                    <div id="view-release" class="gate-view">
+                        <h4 style="color:var(--run)">Gate 3: Production Release</h4>
+                        <p style="font-size:0.9rem">Final check before "Go Live". Verification of implementation.</p>
+                        
+                        <div class="checklist-item missing" id="art-release-pentest">
+                            <div><strong>Penetration Test Report</strong><br><span class="doc-status">Status: Missing</span></div>
+                            <button class="btn-small btn-run" onclick="uploadArtifact('release', 'pentest')">Upload</button>
+                        </div>
+                        <div class="checklist-item missing" id="art-release-sast">
+                            <div><strong>Final SAST/DAST Report</strong><br><span class="doc-status">Status: Missing</span></div>
+                            <button class="btn-small btn-run" onclick="uploadArtifact('release', 'sast')">Verify</button>
+                        </div>
+                        <div class="checklist-item missing" id="art-release-sign">
+                            <div><strong>CISO / Business Sign-off</strong><br><span class="doc-status">Status: Pending</span></div>
+                            <button class="btn-small btn-run" onclick="uploadArtifact('release', 'sign')">Request</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Gate Decision Board</h3>
+                <p>Current Phase: <strong id="currentPhaseLabel" style="color:var(--run)">Requirements</strong></p>
+                
+                <div id="gateStatus" style="font-size: 1.2rem; font-weight: bold; text-align: center; margin: 20px 0; color: #555;">
+                    GATE LOCKED
+                </div>
+                
+                <div style="display:flex; gap:10px">
+                    <button class="btn-reject" onclick="gateDecision('reject')">⛔ REJECT & FIX</button>
+                    <button class="btn-approve" onclick="gateDecision('approve')" id="btnApprove" disabled>✅ APPROVE & ADVANCE</button>
+                </div>
+                <p style="font-size:0.7rem; color:#666; margin-top:10px; text-align:center;">
+                    * Approving advances the lifecycle to the next gate.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: AUTOMATED BREAK/BUILD (CI/CD) -->
+    <div id="auto" class="tab-content">
+        <div class="container">
+            <!-- Configuration -->
+            <div class="card">
+                <h3>Break Criteria Policy</h3>
+                <p>Define the thresholds that stop the pipeline.</p>
+                
+                <div class="criteria-box">
+                    <strong>1. Vulnerability Severity (CVSS)</strong>
+                    <div class="slider-container">
+                        <span>Low (0)</span>
+                        <span>Med (4)</span>
+                        <span>High (7)</span>
+                        <span>Crit (9)</span>
+                    </div>
+                    <input type="range" min="0" max="10" value="7" id="cvssThresh" oninput="updateThreshDisplay()">
+                    <div style="text-align:right; color:var(--run)">Break on CVSS >= <span id="cvssVal">7</span></div>
+                </div>
+
+                <div class="criteria-box">
+                    <strong>2. Secret Detection</strong>
+                    <label style="display:flex; align-items:center; gap:10px; margin-top:5px; cursor:pointer">
+                        <input type="checkbox" id="breakSecrets" checked> Break build on ANY secret found
+                    </label>
+                </div>
+
+                <div class="criteria-box">
+                    <strong>3. License Compliance</strong>
+                    <label style="display:flex; align-items:center; gap:10px; margin-top:5px; cursor:pointer">
+                        <input type="checkbox" id="breakGPL" checked> Block Copyleft (GPL) Libraries
+                    </label>
+                </div>
+
+                <button class="btn-run" onclick="runPipeline()">🚀 Run CI/CD Pipeline</button>
+            </div>
+
+            <!-- Pipeline Visual -->
+            <div class="card">
+                <h3>Pipeline Execution Flow</h3>
+                
+                <div class="pipeline-track">
+                    <div class="pipe-line"></div>
+                    
+                    <div class="pipe-stage" id="st-secrets">
+                        Secrets
+                        <small>Pre-Commit</small>
+                    </div>
+                    <div class="pipe-stage" id="st-sast">
+                        SAST
+                        <small>Static Code</small>
+                    </div>
+                    <div class="pipe-stage" id="st-sca">
+                        SCA
+                        <small>Libraries</small>
+                    </div>
+                    <div class="pipe-stage" id="st-container">
+                        Image
+                        <small>Container</small>
+                    </div>
+                    <div class="pipe-stage" id="st-deploy">
+                        Deploy
+                        <small>Prod</small>
+                    </div>
+                </div>
+
+                <div id="pipelineReport" style="margin-top:20px; border-top:1px solid #333; padding-top:10px; display:none;">
+                    <h4>Finding Report</h4>
+                    <ul id="findingList" style="padding-left:20px; font-size:0.9rem; color:#ccc;"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> System Ready. Governance Mode: Active.</div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'gov':0, 'auto':1};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const color = type === 'pass' ? 'var(--pass)' : (type === 'fail' ? 'var(--fail)' : (type === 'warn' ? 'var(--warn)' : '#aaa'));
+            term.innerHTML += `<div style="color:${color}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- GOVERNANCE GATE LOGIC --- */
+        let currentGate = 'req'; // req, design, release, done
+        const gateState = {
+            req: { doc: false, abuse: false, pia: false },
+            design: { threat: false, surface: false, arch: false },
+            release: { pentest: false, sast: false, sign: false }
+        };
+
+        const gateNames = {
+            'req': 'Requirements', 'design': 'Design', 'release': 'Production Release'
+        };
+
+        function loadGate(gate) {
+            // Prevent jumping ahead
+            if (gate === 'design' && currentGate === 'req') return;
+            if (gate === 'release' && (currentGate === 'req' || currentGate === 'design')) return;
+            
+            // Switch View
+            document.querySelectorAll('.gate-view').forEach(v => v.classList.remove('active'));
+            document.getElementById(`view-${gate}`).classList.add('active');
+            
+            // Update Decision Board Title
+            document.getElementById('currentPhaseLabel').innerText = gateNames[gate];
+            
+            checkGateReadiness(gate);
+        }
+
+        function uploadArtifact(gate, type) {
+            gateState[gate][type] = true;
+            
+            const el = document.getElementById(`art-${gate}-${type}`);
+            el.classList.remove('missing');
+            el.classList.add('met');
+            el.querySelector('.doc-status').innerText = "Status: Uploaded";
+            el.querySelector('button').disabled = true;
+            el.querySelector('button').innerText = "Done";
+            
+            log(`Artifact Accepted: ${type.toUpperCase()}`, 'pass');
+            checkGateReadiness(gate);
+        }
+
+        function checkGateReadiness(gate) {
+            const status = document.getElementById('gateStatus');
+            const btn = document.getElementById('btnApprove');
+            
+            // Check if all artifacts in current gate are true
+            const allMet = Object.values(gateState[gate]).every(v => v === true);
+
+            if (allMet) {
+                status.innerText = "GATE READY FOR DECISION";
+                status.style.color = "var(--warn)";
+                btn.disabled = false;
+                // If we are viewing a past gate, disable button
+                if (getGateOrder(gate) < getGateOrder(currentGate)) {
+                    status.innerText = "GATE ALREADY PASSED";
+                    status.style.color = "var(--pass)";
+                    btn.disabled = true;
+                }
+            } else {
+                status.innerText = "GATE LOCKED (Missing Artifacts)";
+                status.style.color = "#555";
+                btn.disabled = true;
+            }
+        }
+
+        function getGateOrder(g) {
+            if (g === 'req') return 1;
+            if (g === 'design') return 2;
+            if (g === 'release') return 3;
+            if (g === 'done') return 4;
+            return 0;
+        }
+
+        function gateDecision(decision) {
+            if (decision === 'approve') {
+                log(`${gateNames[currentGate]} Gate Approved. Advancing Lifecycle.`, 'pass');
+                
+                // Mark current stepper as completed
+                document.getElementById(`step-${currentGate}`).classList.remove('active');
+                document.getElementById(`step-${currentGate}`).classList.add('completed');
+
+                // Advance Logic
+                if (currentGate === 'req') {
+                    currentGate = 'design';
+                    document.getElementById('step-design').classList.remove('locked');
+                    document.getElementById('step-design').classList.add('active');
+                    loadGate('design');
+                } else if (currentGate === 'design') {
+                    currentGate = 'release';
+                    document.getElementById('step-release').classList.remove('locked');
+                    document.getElementById('step-release').classList.add('active');
+                    loadGate('release');
+                } else if (currentGate === 'release') {
+                    currentGate = 'done';
+                    document.getElementById('gateStatus').innerText = "PROJECT DEPLOYED";
+                    document.getElementById('gateStatus').style.color = "var(--pass)";
+                    document.getElementById('btnApprove').disabled = true;
+                    log("Lifecycle Complete. Software is Live.", 'run');
+                }
+            } else {
+                log("Gate Decision: REJECTED. Fix artifacts before proceeding.", 'fail');
+            }
+        }
+
+        /* --- BREAK/BUILD LOGIC --- */
+        function updateThreshDisplay() {
+            document.getElementById('cvssVal').innerText = document.getElementById('cvssThresh').value;
+        }
+
+        const projectFindings = [
+            { stage: 'st-secrets', type: 'Secret', name: 'AWS Access Key', sev: 10, msg: "Hardcoded AWS Key in config.js" },
+            { stage: 'st-sast', type: 'Vuln', name: 'Reflected XSS', sev: 6.5, msg: "Unsanitized input in search.php" },
+            { stage: 'st-sca', type: 'License', name: 'GPL-3.0', sev: 0, msg: "Viral License detected in 'lib-print'" },
+            { stage: 'st-sca', type: 'Vuln', name: 'Log4Shell', sev: 9.8, msg: "Critical RCE in log4j-core" },
+            { stage: 'st-container', type: 'Config', name: 'Root User', sev: 5.0, msg: "Container running as Root" }
+        ];
+
+        async function runPipeline() {
+            resetPipeline();
+            log("Starting Automated Pipeline...", 'run');
+            
+            const cvssLimit = parseFloat(document.getElementById('cvssThresh').value);
+            const blockSecrets = document.getElementById('breakSecrets').checked;
+            const blockGPL = document.getElementById('breakGPL').checked;
+
+            const stages = ['st-secrets', 'st-sast', 'st-sca', 'st-container', 'st-deploy'];
+            
+            for (let stageId of stages) {
+                const el = document.getElementById(stageId);
+                el.classList.add('running');
+                await new Promise(r => setTimeout(r, 800));
+
+                const stageFindings = projectFindings.filter(f => f.stage === stageId);
+                let broken = false;
+                let reasons = [];
+
+                for (let finding of stageFindings) {
+                    if (finding.type === 'Secret' && blockSecrets) {
+                        broken = true; reasons.push(`[BLOCK] Secret: ${finding.name}`);
+                    }
+                    else if (finding.type === 'License' && blockGPL && finding.name.includes('GPL')) {
+                        broken = true; reasons.push(`[BLOCK] License: ${finding.name}`);
+                    }
+                    else if (finding.type === 'Vuln' || finding.type === 'Config') {
+                        if (finding.sev >= cvssLimit) {
+                            broken = true; reasons.push(`[BLOCK] CVSS ${finding.sev}: ${finding.name}`);
+                        } else {
+                            reasons.push(`[WARN] CVSS ${finding.sev}: ${finding.name}`);
+                        }
+                    }
+                }
+
+                el.classList.remove('running');
+                if (broken) {
+                    el.classList.add('fail');
+                    log(`STAGE FAILED: ${stageId.replace('st-','').toUpperCase()}`, 'fail');
+                    reasons.forEach(r => log(r, r.includes('[BLOCK]') ? 'fail' : 'warn'));
+                    displayFindings(stageFindings);
+                    return; 
+                } else {
+                    el.classList.add('pass');
+                    if(reasons.length > 0) reasons.forEach(r => log(r, 'warn'));
+                }
+            }
+            log("PIPELINE SUCCESS: Build Deployed to Prod.", 'pass');
+        }
+
+        function displayFindings(list) {
+            const box = document.getElementById('pipelineReport');
+            const ul = document.getElementById('findingList');
+            box.style.display = 'block';
+            list.forEach(f => {
+                ul.innerHTML += `<li><strong>${f.type}:</strong> ${f.msg} (Sev: ${f.sev})</li>`;
+            });
+        }
+
+        function resetPipeline() {
+            document.querySelectorAll('.pipe-stage').forEach(el => { el.className = 'pipe-stage'; });
+            document.getElementById('pipelineReport').style.display = 'none';
+            document.getElementById('findingList').innerHTML = "";
+        }
+
+    </script>
+</body>
+</html>

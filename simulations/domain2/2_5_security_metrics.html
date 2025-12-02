@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 2: Security Metrics & KPIs</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f1f5f9;
+            --accent: #8b5cf6; /* Violet */
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --chart-bg: #000000;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .dashboard-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            width: 100%; max-width: 1200px;
+        }
+
+        .card {
+            background: var(--panel); padding: 20px; border-radius: 12px;
+            border: 1px solid #334155; position: relative;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid #334155; padding-bottom: 10px; font-size: 1rem; }
+
+        .stat-big { font-size: 2.5rem; font-weight: bold; margin: 10px 0; }
+        .stat-label { font-size: 0.9rem; color: #94a3b8; text-transform: uppercase; }
+        
+        .trend-up { color: var(--danger); } /* Bad for bugs */
+        .trend-down { color: var(--success); } /* Good for bugs */
+
+        /* --- Chart Container --- */
+        .chart-box { height: 250px; width: 100%; background: var(--chart-bg); border-radius: 8px; padding: 10px; box-sizing: border-box; }
+
+        /* --- Team Table --- */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th { text-align: left; color: #94a3b8; border-bottom: 1px solid #475569; padding: 5px; }
+        td { padding: 8px 5px; border-bottom: 1px solid #333; }
+        .score-bad { color: var(--danger); font-weight: bold; }
+        .score-ok { color: var(--warning); }
+        .score-good { color: var(--success); }
+
+        /* --- Complexity Visualizer --- */
+        .code-complexity {
+            display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px;
+        }
+        .complexity-node {
+            width: 30px; height: 30px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; font-weight: bold; color: black; cursor: pointer;
+        }
+        .c-low { background: var(--success); }
+        .c-med { background: var(--warning); }
+        .c-high { background: var(--danger); animation: pulse 2s infinite; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+        /* --- Controls --- */
+        .control-panel {
+            grid-column: span 2; background: #111; padding: 15px; border-radius: 8px;
+            display: flex; gap: 20px; align-items: center; justify-content: space-between;
+        }
+        button {
+            padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; background: var(--accent); color: white;
+        }
+        button:hover { opacity: 0.9; }
+
+        /* --- Log --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 100px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid #334155; color: #a6e3a1; font-size: 0.9rem;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Security Metrics & KPIs</h1>
+
+    <div class="dashboard-grid">
+        
+        <!-- KPI 1: MTTR -->
+        <div class="card">
+            <h3>KPI: Mean Time To Remediate (MTTR)</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div class="stat-big trend-up" id="mttrVal">14 Days</div>
+                    <div class="stat-label">Target: < 7 Days</div>
+                </div>
+                <div style="width: 60%">
+                    <div class="chart-box">
+                        <canvas id="mttrChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <p style="font-size:0.8rem; color:#aaa; margin-top:10px;">
+                Insight: Remediation is slowing down. Why? (Maybe complexity?)
+            </p>
+        </div>
+
+        <!-- KPI 2: Vulnerability Density -->
+        <div class="card">
+            <h3>KPI: Vulnerability Density (Defects / KLOC)</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div class="stat-big trend-down" id="densityVal">2.5</div>
+                    <div class="stat-label">Target: < 1.0</div>
+                </div>
+                <div style="width: 60%">
+                    <div class="chart-box">
+                        <canvas id="densityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <p style="font-size:0.8rem; color:#aaa; margin-top:10px;">
+                Insight: Code quality is improving slightly, but still high.
+            </p>
+        </div>
+
+        <!-- Team Leaderboard (Risk) -->
+        <div class="card">
+            <h3>Team Risk Scoreboard (CVSS Based)</h3>
+            <table id="teamTable">
+                <thead>
+                    <tr><th>Team</th><th>Open Criticals</th><th>Avg Complexity</th><th>Risk Score</th></tr>
+                </thead>
+                <tbody>
+                    <!-- Injected by JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Complexity Visualizer -->
+        <div class="card">
+            <h3>Correlation: Complexity vs. Bugs</h3>
+            <p style="font-size:0.8rem">Visualizing modules by Cyclomatic Complexity. High Complexity usually equals High Defects.</p>
+            <div class="code-complexity" id="complexityMap">
+                <!-- Nodes injected -->
+            </div>
+            <div style="margin-top:10px; font-size:0.8rem; display:flex; gap:10px;">
+                <span style="color:var(--success)">■ Simple</span>
+                <span style="color:var(--warning)">■ Moderate</span>
+                <span style="color:var(--danger)">■ Complex (Refactor Needed)</span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="control-panel">
+            <div>
+                <strong>Simulation Controls:</strong><br>
+                <small style="color:#aaa">Influence the metrics by taking action.</small>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="takeAction('train')">📚 Train Developers (Reduce Density)</button>
+                <button onclick="takeAction('refactor')" style="background:var(--warning); color:black">🛠️ Refactor Code (Reduce Complexity)</button>
+                <button onclick="takeAction('sprint')" style="background:var(--danger); color:white">🚀 Rush Features (Increase Risk)</button>
+            </div>
+        </div>
+
+        <!-- Log -->
+        <div class="log-terminal" id="logs">
+            <div>> Dashboard Initialized. Interpreting data...</div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DATA STATE ---
+        let state = {
+            mttr: [10, 12, 11, 13, 14, 14], // Trend Up (Bad)
+            density: [3.0, 2.9, 2.8, 2.6, 2.5, 2.5], // Trend Down (Good)
+            teams: [
+                { name: "Alpha", crits: 0, comp: 5, risk: "Low" },
+                { name: "Beta", crits: 2, comp: 12, risk: "Med" },
+                { name: "Gamma", crits: 5, comp: 25, risk: "High" } // Problem Child
+            ],
+            modules: Array.from({length: 20}, () => Math.floor(Math.random() * 30)) // Complexity scores
+        };
+
+        // --- CHART INSTANCES ---
+        let mttrChart, densityChart;
+
+        function initCharts() {
+            // MTTR Chart
+            const ctx1 = document.getElementById('mttrChart').getContext('2d');
+            mttrChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'MTTR (Days)',
+                        data: state.mttr,
+                        borderColor: '#ef4444',
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#333' } }, x: { grid: { display: false } } }
+                }
+            });
+
+            // Density Chart
+            const ctx2 = document.getElementById('densityChart').getContext('2d');
+            densityChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Vuln Density',
+                        data: state.density,
+                        backgroundColor: '#10b981',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { color: '#333' } }, x: { grid: { display: false } } }
+                }
+            });
+        }
+
+        // --- RENDER UI ---
+        function renderDashboard() {
+            // Update Big Stats
+            const currentMTTR = state.mttr[state.mttr.length - 1];
+            const currentDen = state.density[state.density.length - 1];
+            
+            const elMttr = document.getElementById('mttrVal');
+            elMttr.innerText = `${currentMTTR} Days`;
+            elMttr.className = currentMTTR > 10 ? 'stat-big trend-up' : 'stat-big trend-down'; // Red if > 10
+
+            const elDen = document.getElementById('densityVal');
+            elDen.innerText = currentDen.toFixed(1);
+            
+            // Update Charts
+            mttrChart.data.datasets[0].data = state.mttr;
+            mttrChart.update();
+            densityChart.data.datasets[0].data = state.density;
+            densityChart.update();
+
+            // Update Team Table
+            const tbody = document.querySelector('#teamTable tbody');
+            tbody.innerHTML = "";
+            state.teams.forEach(t => {
+                let riskClass = t.risk === 'High' ? 'score-bad' : (t.risk === 'Med' ? 'score-ok' : 'score-good');
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${t.name}</td>
+                        <td>${t.crits}</td>
+                        <td>${t.comp} (Cyclomatic)</td>
+                        <td class="${riskClass}">${t.risk}</td>
+                    </tr>
+                `;
+            });
+
+            // Update Complexity Map
+            const map = document.getElementById('complexityMap');
+            map.innerHTML = "";
+            state.modules.forEach(score => {
+                let cls = 'c-low';
+                if (score > 10) cls = 'c-med';
+                if (score > 20) cls = 'c-high';
+                map.innerHTML += `<div class="complexity-node ${cls}" title="Complexity: ${score}">${score}</div>`;
+            });
+        }
+
+        // --- ACTIONS ---
+        function log(msg) {
+            const term = document.getElementById('logs');
+            term.innerHTML += `<div>> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function takeAction(action) {
+            if (action === 'train') {
+                log("Action: Developers Trained on Secure Coding.");
+                // Effect: Lowers Density significantly, Lowers MTTR slightly
+                let lastDen = state.density[state.density.length-1];
+                let lastMttr = state.mttr[state.mttr.length-1];
+                
+                state.density.push(Math.max(0.5, lastDen - 0.5));
+                state.mttr.push(Math.max(1, lastMttr - 1));
+                state.teams[2].crits = Math.max(0, state.teams[2].crits - 2); // Gamma improves
+                
+                renderDashboard();
+            }
+            else if (action === 'refactor') {
+                log("Action: Refactoring Legacy Code (Gamma Team).");
+                // Effect: Lowers Complexity drastically, Lowers MTTR (easier to fix)
+                state.teams[2].comp = 10; // Gamma Fixed
+                state.teams[2].risk = "Med";
+                
+                // Update module viz
+                state.modules = state.modules.map(m => m > 20 ? Math.floor(m/2) : m);
+                
+                let lastMttr = state.mttr[state.mttr.length-1];
+                state.mttr.push(Math.max(1, lastMttr - 3)); // Big MTTR win
+                state.density.push(state.density[state.density.length-1]); // Stays same
+                
+                renderDashboard();
+            }
+            else if (action === 'sprint') {
+                log("Action: Rushing Features to meet deadline!", 'err');
+                // Effect: Increases Density, Increases Complexity, MTTR stays high
+                let lastDen = state.density[state.density.length-1];
+                let lastMttr = state.mttr[state.mttr.length-1];
+
+                state.density.push(lastDen + 0.8);
+                state.mttr.push(lastMttr + 2);
+                
+                // Add complex modules
+                state.modules.push(25, 28, 30);
+                state.teams[1].risk = "High"; // Beta gets worse
+                state.teams[1].crits += 3;
+
+                renderDashboard();
+            }
+            
+            // Shift arrays to keep chart moving
+            if(state.mttr.length > 6) {
+                state.mttr.shift();
+                state.density.shift();
+            }
+        }
+
+        // Init
+        setTimeout(() => {
+            initCharts();
+            renderDashboard();
+        }, 100);
+
+    </script>
+</body>
+</html>

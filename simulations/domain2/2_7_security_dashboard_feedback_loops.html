@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 2: Security Reporting & Feedback</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f1f5f9;
+            --accent: #8b5cf6; /* Violet */
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1200px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .container {
+            display: grid; grid-template-columns: 300px 1fr; gap: 20px;
+            width: 100%; max-width: 1200px;
+        }
+
+        .card {
+            background: var(--panel); padding: 20px; border-radius: 12px;
+            border: 1px solid var(--border); height: fit-content;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- Dashboard Styles --- */
+        .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .kpi-box { background: #111; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #333; }
+        .kpi-val { font-size: 1.8rem; font-weight: bold; margin: 5px 0; }
+        .kpi-label { font-size: 0.8rem; color: #aaa; text-transform: uppercase; }
+        
+        .chart-box { height: 300px; background: #000; padding: 10px; border-radius: 8px; }
+
+        /* --- Audience Selector --- */
+        .role-btn {
+            display: block; width: 100%; text-align: left; padding: 10px; margin-bottom: 5px;
+            background: #111; border: 1px solid #333; color: #ccc; border-radius: 4px; cursor: pointer;
+        }
+        .role-btn:hover { background: #333; }
+        .role-btn.active { background: var(--info); color: white; border-color: var(--info); }
+
+        /* --- Feedback Loop Styles --- */
+        .ticket-list { max-height: 400px; overflow-y: auto; }
+        .ticket {
+            background: #111; padding: 10px; margin-bottom: 10px; border-radius: 4px;
+            border-left: 4px solid var(--warning); display: flex; justify-content: space-between; align-items: center;
+        }
+        .ticket-info { font-size: 0.9rem; }
+        .ticket-actions button { margin-left: 5px; font-size: 0.8rem; padding: 4px 8px; }
+        
+        .btn-confirm { background: var(--danger); color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-fp { background: var(--success); color: white; border: none; border-radius: 4px; cursor: pointer; }
+
+        .engine-status { margin-top: 20px; padding: 10px; background: #111; border: 1px dashed #555; border-radius: 4px; font-family: monospace; font-size: 0.9rem; }
+
+        /* --- Alert Manager Styles --- */
+        .alert-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #333; }
+        input[type=range] { width: 100px; }
+        
+        /* --- Logs --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 100px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem; margin-top: 20px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Reporting & Feedback Loops</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('dash')">1. Audience Dashboards</button>
+        <button class="tab-btn" onclick="switchTab('loop')">2. Feedback Loop (Tuning)</button>
+        <button class="tab-btn" onclick="switchTab('alert')">3. Alert Thresholds</button>
+    </div>
+
+    <!-- TAB 1: DASHBOARDS -->
+    <div id="dash" class="tab-content active">
+        <div class="container">
+            <!-- Sidebar -->
+            <div class="card">
+                <h3>Select Audience</h3>
+                <button id="btn-exec" class="role-btn active" onclick="loadView('exec')">🏢 Executive (CISO/Board)</button>
+                <button id="btn-manager" class="role-btn" onclick="loadView('manager')">👔 Management (AppSec Lead)</button>
+                <button id="btn-dev" class="role-btn" onclick="loadView('dev')">💻 Operational (Developer)</button>
+                
+                <div style="margin-top:20px; font-size:0.8rem; color:#aaa">
+                    <strong>Tip:</strong> Executives care about Risk & Money. Devs care about Bugs & Tasks.
+                </div>
+            </div>
+
+            <!-- Main View -->
+            <div class="card">
+                <h3 id="dashTitle">Executive Risk Overview</h3>
+                
+                <div class="kpi-grid" id="kpiContainer">
+                    <!-- Injected via JS -->
+                </div>
+
+                <div class="chart-box">
+                    <canvas id="mainChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: FEEDBACK LOOP -->
+    <div id="loop" class="tab-content">
+        <div class="container">
+            <div class="card">
+                <h3>SAST Findings Inbox</h3>
+                <p>Developers have flagged these issues. Review them to tune the engine.</p>
+                <div class="ticket-list" id="ticketList">
+                    <!-- Tickets -->
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Scanning Engine Config</h3>
+                <p>Adjust the rules based on feedback to reduce noise.</p>
+                
+                <div class="engine-status" id="engineConfig">
+                    Rule: SQL Injection [ACTIVE]<br>
+                    Rule: Hardcoded Secrets [ACTIVE]<br>
+                    Rule: Console.log Usage [ACTIVE] <span style="color:yellow">(Noisy)</span><br>
+                    Confidence Threshold: Medium
+                </div>
+
+                <div style="margin-top:20px;">
+                    <div style="font-weight:bold; margin-bottom:5px">Feedback Stats:</div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.9rem;">
+                        <span>Valid Bugs: <strong style="color:var(--danger)" id="countValid">0</strong></span>
+                        <span>False Positives: <strong style="color:var(--success)" id="countFP">0</strong></span>
+                    </div>
+                    <div style="background:#333; height:10px; border-radius:5px; margin-top:5px; overflow:hidden">
+                        <div id="fpBar" style="width:50%; background:var(--success); height:100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: ALERTS -->
+    <div id="alert" class="tab-content">
+        <div class="card" style="max-width:800px; margin:0 auto;">
+            <h3>Alert Fatigue Manager</h3>
+            <p>Configure notification thresholds. Too many alerts = Ignored emails.</p>
+            
+            <div class="alert-row">
+                <div>
+                    <strong>Critical Vulnerabilities</strong><br>
+                    <small>Immediate risk (e.g., Log4j)</small>
+                </div>
+                <select style="background:#111; color:white; border:1px solid #555; padding:5px">
+                    <option>Email + SMS (Immediate)</option>
+                    <option>JIRA Ticket</option>
+                </select>
+            </div>
+
+            <div class="alert-row">
+                <div>
+                    <strong>Medium Vulnerabilities</strong><br>
+                    <small>Standard bugs</small>
+                </div>
+                <select style="background:#111; color:white; border:1px solid #555; padding:5px">
+                    <option>JIRA Ticket (Weekly)</option>
+                    <option>Email Immediate</option>
+                </select>
+            </div>
+
+            <div class="alert-row">
+                <div>
+                    <strong>Failed Unit Tests</strong><br>
+                    <small>Broken build</small>
+                </div>
+                <select style="background:#111; color:white; border:1px solid #555; padding:5px">
+                    <option>Slack Channel</option>
+                    <option>Email All Devs</option>
+                </select>
+            </div>
+
+            <button onclick="log('Alert Policy Updated. Focusing on high-value signals.')" style="margin-top:20px; background:var(--info); border:none; padding:10px; color:white; cursor:pointer; width:100%">Save Policy</button>
+        </div>
+    </div>
+
+    <div class="log-terminal" id="logs">
+        <div>> Reporting Engine Online.</div>
+    </div>
+
+    <script>
+        /* --- TABS --- */
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'dash':0, 'loop':1, 'alert':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg) {
+            const term = document.getElementById('logs');
+            term.innerHTML += `<div>> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- DASHBOARD LOGIC --- */
+        let chartInstance = null;
+
+        function loadView(role) {
+            // Update active state reliably using IDs
+            document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById(`btn-${role}`);
+            if(activeBtn) activeBtn.classList.add('active');
+
+            const kpiBox = document.getElementById('kpiContainer');
+            const title = document.getElementById('dashTitle');
+            
+            let chartLabel = "";
+            let chartData = [];
+            let chartColor = "";
+
+            if (role === 'exec') {
+                title.innerText = "Executive Risk Scorecard";
+                kpiBox.innerHTML = `
+                    <div class="kpi-box"><div class="kpi-val" style="color:var(--danger)">High</div><div class="kpi-label">Overall Risk</div></div>
+                    <div class="kpi-box"><div class="kpi-val" style="color:var(--success)">$2M</div><div class="kpi-label">Est. Loss Prevented</div></div>
+                    <div class="kpi-box"><div class="kpi-val">85%</div><div class="kpi-label">Compliance Rate</div></div>
+                `;
+                chartLabel = "Risk Reduction Trend (Yearly)";
+                chartData = [90, 85, 80, 75, 60, 40];
+                chartColor = "#8b5cf6";
+            } 
+            else if (role === 'manager') {
+                title.innerText = "AppSec Operations View";
+                kpiBox.innerHTML = `
+                    <div class="kpi-box"><div class="kpi-val">14 Days</div><div class="kpi-label">Avg MTTR</div></div>
+                    <div class="kpi-box"><div class="kpi-val">120</div><div class="kpi-label">Open Findings</div></div>
+                    <div class="kpi-box"><div class="kpi-val">98%</div><div class="kpi-label">Scan Coverage</div></div>
+                `;
+                chartLabel = "Vulnerability Backlog (Monthly)";
+                chartData = [50, 60, 55, 80, 100, 120]; // Going up!
+                chartColor = "#f59e0b";
+            }
+            else { // Dev
+                title.innerText = "Developer Task Board";
+                kpiBox.innerHTML = `
+                    <div class="kpi-box"><div class="kpi-val" style="color:var(--danger)">3</div><div class="kpi-label">Blocking Issues</div></div>
+                    <div class="kpi-box"><div class="kpi-val">5</div><div class="kpi-label">Pending PRs</div></div>
+                    <div class="kpi-box"><div class="kpi-val" style="color:var(--success)">0</div><div class="kpi-label">Failed Tests</div></div>
+                `;
+                chartLabel = "New Bugs vs Fixed Bugs (Weekly)";
+                chartData = [5, 2, 8, 4, 3, 1];
+                chartColor = "#3b82f6";
+            }
+
+            renderChart(chartLabel, chartData, chartColor);
+            log(`Dashboard View Switched: ${role.toUpperCase()}`);
+        }
+
+        function renderChart(label, data, color) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            if(chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'],
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '33', // transparent
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#ccc' } } },
+                    scales: {
+                        y: { grid: { color: '#333' }, ticks: { color: '#aaa' } },
+                        x: { grid: { display: false }, ticks: { color: '#aaa' } }
+                    }
+                }
+            });
+        }
+
+        /* --- FEEDBACK LOOP LOGIC --- */
+        const tickets = [
+            { id: 101, name: "SQL Injection in Login", file: "auth.js", reporter: "Scanner" },
+            { id: 102, name: "Hardcoded Secret (AWS)", file: "config.yaml", reporter: "Scanner" },
+            { id: 103, name: "Console.log left in prod", file: "utils.js", reporter: "Scanner" },
+            { id: 104, name: "Weak Random Number", file: "game.js", reporter: "Scanner" }
+        ];
+
+        let validCount = 0;
+        let fpCount = 0;
+
+        function loadTickets() {
+            const list = document.getElementById('ticketList');
+            list.innerHTML = "";
+            tickets.forEach(t => {
+                list.innerHTML += `
+                    <div class="ticket" id="t-${t.id}">
+                        <div class="ticket-info">
+                            <strong>${t.name}</strong><br>
+                            <span style="color:#aaa">${t.file}</span>
+                        </div>
+                        <div class="ticket-actions">
+                            <button class="btn-confirm" onclick="resolveTicket(${t.id}, 'valid')">Confirm Bug</button>
+                            <button class="btn-fp" onclick="resolveTicket(${t.id}, 'fp')">Mark False Positive</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function resolveTicket(id, type) {
+            const el = document.getElementById(`t-${id}`);
+            el.style.opacity = 0.5;
+            el.style.pointerEvents = 'none';
+            
+            if (type === 'valid') {
+                validCount++;
+                el.style.borderLeftColor = "var(--danger)";
+                log(`Ticket #${id} Confirmed. Sent to JIRA.`);
+            } else {
+                fpCount++;
+                el.style.borderLeftColor = "var(--success)";
+                log(`Ticket #${id} marked False Positive. Tuning Engine...`);
+                tuneEngine(id);
+            }
+            updateStats();
+        }
+
+        function tuneEngine(id) {
+            // Simulate tuning logic
+            const status = document.getElementById('engineConfig');
+            if (id === 103) { // Console log
+                status.innerHTML = status.innerHTML.replace("Console.log Usage [ACTIVE]", "Console.log Usage [DISABLED]");
+                log("Action: Disabled 'Console.log' rule to reduce noise.");
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('countValid').innerText = validCount;
+            document.getElementById('countFP').innerText = fpCount;
+            
+            const total = validCount + fpCount;
+            if(total > 0) {
+                const fpPct = (fpCount / total) * 100;
+                document.getElementById('fpBar').style.width = fpPct + "%";
+            }
+        }
+
+        // Init
+        setTimeout(() => {
+            loadView('exec');
+            loadTickets();
+        }, 100);
+
+    </script>
+</body>
+</html>

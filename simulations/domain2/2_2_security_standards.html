@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 2: Security Standards & Awareness</title>
+    <style>
+        :root {
+            --bg: #111827;
+            --panel: #1f2937;
+            --text: #f3f4f6;
+            --accent: #14b8a6; /* Teal */
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --iso: #8b5cf6;    /* Violet for ISO */
+            --asvs: #f43f5e;   /* Rose for ASVS */
+            --cc: #f59e0b;     /* Amber for Common Criteria */
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid #374151; padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1000px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid #374151; margin-bottom: 20px; position: relative;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid #374151; padding-bottom: 10px; }
+
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--accent); color: white; }
+        .btn-check { background: var(--info); color: white; }
+
+        /* --- Gap Analysis Styles --- */
+        .framework-selector {
+            display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; background: #111; padding: 10px; border-radius: 8px;
+        }
+        .framework-selector select { width: auto; font-size: 1rem; }
+
+        .control-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #111; padding: 10px; margin-bottom: 5px; border-radius: 4px;
+            border-left: 4px solid #555; transition: all 0.3s;
+        }
+        .control-row.pass { border-left-color: var(--success); }
+        .control-row.fail { border-left-color: var(--danger); }
+        .status-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; background: #333; min-width: 80px; text-align: center;}
+
+        /* --- Maturity Model Styles --- */
+        .maturity-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
+        .maturity-col { background: #111; padding: 10px; border-radius: 8px; border: 1px solid #333; text-align: center; }
+        .level-indicator {
+            height: 10px; background: #333; margin-top: 10px; border-radius: 5px; overflow: hidden;
+        }
+        .level-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.5s; }
+
+        /* BSIMM Chart */
+        .bsimm-container { margin-top: 20px; border-top: 1px solid #444; padding-top: 20px; }
+        .bsimm-row { display: grid; grid-template-columns: 150px 1fr 50px; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .bsimm-bar-bg { height: 20px; background: #333; border-radius: 10px; position: relative; overflow: hidden; }
+        .bsimm-bar-industry { position: absolute; height: 100%; background: #555; width: 0%; border-right: 2px solid #fff; opacity: 0.5; }
+        .bsimm-bar-you { position: absolute; height: 100%; background: var(--iso); width: 0%; top: 5px; bottom: 5px; height: 10px; border-radius: 5px; transition: width 1s; }
+        .bsimm-legend { display: flex; gap: 20px; justify-content: center; font-size: 0.8rem; margin-bottom: 10px; color: #aaa; }
+        .legend-item span { display: inline-block; width: 10px; height: 10px; margin-right: 5px; }
+
+        /* --- Awareness Styles --- */
+        .role-card {
+            background: #111; padding: 15px; border: 1px solid #333; border-radius: 6px;
+            margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+        }
+        select { background: #333; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; width: 100%; }
+
+        /* --- Log --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid #374151; color: #14b8a6; font-size: 0.9rem; margin-top: 20px;
+        }
+        .log-err { color: var(--danger); }
+        .log-ok { color: var(--success); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Security Frameworks & Compliance</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('gap')">1. Framework Auditor</button>
+        <button class="tab-btn" onclick="switchTab('maturity')">2. Maturity (SAMM vs BSIMM)</button>
+        <button class="tab-btn" onclick="switchTab('aware')">3. Awareness Training</button>
+    </div>
+
+    <!-- TAB 1: FRAMEWORK AUDITOR -->
+    <div id="gap" class="tab-content active">
+        <div class="card">
+            <h3>Compliance Gap Analysis</h3>
+            <p>Select a framework to audit the current project against.</p>
+            
+            <div class="framework-selector">
+                <label style="align-self:center; color:#aaa">Standard:</label>
+                <select id="fwSelect" onchange="loadFramework()">
+                    <option value="nist">NIST SP 800-53 (Federal/Gov)</option>
+                    <option value="iso">ISO/IEC 27001 (Management)</option>
+                    <option value="asvs">OWASP ASVS (Web App)</option>
+                    <option value="cc">Common Criteria (Product Eval)</option>
+                </select>
+            </div>
+
+            <div id="auditList">
+                <!-- Controls injected here -->
+            </div>
+
+            <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
+                <button class="btn-check" onclick="runAudit()">📋 Run Compliance Scan</button>
+                <div id="complianceScore" style="font-size:1.2rem; font-weight:bold;">Score: --</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: MATURITY MODELS -->
+    <div id="maturity" class="tab-content">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:20px;">
+                <h3 style="border:none; padding:0; margin:0">Maturity Models</h3>
+                <select id="modelSelect" style="width:auto" onchange="toggleModel()">
+                    <option value="samm">OWASP SAMM (Prescriptive)</option>
+                    <option value="bsimm">BSIMM (Descriptive/Benchmark)</option>
+                </select>
+            </div>
+
+            <!-- SAMM VIEW -->
+            <div id="view-samm">
+                <p><strong>OWASP SAMM:</strong> "Here is what you *should* do." Rate your current practices.</p>
+                <div class="maturity-grid">
+                    <div class="maturity-col">
+                        <strong>Governance</strong>
+                        <div style="font-size:0.8rem; color:#aaa; margin:10px 0">Strategy & Policy</div>
+                        <select id="mat-gov" onchange="updateSamm()">
+                            <option value="0">Level 0: None</option>
+                            <option value="1">Level 1: Ad-hoc</option>
+                            <option value="2">Level 2: Standardized</option>
+                            <option value="3">Level 3: Optimized</option>
+                        </select>
+                        <div class="level-indicator"><div class="level-fill" id="fill-gov"></div></div>
+                    </div>
+                    <div class="maturity-col">
+                        <strong>Construction</strong>
+                        <div style="font-size:0.8rem; color:#aaa; margin:10px 0">Secure Build</div>
+                        <select id="mat-con" onchange="updateSamm()">
+                            <option value="0">Level 0: None</option>
+                            <option value="1">Level 1: Basic</option>
+                            <option value="2">Level 2: Integrated</option>
+                            <option value="3">Level 3: Automated</option>
+                        </select>
+                        <div class="level-indicator"><div class="level-fill" id="fill-con"></div></div>
+                    </div>
+                    <div class="maturity-col">
+                        <strong>Verification</strong>
+                        <div style="font-size:0.8rem; color:#aaa; margin:10px 0">Testing & Audit</div>
+                        <select id="mat-ver" onchange="updateSamm()">
+                            <option value="0">Level 0: None</option>
+                            <option value="1">Level 1: Manual</option>
+                            <option value="2">Level 2: Automated</option>
+                            <option value="3">Level 3: Continuous</option>
+                        </select>
+                        <div class="level-indicator"><div class="level-fill" id="fill-ver"></div></div>
+                    </div>
+                </div>
+                <div id="sammResult" style="margin-top:20px; text-align:center; font-weight:bold; color:var(--accent)">
+                    Maturity: Level 0
+                </div>
+            </div>
+
+            <!-- BSIMM VIEW -->
+            <div id="view-bsimm" style="display:none;">
+                <p><strong>BSIMM:</strong> "Here is how you compare to everyone else."</p>
+                
+                <div class="bsimm-legend">
+                    <div class="legend-item"><span style="background:#555"></span> Industry Avg</div>
+                    <div class="legend-item"><span style="background:var(--iso)"></span> You</div>
+                </div>
+
+                <div class="bsimm-container">
+                    <div class="bsimm-row">
+                        <div>Governance</div>
+                        <div class="bsimm-bar-bg">
+                            <div class="bsimm-bar-industry" style="width:60%"></div>
+                            <div class="bsimm-bar-you" id="bsimm-gov" style="width:20%"></div>
+                        </div>
+                        <div id="bsimm-val-gov">20%</div>
+                    </div>
+                    <div class="bsimm-row">
+                        <div>Intelligence</div>
+                        <div class="bsimm-bar-bg">
+                            <div class="bsimm-bar-industry" style="width:45%"></div>
+                            <div class="bsimm-bar-you" id="bsimm-int" style="width:10%"></div>
+                        </div>
+                        <div id="bsimm-val-int">10%</div>
+                    </div>
+                    <div class="bsimm-row">
+                        <div>SSDL Touchpoints</div>
+                        <div class="bsimm-bar-bg">
+                            <div class="bsimm-bar-industry" style="width:70%"></div>
+                            <div class="bsimm-bar-you" id="bsimm-ssdl" style="width:30%"></div>
+                        </div>
+                        <div id="bsimm-val-ssdl">30%</div>
+                    </div>
+                    <div class="bsimm-row">
+                        <div>Deployment</div>
+                        <div class="bsimm-bar-bg">
+                            <div class="bsimm-bar-industry" style="width:55%"></div>
+                            <div class="bsimm-bar-you" id="bsimm-dep" style="width:40%"></div>
+                        </div>
+                        <div id="bsimm-val-dep">40%</div>
+                    </div>
+                </div>
+                <button class="btn-check" onclick="assessBSIMM()">📊 Run Assessment</button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- TAB 3: AWARENESS (Existing) -->
+    <div id="aware" class="tab-content">
+        <div class="card">
+            <h3>Security Awareness Campaign</h3>
+            <p>Assign the correct training module to the employee role.</p>
+            <div class="role-card">
+                <div><strong>👤 Alice (Developer)</strong><br><small>Backend Java Dev</small></div>
+                <select id="train-alice" style="width:200px">
+                    <option value="none">-- Select --</option>
+                    <option value="phish">Phishing 101</option>
+                    <option value="owasp">OWASP Top 10</option>
+                    <option value="risk">Risk Mgmt</option>
+                </select>
+            </div>
+            <div class="role-card">
+                <div><strong>👤 Bob (Executive)</strong><br><small>CEO</small></div>
+                <select id="train-bob" style="width:200px">
+                    <option value="none">-- Select --</option>
+                    <option value="phish">Phishing / Whaling</option>
+                    <option value="owasp">Secure Coding</option>
+                    <option value="risk">Liability & Risk</option>
+                </select>
+            </div>
+            <div class="role-card">
+                <div><strong>👤 Charlie (QA)</strong><br><small>Tester</small></div>
+                <select id="train-charlie" style="width:200px">
+                    <option value="none">-- Select --</option>
+                    <option value="fuzz">Security Testing (DAST)</option>
+                    <option value="policy">Writing Policy</option>
+                    <option value="net">Firewalls</option>
+                </select>
+            </div>
+            <button class="btn-action" onclick="checkTraining()">✅ Verify</button>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> GRC System Initialized.</div>
+    </div>
+
+    <script>
+        // --- DATA SETS ---
+        const frameworks = {
+            'nist': [
+                { id: "AC-2", name: "Account Management", implemented: true },
+                { id: "AC-3", name: "Access Enforcement", implemented: true },
+                { id: "AU-2", name: "Audit Events", implemented: false }, 
+                { id: "SC-8", name: "Transmission Confidentiality", implemented: true },
+                { id: "SI-2", name: "Flaw Remediation", implemented: false }
+            ],
+            'iso': [
+                { id: "A.5.1", name: "InfoSec Policies", implemented: true },
+                { id: "A.8.2", name: "Information Classification", implemented: false }, // GAP
+                { id: "A.9.2", name: "User Access Provisioning", implemented: true },
+                { id: "A.12.6", name: "Technical Vuln Mgmt", implemented: false }, // GAP
+                { id: "A.14.2", name: "Secure Development Policy", implemented: true }
+            ],
+            'asvs': [
+                { id: "V2.1.1", name: "Verify Password Length >= 12", implemented: false }, // GAP
+                { id: "V2.1.2", name: "Verify Password Complexity", implemented: true },
+                { id: "V3.1.1", name: "Verify Secure Session Tokens", implemented: true },
+                { id: "V5.3.3", name: "Verify Input Validation", implemented: true },
+                { id: "V14.4", name: "Verify HTTP Security Headers", implemented: false } // GAP
+            ],
+            'cc': [
+                { id: "ASE_SPD.1", name: "Security Problem Definition", implemented: true },
+                { id: "ADV_FSP.4", name: "Complete Functional Spec", implemented: false }, // GAP
+                { id: "ATE_COV.2", name: "Analysis of Coverage", implemented: true },
+                { id: "AVA_VAN.3", name: "Vulnerability Analysis", implemented: false }, // GAP
+                { id: "ALC_CMC.4", name: "Production Support", implemented: true }
+            ]
+        };
+
+        // --- TABS ---
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'gap':0, 'maturity':1, 'aware':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : '');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        // --- GAP ANALYSIS LOGIC ---
+        function loadFramework() {
+            const fw = document.getElementById('fwSelect').value;
+            const controls = frameworks[fw];
+            const list = document.getElementById('auditList');
+            
+            list.innerHTML = "";
+            controls.forEach(c => {
+                list.innerHTML += `
+                    <div class="control-row" id="row-${c.id.replace(/\./g,'_')}">
+                        <div>
+                            <strong>${c.id}</strong><br>
+                            <span style="font-size:0.8rem; color:#aaa">${c.name}</span>
+                        </div>
+                        <span class="status-badge" id="badge-${c.id.replace(/\./g,'_')}">Pending</span>
+                    </div>
+                `;
+            });
+            
+            // Reset Score
+            document.getElementById('complianceScore').innerText = "Score: --";
+            document.getElementById('complianceScore').style.color = "white";
+            
+            // Log
+            const names = {nist:'NIST 800-53', iso:'ISO 27001', asvs:'OWASP ASVS', cc:'Common Criteria'};
+            log(`Loaded Framework: ${names[fw]}`);
+        }
+
+        function runAudit() {
+            const fw = document.getElementById('fwSelect').value;
+            const controls = frameworks[fw];
+            let passed = 0;
+
+            log(`Starting audit for ${fw.toUpperCase()}...`);
+
+            controls.forEach(c => {
+                const idSafe = c.id.replace(/\./g,'_');
+                const row = document.getElementById(`row-${idSafe}`);
+                const badge = document.getElementById(`badge-${idSafe}`);
+
+                if(c.implemented) {
+                    row.classList.add('pass');
+                    row.classList.remove('fail');
+                    badge.innerText = "PASS";
+                    badge.style.color = "var(--success)";
+                    passed++;
+                } else {
+                    row.classList.add('fail');
+                    row.classList.remove('pass');
+                    badge.innerText = "FAIL";
+                    badge.style.color = "var(--danger)";
+                    log(`GAP DETECTED: ${c.id}`, 'err');
+                }
+            });
+
+            const score = Math.round((passed / controls.length) * 100);
+            const scoreEl = document.getElementById('complianceScore');
+            scoreEl.innerText = `Score: ${score}%`;
+            scoreEl.style.color = score === 100 ? "var(--success)" : "var(--danger)";
+        }
+
+        // --- MATURITY LOGIC ---
+        function toggleModel() {
+            const model = document.getElementById('modelSelect').value;
+            if(model === 'samm') {
+                document.getElementById('view-samm').style.display = 'block';
+                document.getElementById('view-bsimm').style.display = 'none';
+            } else {
+                document.getElementById('view-samm').style.display = 'none';
+                document.getElementById('view-bsimm').style.display = 'block';
+            }
+        }
+
+        function updateSamm() {
+            const gov = parseInt(document.getElementById('mat-gov').value);
+            const con = parseInt(document.getElementById('mat-con').value);
+            const ver = parseInt(document.getElementById('mat-ver').value);
+
+            document.getElementById('fill-gov').style.width = (gov * 33) + "%";
+            document.getElementById('fill-con').style.width = (con * 33) + "%";
+            document.getElementById('fill-ver').style.width = (ver * 33) + "%";
+
+            const avg = (gov + con + ver) / 3;
+            document.getElementById('sammResult').innerText = `Maturity: Level ${avg.toFixed(1)}`;
+        }
+
+        function assessBSIMM() {
+            // Simulate an assessment result that improves
+            const scores = { gov: 50, int: 40, ssdl: 65, dep: 60 };
+            
+            document.getElementById('bsimm-gov').style.width = scores.gov + "%";
+            document.getElementById('bsimm-val-gov').innerText = scores.gov + "%";
+            
+            document.getElementById('bsimm-int').style.width = scores.int + "%";
+            document.getElementById('bsimm-val-int').innerText = scores.int + "%";
+            
+            document.getElementById('bsimm-ssdl').style.width = scores.ssdl + "%";
+            document.getElementById('bsimm-val-ssdl').innerText = scores.ssdl + "%";
+            
+            document.getElementById('bsimm-dep').style.width = scores.dep + "%";
+            document.getElementById('bsimm-val-dep').innerText = scores.dep + "%";
+
+            log("BSIMM Assessment Complete. Compare your purple bars to the grey industry average.", 'ok');
+        }
+
+        // --- AWARENESS LOGIC ---
+        function checkTraining() {
+            const alice = document.getElementById('train-alice').value;
+            const bob = document.getElementById('train-bob').value;
+            const charlie = document.getElementById('train-charlie').value;
+            let s = 0;
+
+            if(alice === 'owasp') s++;
+            if(bob === 'risk' || bob === 'phish') s++; // Execs need both really
+            if(charlie === 'fuzz') s++;
+
+            if(s >= 3) log("Training Plan: PERFECT.", 'ok');
+            else log("Training Plan: Mismatched roles found.", 'err');
+        }
+
+        // Init
+        loadFramework();
+
+    </script>
+</body>
+</html>

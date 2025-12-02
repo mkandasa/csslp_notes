@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 2: Legal & Integrated Risk</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #e2e8f0;
+            --accent: #f59e0b; /* Amber */
+            --iso: #8b5cf6;    /* Violet */
+            --pci: #f43f5e;    /* Rose */
+            --nist: #3b82f6;   /* Blue */
+            --owasp: #10b981;  /* Green */
+            --legal: #d946ef;  /* Magenta for Legal */
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1000px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); height: fit-content; margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--accent); color: white; }
+        .btn-check { background: var(--nist); color: white; }
+        .btn-legal { background: var(--legal); color: white; }
+
+        /* --- Existing Styles (Preserved) --- */
+        .framework-selector { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; background: #111; padding: 10px; border-radius: 8px; }
+        .framework-selector select { width: auto; font-size: 1rem; }
+        .control-row { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 10px; margin-bottom: 5px; border-radius: 4px; border-left: 4px solid #555; transition: all 0.3s; }
+        .control-row.pass { border-left-color: var(--owasp); }
+        .control-row.fail { border-left-color: var(--pci); }
+        .status-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; background: #333; min-width: 80px; text-align: center;}
+        
+        /* --- Legal Lab Styles --- */
+        .breach-scenario { background: #111; padding: 15px; border-radius: 6px; border-left: 4px solid var(--pci); margin-bottom: 15px; }
+        .timer-display { font-size: 1.5rem; font-weight: bold; color: var(--pci); text-align: center; margin: 10px 0; }
+        
+        .license-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #333; }
+        .lic-permissive { color: var(--owasp); }
+        .lic-copyleft { color: var(--pci); font-weight: bold; }
+
+        .escrow-vault {
+            width: 100px; height: 100px; background: #333; border: 4px solid #555; margin: 0 auto;
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; transition: all 0.5s; cursor: not-allowed;
+        }
+        .escrow-vault.open { border-color: var(--owasp); background: #064e3b; cursor: pointer; box-shadow: 0 0 20px var(--owasp); }
+
+        /* --- Log --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem; margin-top: 20px;
+        }
+        .log-err { color: var(--pci); }
+        .log-ok { color: var(--owasp); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Integrated Risk & Legal Compliance</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('gap')">1. Framework Auditor</button>
+        <button class="tab-btn" onclick="switchTab('legal')">2. Legal (Breach & IP)</button>
+        <button class="tab-btn" onclick="switchTab('escrow')">3. Code Escrow</button>
+    </div>
+
+    <!-- TAB 1: FRAMEWORK AUDITOR (Existing) -->
+    <div id="gap" class="tab-content active">
+        <div class="card">
+            <h3>Compliance Gap Analysis</h3>
+            <p>Select a framework to audit the current project against.</p>
+            
+            <div class="framework-selector">
+                <label style="align-self:center; color:#aaa">Standard:</label>
+                <select id="fwSelect" onchange="loadFramework()">
+                    <option value="nist">NIST SP 800-53 (Federal/Gov)</option>
+                    <option value="iso">ISO/IEC 27001 (Management)</option>
+                    <option value="asvs">OWASP ASVS (Web App)</option>
+                    <option value="cc">Common Criteria (Product Eval)</option>
+                </select>
+            </div>
+
+            <div id="auditList">
+                <!-- Controls injected here -->
+            </div>
+
+            <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
+                <button class="btn-check" onclick="runAudit()">📋 Run Compliance Scan</button>
+                <div id="complianceScore" style="font-size:1.2rem; font-weight:bold;">Score: --</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: LEGAL & IP (New) -->
+    <div id="legal" class="tab-content">
+        <div class="card">
+            <h3>Scenario 1: Data Breach Response</h3>
+            <div class="breach-scenario">
+                <strong>ALERT:</strong> Database containing EU Customer Data was exfiltrated.<br>
+                <small>Timestamp: Friday, 5:00 PM</small>
+            </div>
+            
+            <div class="timer-display" id="gdprTimer">GDPR Deadline: 72:00:00</div>
+            
+            <div style="display:flex; gap:10px;">
+                <button class="btn-legal" onclick="notifyRegulator()">📞 Notify DPA (Regulator)</button>
+                <button class="btn-action" onclick="notifyUsers()">📧 Notify Users</button>
+                <button class="btn-check" onclick="containBreach()">🛡️ Contain System</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Scenario 2: Open Source License Audit</h3>
+            <p>Scanning dependencies for "Viral" (Copyleft) licenses that force us to open-source our code.</p>
+            
+            <div style="background:#111; border-radius:6px; padding:10px;">
+                <div class="license-row">
+                    <span>react (MIT)</span>
+                    <span class="lic-permissive">Permissive (OK)</span>
+                </div>
+                <div class="license-row">
+                    <span>lodash (Apache 2.0)</span>
+                    <span class="lic-permissive">Permissive (OK)</span>
+                </div>
+                <div class="license-row">
+                    <span>super-algo-lib (GPL v3)</span>
+                    <span class="lic-copyleft">COPYLEFT (RISK)</span>
+                </div>
+            </div>
+
+            <button class="btn-legal" onclick="removeGPL()">🚫 Remediation: Replace GPL Library</button>
+        </div>
+    </div>
+
+    <!-- TAB 3: ESCROW (New) -->
+    <div id="escrow" class="tab-content">
+        <div class="card">
+            <h3>Scenario 3: Vendor Bankruptcy (Escrow Trigger)</h3>
+            <p>Your critical software vendor "SoftCorp" has declared bankruptcy. You need the source code to maintain business continuity.</p>
+            
+            <div style="text-align:center; margin:20px 0;">
+                <div class="escrow-vault" id="vaultIcon">🔒</div>
+                <div id="vaultStatus" style="margin-top:10px; color:#aaa">Vault Status: LOCKED by Escrow Agent</div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#111; padding:15px; border-radius:6px;">
+                <div>
+                    <strong>Legal Trigger:</strong> Bankruptcy Event Verified<br>
+                    <small>Contract Clause 9.2 activated.</small>
+                </div>
+                <button class="btn-legal" style="width:auto; margin:0;" onclick="triggerEscrow()">🔑 Request Release</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> Legal & Compliance Module Loaded.</div>
+    </div>
+
+    <script>
+        // --- DATA SETS ---
+        const frameworks = {
+            'nist': [
+                { id: "AC-2", name: "Account Management", implemented: true },
+                { id: "AC-3", name: "Access Enforcement", implemented: true },
+                { id: "AU-2", name: "Audit Events", implemented: false }, 
+                { id: "SC-8", name: "Transmission Confidentiality", implemented: true },
+                { id: "SI-2", name: "Flaw Remediation", implemented: false }
+            ],
+            'iso': [
+                { id: "A.5.1", name: "InfoSec Policies", implemented: true },
+                { id: "A.8.2", name: "Information Classification", implemented: false }, 
+                { id: "A.9.2", name: "User Access Provisioning", implemented: true },
+                { id: "A.12.6", name: "Technical Vuln Mgmt", implemented: false }, 
+                { id: "A.14.2", name: "Secure Development Policy", implemented: true }
+            ],
+            'asvs': [
+                { id: "V2.1.1", name: "Verify Password Length >= 12", implemented: false }, 
+                { id: "V2.1.2", name: "Verify Password Complexity", implemented: true },
+                { id: "V3.1.1", name: "Verify Secure Session Tokens", implemented: true },
+                { id: "V5.3.3", name: "Verify Input Validation", implemented: true },
+                { id: "V14.4", name: "Verify HTTP Security Headers", implemented: false } 
+            ],
+            'cc': [
+                { id: "ASE_SPD.1", name: "Security Problem Definition", implemented: true },
+                { id: "ADV_FSP.4", name: "Complete Functional Spec", implemented: false }, 
+                { id: "ATE_COV.2", name: "Analysis of Coverage", implemented: true },
+                { id: "AVA_VAN.3", name: "Vulnerability Analysis", implemented: false }, 
+                { id: "ALC_CMC.4", name: "Production Support", implemented: true }
+            ]
+        };
+
+        // --- TABS ---
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'gap':0, 'legal':1, 'escrow':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : '');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        // --- GAP ANALYSIS LOGIC (Existing) ---
+        function loadFramework() {
+            const fw = document.getElementById('fwSelect').value;
+            const controls = frameworks[fw];
+            const list = document.getElementById('auditList');
+            
+            list.innerHTML = "";
+            controls.forEach(c => {
+                list.innerHTML += `
+                    <div class="control-row" id="row-${c.id.replace(/\./g,'_')}">
+                        <div>
+                            <strong>${c.id}</strong><br>
+                            <span style="font-size:0.8rem; color:#aaa">${c.name}</span>
+                        </div>
+                        <span class="status-badge" id="badge-${c.id.replace(/\./g,'_')}">Pending</span>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('complianceScore').innerText = "Score: --";
+            document.getElementById('complianceScore').style.color = "white";
+            const names = {nist:'NIST 800-53', iso:'ISO 27001', asvs:'OWASP ASVS', cc:'Common Criteria'};
+            log(`Loaded Framework: ${names[fw]}`);
+        }
+
+        function runAudit() {
+            const fw = document.getElementById('fwSelect').value;
+            const controls = frameworks[fw];
+            let passed = 0;
+
+            log(`Starting audit for ${fw.toUpperCase()}...`);
+
+            controls.forEach(c => {
+                const idSafe = c.id.replace(/\./g,'_');
+                const row = document.getElementById(`row-${idSafe}`);
+                const badge = document.getElementById(`badge-${idSafe}`);
+
+                if(c.implemented) {
+                    row.classList.add('pass');
+                    row.classList.remove('fail');
+                    badge.innerText = "PASS";
+                    badge.style.color = "var(--owasp)";
+                    passed++;
+                } else {
+                    row.classList.add('fail');
+                    row.classList.remove('pass');
+                    badge.innerText = "FAIL";
+                    badge.style.color = "var(--pci)";
+                    log(`GAP DETECTED: ${c.id}`, 'err');
+                }
+            });
+
+            const score = Math.round((passed / controls.length) * 100);
+            const scoreEl = document.getElementById('complianceScore');
+            scoreEl.innerText = `Score: ${score}%`;
+            scoreEl.style.color = score === 100 ? "var(--owasp)" : "var(--pci)";
+        }
+
+        /* --- LEGAL & IP LOGIC (New) --- */
+        let breachNotified = false;
+        
+        function notifyRegulator() {
+            if(breachNotified) { log("Regulator already notified.", 'err'); return; }
+            log("GDPR: Data Protection Authority (DPA) Notified within 72h window.", 'ok');
+            document.getElementById('gdprTimer').style.color = "var(--owasp)";
+            document.getElementById('gdprTimer').innerText = "COMPLIANT";
+            breachNotified = true;
+        }
+
+        function notifyUsers() {
+            log("Users notified. Transparency builds trust (even in a crisis).");
+        }
+
+        function containBreach() {
+            log("Systems isolated. Incident Response Team deployed.");
+        }
+
+        function removeGPL() {
+            log("IP Risk Mitigation: 'super-algo-lib' (GPL) removed.", 'ok');
+            log("Replaced with 'mit-algo-lib' (MIT). Proprietary code protected.", 'ok');
+            // Visual feedback
+            const rows = document.querySelectorAll('.license-row');
+            rows[2].innerHTML = `<span>mit-algo-lib (MIT)</span><span class="lic-permissive">Permissive (OK)</span>`;
+        }
+
+        /* --- ESCROW LOGIC (New) --- */
+        function triggerEscrow() {
+            log("Escrow Agent: Verifying Bankruptcy Filing...", 'info');
+            setTimeout(() => {
+                log("Escrow Condition Met. Releasing Source Code...", 'ok');
+                const vault = document.getElementById('vaultIcon');
+                vault.classList.add('open');
+                vault.innerText = "🔓";
+                document.getElementById('vaultStatus').innerText = "Vault Status: RELEASED to Customer";
+                document.getElementById('vaultStatus').style.color = "var(--owasp)";
+            }, 1500);
+        }
+
+        // Init
+        loadFramework();
+
+    </script>
+</body>
+</html>
