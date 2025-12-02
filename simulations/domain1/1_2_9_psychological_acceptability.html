@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Psychological Acceptability</title>
+    <style>
+        :root {
+            --bg: #fafafa;
+            --panel: #ffffff;
+            --text: #18181b;
+            --accent: #6366f1; /* Indigo */
+            --pain: #ef4444;   /* Red */
+            --joy: #10b981;    /* Green */
+            --neutral: #71717a;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; color: var(--accent); }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #52525b;
+            border: 1px solid #d4d4d8; padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #f4f4f5; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 900px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 30px; border-radius: 12px;
+            border: 1px solid #e4e4e7; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .card h3 { margin-top: 0; color: #27272a; border-bottom: 1px solid #f4f4f5; padding-bottom: 10px; }
+
+        input {
+            width: 100%; padding: 10px; margin-top: 5px; border-radius: 6px;
+            border: 1px solid #d4d4d8; font-size: 1rem; box-sizing: border-box;
+        }
+        
+        button {
+            padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; margin-top: 15px; width: 100%;
+            font-size: 1rem;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-joy { background: var(--joy); color: white; }
+        .btn-pain { background: var(--pain); color: white; }
+        .btn-neutral { background: var(--text); color: white; }
+
+        /* --- UX Meter --- */
+        .ux-meter {
+            display: flex; height: 10px; background: #e4e4e7; border-radius: 5px; margin-top: 20px; overflow: hidden;
+        }
+        .ux-fill { width: 50%; background: var(--neutral); transition: width 0.5s, background 0.5s; }
+        .ux-label { text-align: right; font-size: 0.8rem; margin-top: 5px; font-weight: bold; }
+
+        /* --- Tab 1: Password Complexity --- */
+        .req-list { list-style: none; padding: 0; font-size: 0.85rem; color: var(--pain); }
+        .req-item { margin-bottom: 5px; display: flex; align-items: center; }
+        .req-item::before { content: '❌'; margin-right: 8px; }
+        .req-item.met { color: var(--joy); }
+        .req-item.met::before { content: '✅'; }
+
+        /* --- Tab 2: Passwordless --- */
+        .bio-scanner {
+            width: 80px; height: 80px; margin: 20px auto; border-radius: 20px;
+            background: #f4f4f5; display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; cursor: pointer; border: 2px solid #d4d4d8; transition: all 0.3s;
+        }
+        .bio-scanner:active { transform: scale(0.95); background: #e4e4e7; }
+        .bio-success { border-color: var(--joy); background: #ecfdf5; color: var(--joy); }
+
+        /* --- Tab 3: CAPTCHA --- */
+        .captcha-box {
+            background: #f4f4f5; padding: 15px; border: 1px solid #d4d4d8;
+            margin-top: 10px; text-align: center; font-family: 'Courier New', monospace;
+            letter-spacing: 3px; font-weight: bold; font-size: 1.2rem;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><path d="M0 0 L100 100 M100 0 L0 100" stroke="rgba(0,0,0,0.1)"/></svg>');
+            user-select: none;
+        }
+        
+        .invisible-captcha {
+            border: 1px solid #e4e4e7; padding: 15px; background: #fff; border-radius: 6px;
+            display: flex; align-items: center; justify-content: space-between; margin-top: 10px;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3; border-top: 3px solid var(--joy); border-radius: 50%;
+            width: 20px; height: 20px; animation: spin 1s linear infinite; display: none;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Psychological Acceptability</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('policy')">1. The "Bad Policy"</button>
+        <button class="tab-btn" onclick="switchTab('fido')">2. Passwordless (Joy)</button>
+        <button class="tab-btn" onclick="switchTab('captcha')">3. CAPTCHA Friction</button>
+    </div>
+
+    <!-- TAB 1: BAD POLICY -->
+    <div id="policy" class="tab-content active">
+        <div class="card">
+            <h3>Scenario: The "Secure" Password Policy</h3>
+            <p><strong>Goal:</strong> Create a password. Notice how the restrictions make you want to give up or write it down.</p>
+            
+            <input type="text" id="complexInput" placeholder="Type password here..." oninput="checkPolicy()">
+            
+            <ul class="req-list">
+                <li id="r1" class="req-item">At least 12 characters</li>
+                <li id="r2" class="req-item">At least 1 Uppercase</li>
+                <li id="r3" class="req-item">At least 1 Number</li>
+                <li id="r4" class="req-item">At least 1 Symbol (!@#$)</li>
+                <li id="r5" class="req-item">Cannot contain "password", "123", or your name</li>
+                <li id="r6" class="req-item">Must not match last 5 passwords (Simulated)</li>
+            </ul>
+
+            <button id="btnPolicy" class="btn-pain" disabled onclick="submitPolicy()">Create Account</button>
+            
+            <div style="margin-top:20px">
+                <label>User Frustration Level:</label>
+                <div class="ux-meter"><div class="ux-fill" id="ux1" style="width:90%; background:var(--pain)"></div></div>
+                <div class="ux-label" id="label1" style="color:var(--pain)">HIGH</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: PASSWORDLESS -->
+    <div id="fido" class="tab-content">
+        <div class="card">
+            <h3>Scenario: Passwordless (FIDO2 / WebAuthn)</h3>
+            <p><strong>Goal:</strong> Login securely without remembering anything. The "Gold Standard" of usability.</p>
+            
+            <div style="text-align:center">
+                <div class="bio-scanner" id="bioBtn" onclick="runBioAuth()">
+                    👆
+                </div>
+                <div id="bioStatus" style="color:var(--neutral)">Tap fingerprint to login</div>
+            </div>
+
+            <div style="margin-top:20px">
+                <label>User Frustration Level:</label>
+                <div class="ux-meter"><div class="ux-fill" id="ux2" style="width:5%; background:var(--joy)"></div></div>
+                <div class="ux-label" id="label2" style="color:var(--joy)">NONE</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: CAPTCHA -->
+    <div id="captcha" class="tab-content">
+        <div class="card">
+            <h3>Scenario: CAPTCHA Evolution</h3>
+            <p>Compare the friction of proving "I am human."</p>
+
+            <!-- Old School -->
+            <div style="border:1px solid #eee; padding:15px; border-radius:8px; margin-bottom:20px;">
+                <strong>v1.0: Distorted Text (High Friction)</strong>
+                <div class="captcha-box">S m 3 # k L 9</div>
+                <input type="text" placeholder="Type characters above" id="capInput">
+                <button class="btn-pain" onclick="checkCaptcha()">Verify</button>
+                <div id="capResult" style="margin-top:5px; font-size:0.9rem;"></div>
+            </div>
+
+            <!-- Modern -->
+            <div style="border:1px solid #eee; padding:15px; border-radius:8px; background:#f9fafb">
+                <strong>v3.0: Invisible / Passive (Zero Friction)</strong>
+                <div class="invisible-captcha">
+                    <span style="font-size:0.9rem">Protected by reCAPTCHA</span>
+                    <div id="spinner" class="spinner"></div>
+                    <div id="passiveResult" style="color:var(--joy); font-weight:bold; display:none">✅ Verified (Score: 0.9)</div>
+                </div>
+                <button class="btn-joy" onclick="runPassive()">Login</button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'policy':0, 'fido':1, 'captcha':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        /* --- TAB 1: POLICY --- */
+        function checkPolicy() {
+            const val = document.getElementById('complexInput').value;
+            let score = 0;
+
+            // R1: Length
+            if(val.length >= 12) { document.getElementById('r1').classList.add('met'); score++; }
+            else document.getElementById('r1').classList.remove('met');
+
+            // R2: Upper
+            if(/[A-Z]/.test(val)) { document.getElementById('r2').classList.add('met'); score++; }
+            else document.getElementById('r2').classList.remove('met');
+
+            // R3: Number
+            if(/[0-9]/.test(val)) { document.getElementById('r3').classList.add('met'); score++; }
+            else document.getElementById('r3').classList.remove('met');
+
+            // R4: Symbol
+            if(/[!@#$%^&*]/.test(val)) { document.getElementById('r4').classList.add('met'); score++; }
+            else document.getElementById('r4').classList.remove('met');
+
+            // R5: Common words
+            if(!/password|123|admin/i.test(val) && val.length > 0) { document.getElementById('r5').classList.add('met'); score++; }
+            else if(val.length === 0) document.getElementById('r5').classList.remove('met'); // Default state
+            else document.getElementById('r5').classList.remove('met');
+
+            // R6: History (Free pass for simulation)
+            document.getElementById('r6').classList.add('met'); score++;
+
+            // UX Meter Logic (More reqs met = slightly less frustration because "I'm almost done", but the effort remains high)
+            // Actually, usability theory says frustration PEAKS when you struggle to meet specific rules.
+            // We'll keep frustration high until success.
+            
+            const btn = document.getElementById('btnPolicy');
+            if(score === 6) {
+                btn.disabled = false;
+                btn.classList.remove('btn-pain');
+                btn.classList.add('btn-joy');
+                btn.innerText = "Create Account";
+                
+                // Success reduces frustration
+                document.getElementById('ux1').style.width = "20%";
+                document.getElementById('ux1').style.background = "var(--joy)";
+                document.getElementById('label1').innerText = "LOW (Finally Done)";
+                document.getElementById('label1').style.color = "var(--joy)";
+            } else {
+                btn.disabled = true;
+                btn.classList.add('btn-pain');
+                btn.classList.remove('btn-joy');
+                btn.innerText = "Requirements Not Met";
+                
+                document.getElementById('ux1').style.width = "90%";
+                document.getElementById('ux1').style.background = "var(--pain)";
+                document.getElementById('label1').innerText = "HIGH (Struggling)";
+                document.getElementById('label1').style.color = "var(--pain)";
+            }
+        }
+
+        function submitPolicy() {
+            alert("Account Created! Now try to remember that password in 2 weeks...");
+        }
+
+        /* --- TAB 2: FIDO --- */
+        function runBioAuth() {
+            const btn = document.getElementById('bioBtn');
+            const status = document.getElementById('bioStatus');
+            
+            status.innerText = "Scanning...";
+            
+            setTimeout(() => {
+                btn.classList.add('bio-success');
+                btn.innerHTML = "🔓";
+                status.innerText = "Authenticated!";
+                status.style.color = "var(--joy)";
+            }, 800);
+        }
+
+        /* --- TAB 3: CAPTCHA --- */
+        function checkCaptcha() {
+            const val = document.getElementById('capInput').value;
+            const res = document.getElementById('capResult');
+            // Hardcoded check for demo
+            if(val === "Sm3#kL9") {
+                res.innerHTML = "<span style='color:var(--joy)'>Correct.</span>";
+            } else {
+                res.innerHTML = "<span style='color:var(--pain)'>Incorrect. Try again.</span>";
+            }
+        }
+
+        function runPassive() {
+            const spin = document.getElementById('spinner');
+            const res = document.getElementById('passiveResult');
+            
+            spin.style.display = 'block';
+            
+            setTimeout(() => {
+                spin.style.display = 'none';
+                res.style.display = 'block';
+            }, 1000);
+        }
+
+    </script>
+</body>
+</html>

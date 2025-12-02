@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Least Privilege & Zero Trust</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #e2e8f0;
+            --accent: #38bdf8; /* Sky Blue */
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .container {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            width: 100%; max-width: 1000px;
+        }
+
+        .card {
+            background: var(--panel); padding: 20px; border-radius: 8px;
+            border: 1px solid #334155; position: relative;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid #334155; padding-bottom: 5px; }
+
+        /* --- File System View --- */
+        .file-list { display: flex; flex-direction: column; gap: 8px; }
+        .file-item {
+            background: #0f172a; padding: 10px; border-radius: 4px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-left: 4px solid #64748b;
+        }
+        .file-item.critical { border-left-color: var(--danger); }
+        .file-item.public { border-left-color: var(--success); }
+        
+        .perm-tag { font-family: monospace; font-size: 0.8rem; background: #333; padding: 2px 5px; border-radius: 3px; }
+
+        /* --- Context/User Controls --- */
+        .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        select, button { padding: 5px 10px; border-radius: 4px; border: none; cursor: pointer; }
+        button { font-weight: bold; background: var(--accent); color: #000; }
+        button:hover { opacity: 0.9; }
+        button.exploit-btn { background: var(--danger); color: white; width: 100%; margin-top: 10px; }
+        
+        .risk-meter {
+            height: 10px; background: #333; border-radius: 5px; margin-top: 5px; overflow: hidden;
+        }
+        .risk-fill { height: 100%; width: 0%; background: var(--success); transition: width 0.3s, background 0.3s; }
+
+        /* --- Logs --- */
+        .log-box {
+            grid-column: span 2; background: #000; height: 150px;
+            padding: 10px; overflow-y: auto; font-family: monospace;
+            border-radius: 6px; border: 1px solid #333; font-size: 0.9rem;
+        }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #111; }
+        .log-deny { color: var(--danger); }
+        .log-allow { color: var(--success); }
+
+        /* Zero Trust Toggle */
+        .zt-switch {
+            display: flex; align-items: center; gap: 10px; background: #111;
+            padding: 10px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Least Privilege & Zero Trust Simulator</h1>
+
+    <div class="zt-switch">
+        <label style="font-weight:bold; color:var(--warning)">🔒 Zero Trust Engine:</label>
+        <button id="ztToggle" onclick="toggleZeroTrust()" style="background:#333; color:white">DISABLED</button>
+        <span style="font-size:0.8rem; color:#999">When ENABLED, high-risk contexts block access regardless of role.</span>
+    </div>
+
+    <div class="container">
+        
+        <!-- Left: Context Manager -->
+        <div class="card">
+            <h3>1. Identity & Context</h3>
+            
+            <div class="control-row">
+                <label>Current Role:</label>
+                <select id="userRole" onchange="updateRisk()">
+                    <option value="guest">Guest (Low Priv)</option>
+                    <option value="employee">Employee (Med Priv)</option>
+                    <option value="admin">System Admin (High Priv)</option>
+                    <option value="root">ROOT / SYSTEM (God Mode)</option>
+                </select>
+            </div>
+
+            <div class="control-row">
+                <label>Device Health:</label>
+                <select id="deviceHealth" onchange="updateRisk()">
+                    <option value="managed">Managed & Patched</option>
+                    <option value="unknown">Unknown Device</option>
+                    <option value="infected">Infected / Jailbroken</option>
+                </select>
+            </div>
+
+            <div class="control-row">
+                <label>Location IP:</label>
+                <select id="location" onchange="updateRisk()">
+                    <option value="internal">Corporate Office (Internal)</option>
+                    <option value="home">Home (VPN)</option>
+                    <option value="foreign">Unknown Foreign IP</option>
+                </select>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <label>Calculated Risk Score:</label>
+                <div class="risk-meter"><div class="risk-fill" id="riskBar"></div></div>
+                <div id="riskText" style="text-align: right; font-size: 0.8rem; margin-top: 5px;">Low Risk</div>
+            </div>
+        </div>
+
+        <!-- Right: Resource Access -->
+        <div class="card">
+            <h3>2. Protected Resources</h3>
+            <p style="font-size:0.8rem; color:#999">Try to access resources. The Policy Engine will evaluate Role + Context.</p>
+
+            <div class="file-list">
+                <!-- Public File -->
+                <div class="file-item public">
+                    <div>
+                        <strong>public_info.txt</strong><br>
+                        <span class="perm-tag">ACL: Guest+</span>
+                    </div>
+                    <button onclick="attemptAccess('public_info.txt', 10)">READ</button>
+                </div>
+
+                <!-- Internal DB -->
+                <div class="file-item">
+                    <div>
+                        <strong>employee_salary.db</strong><br>
+                        <span class="perm-tag">ACL: Employee+</span>
+                    </div>
+                    <button onclick="attemptAccess('employee_salary.db', 50)">READ</button>
+                </div>
+
+                <!-- System Config -->
+                <div class="file-item critical">
+                    <div>
+                        <strong>/etc/shadow (Passwords)</strong><br>
+                        <span class="perm-tag">ACL: Root Only</span>
+                    </div>
+                    <button onclick="attemptAccess('/etc/shadow', 90)">WRITE</button>
+                </div>
+            </div>
+
+            <hr style="border-color:#333">
+            
+            <!-- Exploitation Sim -->
+            <h4 style="margin:5px 0">Malware Simulation</h4>
+            <p style="font-size:0.8rem">Simulate a buffer overflow script running under the <strong>Current Role</strong>.</p>
+            <button class="exploit-btn" onclick="runExploit()">💥 Execute Malware Payload</button>
+        </div>
+
+        <!-- Logs -->
+        <div class="log-box" id="logConsole">
+            <div class="log-entry">> Policy Engine initialized...</div>
+            <div class="log-entry">> Waiting for access requests...</div>
+        </div>
+
+    </div>
+
+    <script>
+        let zeroTrustEnabled = false;
+        let riskScore = 0; // 0-100
+
+        // Config: Minimum role levels required for files (simple numeric hierarchy)
+        const roleLevels = {
+            'guest': 10,
+            'employee': 50,
+            'admin': 80,
+            'root': 100
+        };
+
+        function toggleZeroTrust() {
+            zeroTrustEnabled = !zeroTrustEnabled;
+            const btn = document.getElementById('ztToggle');
+            if(zeroTrustEnabled) {
+                btn.innerText = "ENABLED";
+                btn.style.background = "#10b981";
+                log("Zero Trust Mode ACTIVATED. Context is now enforced.");
+            } else {
+                btn.innerText = "DISABLED";
+                btn.style.background = "#333";
+                log("Zero Trust Mode DEACTIVATED. Traditional ACLs only.");
+            }
+            updateRisk();
+        }
+
+        function updateRisk() {
+            // Calculate Risk Score based on Context
+            let score = 0;
+            const health = document.getElementById('deviceHealth').value;
+            const loc = document.getElementById('location').value;
+
+            if (health === 'unknown') score += 30;
+            if (health === 'infected') score += 90;
+            
+            if (loc === 'home') score += 20;
+            if (loc === 'foreign') score += 80;
+
+            riskScore = Math.min(score, 100);
+
+            // Visuals
+            const bar = document.getElementById('riskBar');
+            const txt = document.getElementById('riskText');
+            
+            bar.style.width = riskScore + "%";
+            
+            if (riskScore < 30) {
+                bar.style.background = "#10b981"; // Green
+                txt.innerText = "Low Risk";
+            } else if (riskScore < 70) {
+                bar.style.background = "#f59e0b"; // Orange
+                txt.innerText = "Medium Risk";
+            } else {
+                bar.style.background = "#ef4444"; // Red
+                txt.innerText = "HIGH RISK";
+            }
+        }
+
+        function attemptAccess(resource, requiredLevel) {
+            const role = document.getElementById('userRole').value;
+            const currentLevel = roleLevels[role];
+
+            // 1. Traditional ACL Check
+            if (currentLevel < requiredLevel) {
+                log(`<span class="log-deny">❌ BLOCK (ACL): Role '${role}' lacks permission for ${resource}.</span>`);
+                return;
+            }
+
+            // 2. Zero Trust Check (If enabled)
+            if (zeroTrustEnabled) {
+                // Policy: Block Critical resources if Risk > 50
+                // Policy: Block ANY resource if Risk > 80
+                
+                if (riskScore > 80) {
+                    log(`<span class="log-deny">⛔ BLOCK (Zero Trust): Risk Score (${riskScore}) too high. Access denied regardless of role.</span>`);
+                    return;
+                }
+
+                if (requiredLevel >= 80 && riskScore > 40) {
+                     log(`<span class="log-deny">⛔ BLOCK (Zero Trust): Cannot access critical resource ${resource} with Medium/High risk context.</span>`);
+                     return;
+                }
+            }
+
+            log(`<span class="log-allow">✅ ALLOW: Access granted to ${resource}.</span>`);
+        }
+
+        function runExploit() {
+            const role = document.getElementById('userRole').value;
+            
+            log(`⚠️ EXPLOIT: Malware executed buffer overflow...`);
+            
+            if (role === 'root') {
+                log(`<span class="log-deny" style="background:#311">☠️ CATASTROPHIC FAILURE: Malware running as ROOT. System wiped.</span>`);
+                alert("GAME OVER: You ran malware as Root. The principle of Least Privilege was violated.");
+            } else if (role === 'admin') {
+                log(`<span class="log-deny">🔥 CRITICAL DAMAGE: Malware running as Admin. Configuration corrupted.</span>`);
+            } else {
+                log(`<span class="log-allow" style="color:#aaa">🛡️ CONTAINED: Malware running as ${role}. Permission denied to system files. Attack failed.</span>`);
+            }
+        }
+
+        function log(msg) {
+            const box = document.getElementById('logConsole');
+            box.innerHTML += `<div class="log-entry">${msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // Init
+        updateRisk();
+
+    </script>
+</body>
+</html>

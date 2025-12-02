@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Confidentiality Workbench</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 { color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
+        h2 { margin-top: 30px; font-size: 1.2rem; color: #334155; }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 5px solid var(--primary);
+        }
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        button:hover { background-color: #1d4ed8; }
+        button.clear { background-color: #64748b; }
+        .output-box {
+            background-color: #f1f5f9;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+            min-height: 40px;
+            border: 1px solid #e2e8f0;
+        }
+        .concept-note {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        .warning {
+            color: #dc2626;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP Domain 1: Confidentiality Lab</h1>
+    <p>This tool demonstrates the difference between Encoding (No Confidentiality) and Encryption (Confidentiality).</p>
+
+    <div class="container">
+        
+        <!-- Input Section -->
+        <div class="card">
+            <label for="plainTextInput">Input Data (Plaintext):</label>
+            <textarea id="plainTextInput" rows="3" placeholder="Enter sensitive data here (e.g., Credit Card Number, PII)...">SecretProjectData2025</textarea>
+        </div>
+
+        <!-- Encoding Section -->
+        <div class="card" style="border-left-color: #f59e0b;">
+            <h2>1. Encoding (Base64)</h2>
+            <p class="concept-note">Encoding formats data for transmission/storage. It provides <strong>NO confidentiality</strong>. Anyone can reverse it without a key.</p>
+            <button onclick="encodeBase64()">Encode</button>
+            <button onclick="decodeBase64()" class="clear">Decode</button>
+            <br><br>
+            <label>Output:</label>
+            <div id="base64Output" class="output-box"></div>
+        </div>
+
+        <!-- Encryption Section -->
+        <div class="card" style="border-left-color: #10b981;">
+            <h2>2. Encryption (AES - Symmetric)</h2>
+            <p class="concept-note">Encryption uses a mathematical algorithm and a <strong>Key</strong>. Without the key, the data is confidential.</p>
+            
+            <label for="aesKey">Secret Key:</label>
+            <input type="text" id="aesKey" value="MySecretKey123" placeholder="Enter a key...">
+            
+            <button onclick="encryptAES()">Encrypt</button>
+            <button onclick="decryptAES()" class="clear">Decrypt</button>
+            <br><br>
+            <label>Ciphertext Output:</label>
+            <div id="aesOutput" class="output-box"></div>
+        </div>
+
+        <!-- Hashing Section -->
+        <div class="card" style="border-left-color: #8b5cf6;">
+            <h2>3. Hashing (SHA-256)</h2>
+            <p class="concept-note">Hashing is one-way. It is typically used for Integrity, but protecting passwords relies on the confidentiality of the plaintext being unrecoverable.</p>
+            <button onclick="hashSHA256()">Generate Hash</button>
+            <br><br>
+            <label>Hash Digest:</label>
+            <div id="hashOutput" class="output-box"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // Base64 Encoding
+        function encodeBase64() {
+            const input = document.getElementById('plainTextInput').value;
+            // Using CryptoJS for consistent handling of strings
+            const wordArray = CryptoJS.enc.Utf8.parse(input);
+            const base64 = CryptoJS.enc.Base64.stringify(wordArray);
+            document.getElementById('base64Output').innerText = base64;
+        }
+
+        function decodeBase64() {
+            const input = document.getElementById('base64Output').innerText;
+            if(!input) return;
+            try {
+                const parsedWordArray = CryptoJS.enc.Base64.parse(input);
+                const decodedString = parsedWordArray.toString(CryptoJS.enc.Utf8);
+                document.getElementById('base64Output').innerText = "Decoded: " + decodedString;
+            } catch (e) {
+                document.getElementById('base64Output').innerText = "Error decoding.";
+            }
+        }
+
+        // AES Encryption
+        function encryptAES() {
+            const input = document.getElementById('plainTextInput').value;
+            const key = document.getElementById('aesKey').value;
+            if(!key) { alert("Please enter a key"); return; }
+            
+            const encrypted = CryptoJS.AES.encrypt(input, key).toString();
+            document.getElementById('aesOutput').innerText = encrypted;
+        }
+
+        function decryptAES() {
+            const input = document.getElementById('aesOutput').innerText;
+            const key = document.getElementById('aesKey').value;
+            if(!input || !key) return;
+
+            try {
+                const bytes = CryptoJS.AES.decrypt(input, key);
+                const originalText = bytes.toString(CryptoJS.enc.Utf8);
+                if(originalText) {
+                    document.getElementById('aesOutput').innerText = "Decrypted: " + originalText;
+                } else {
+                    document.getElementById('aesOutput').innerText = "Decryption Failed (Wrong Key?)";
+                }
+            } catch (e) {
+                document.getElementById('aesOutput').innerText = "Decryption Error.";
+            }
+        }
+
+        // SHA-256 Hashing
+        function hashSHA256() {
+            const input = document.getElementById('plainTextInput').value;
+            const hash = CryptoJS.SHA256(input).toString();
+            document.getElementById('hashOutput').innerText = hash;
+        }
+    </script>
+</body>
+</html>

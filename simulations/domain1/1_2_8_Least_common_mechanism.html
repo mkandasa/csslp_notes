@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Least Common Mechanism & Isolation</title>
+    <style>
+        :root {
+            --bg: #1e1e2e;
+            --panel: #2b2b3d;
+            --text: #cdd6f4;
+            --accent: #f5c2e7; /* Pink */
+            --leak: #f38ba8;   /* Red */
+            --safe: #a6e3a1;   /* Green */
+            --shared: #fab387; /* Orange */
+            --phy: #89b4fa;    /* Blue */
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #94a3b8;
+            border: 1px solid #45475a; padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #45475a; }
+        .tab-btn.active { background: var(--accent); color: #1e1e2e; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 900px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .container {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            width: 100%; max-width: 1100px;
+        }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid #45475a; margin-bottom: 20px; position: relative;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid #45475a; padding-bottom: 10px; }
+
+        button {
+            padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; margin-top: 10px; width: 100%;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--accent); color: #1e1e2e; }
+        .btn-fix { background: var(--safe); color: #1e1e2e; }
+        .btn-risk { background: var(--leak); color: #1e1e2e; }
+        .btn-phy { background: var(--phy); color: #1e1e2e; }
+
+        /* --- Memory Visualization --- */
+        .memory-block {
+            background: #111; padding: 15px; border-radius: 6px; border: 2px solid #555;
+            font-family: monospace; margin-top: 10px; min-height: 80px;
+            position: relative; transition: all 0.3s;
+        }
+        .var-display { font-size: 1.2rem; text-align: center; margin-top: 10px; }
+        .shared-active { border-color: var(--shared); box-shadow: 0 0 15px var(--shared); }
+        .leak-detected { border-color: var(--leak); box-shadow: 0 0 15px var(--leak); }
+        
+        /* --- Isolation Visuals --- */
+        .iso-diagram { display: flex; gap: 20px; justify-content: center; align-items: flex-end; height: 200px; margin-top: 20px; }
+        .hardware {
+            background: #444; border-radius: 0 0 8px 8px; width: 100px; text-align: center; padding: 5px;
+            color: #aaa; font-size: 0.8rem; border: 1px solid #666; transition: all 0.5s;
+        }
+        .hypervisor {
+            background: var(--shared); color: #000; font-size: 0.8rem; text-align: center; padding: 5px;
+            border: 1px solid #eebb99; width: 220px; margin: 0 auto; transition: all 0.5s;
+        }
+        .vm {
+            width: 80px; height: 80px; background: #333; border: 2px solid var(--safe);
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; position: relative; transition: all 0.5s;
+        }
+        .vm::after { content: 'VM'; font-size: 0.7rem; position: absolute; bottom: 2px; color: #777; }
+        
+        .phy-mode .hardware { width: 100px; margin: 0 10px; }
+        .phy-mode .hypervisor { opacity: 0; height: 0; padding: 0; border: none; }
+        .phy-mode .vm { bottom: 0; }
+        
+        .log-mode .hardware { width: 220px; }
+        .log-mode .vm { margin: 0 10px; bottom: 0; }
+
+        /* --- Allow List Visuals --- */
+        .api-gateway {
+            border: 2px dashed #666; padding: 15px; text-align: center; margin-bottom: 20px;
+            border-radius: 8px; background: #1a1a1a;
+        }
+        .gate-status { font-weight: bold; margin-top: 5px; color: #777; }
+        .gate-open { border-color: var(--leak); color: var(--leak); }
+        .gate-strict { border-color: var(--safe); color: var(--safe); }
+
+        /* --- Log --- */
+        .log-terminal {
+            background: #000; height: 150px; padding: 10px; overflow-y: auto; 
+            font-family: monospace; border: 1px solid #45475a; color: #a6e3a1; font-size: 0.9rem; margin-top: 20px;
+        }
+        .log-err { color: var(--leak); }
+        .log-warn { color: var(--shared); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Least Common Mechanism</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('shared')">1. Shared State Danger</button>
+        <button class="tab-btn" onclick="switchTab('isolation')">2. Isolation Types</button>
+        <button class="tab-btn" onclick="switchTab('allowlist')">3. Allow Lists (Isolation)</button>
+    </div>
+
+    <!-- TAB 1: SHARED STATE (Existing) -->
+    <div id="shared" class="tab-content active">
+        <div class="card">
+            <h3>Scenario: The Singleton Trap</h3>
+            <p><strong>Common Mechanism:</strong> A Global Variable used by multiple users simultaneously.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 200px 1fr; gap: 20px; align-items: center;">
+                <!-- Alice -->
+                <div style="text-align:center">
+                    <div style="font-size:2rem">👩‍💼</div>
+                    <strong>Alice</strong><br>
+                    <button class="btn-action" onclick="loginUser('Alice')">Log In</button>
+                    <div id="aliceView" style="font-size:0.8rem; margin-top:5px; color:#777">--</div>
+                </div>
+
+                <!-- Shared Mem -->
+                <div id="sharedMem" class="memory-block">
+                    <div style="font-size:0.7rem; color:#aaa">GLOBAL VAR</div>
+                    <div class="var-display" id="globalUser">null</div>
+                </div>
+
+                <!-- Bob -->
+                <div style="text-align:center">
+                    <div style="font-size:2rem">👨‍💼</div>
+                    <strong>Bob</strong><br>
+                    <button class="btn-risk" onclick="loginUser('Bob')">Log In</button>
+                    <div id="bobView" style="font-size:0.8rem; margin-top:5px; color:#777">--</div>
+                </div>
+            </div>
+            
+            <div style="margin-top:20px; text-align:center">
+                <label>Architecture:</label>
+                <select id="archMode" style="background:#111; color:white; padding:5px; border-radius:4px;">
+                    <option value="shared">Singleton (Shared / Unsafe)</option>
+                    <option value="isolated">Instantiated (Isolated / Safe)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: ISOLATION TYPES (New) -->
+    <div id="isolation" class="tab-content">
+        <div class="card">
+            <h3>Physical vs. Logical Isolation</h3>
+            <p><strong>Goal:</strong> Reduce the "Common Mechanism" surface area.</p>
+
+            <div style="display:flex; justify-content:center; gap:10px; margin-bottom:20px;">
+                <button class="btn-phy" onclick="setIso('phy')" style="width:auto">Physical Isolation (Air Gap)</button>
+                <button class="btn-risk" onclick="setIso('log')" style="width:auto">Logical Isolation (Virtualization)</button>
+            </div>
+
+            <div id="isoContainer" class="iso-diagram phy-mode">
+                <!-- Structure injected by JS/CSS classes -->
+                <div style="display:flex; flex-direction:column; align-items:center">
+                    <div class="vm">App A</div>
+                    <div class="hardware">Server 1</div>
+                </div>
+                
+                <!-- Hypervisor (Only visible in Logical mode) -->
+                <div class="hypervisor">Hypervisor (Common Mech)</div>
+
+                <div style="display:flex; flex-direction:column; align-items:center">
+                    <div class="vm">App B</div>
+                    <div class="hardware">Server 2</div>
+                </div>
+            </div>
+
+            <div id="isoDesc" style="margin-top:20px; text-align:center; font-style:italic; color:#aaa">
+                Select a mode above.
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: ALLOW LISTS (New) -->
+    <div id="allowlist" class="tab-content">
+        <div class="card">
+            <h3>Allow Lists as Isolation</h3>
+            <p><strong>Scenario:</strong> A Shared "Command Runner" service. If User A crashes it, User B suffers (Denial of Service).</p>
+            
+            <div class="api-gateway" id="gateway">
+                <div>⚡ SHARED COMMAND PROCESSOR ⚡</div>
+                <div class="gate-status" id="gateStatus">Mode: Unrestricted (Open)</div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                <div>
+                    <label>User A Input:</label>
+                    <select id="cmdInput" style="width:100%; padding:8px; background:#111; color:white; margin-top:5px; border-radius:4px;">
+                        <option value="get_time">get_time (Safe)</option>
+                        <option value="echo hello">echo hello (Safe)</option>
+                        <option value="shutdown -now">shutdown -now (DANGEROUS)</option>
+                        <option value="rm -rf /">rm -rf / (DANGEROUS)</option>
+                    </select>
+                    <button class="btn-risk" onclick="runCommand()">Run Command</button>
+                </div>
+                <div style="border-left:1px solid #444; padding-left:20px; display:flex; flex-direction:column; justify-content:center;">
+                    <label>Filter Configuration:</label>
+                    <button class="btn-fix" onclick="toggleAllowList(true)">🔒 Enable Allow List</button>
+                    <button class="btn-risk" onclick="toggleAllowList(false)" style="margin-top:5px">🔓 Disable Filter</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> System initialized.</div>
+    </div>
+
+    <script>
+        /* --- TABS --- */
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'shared':0, 'isolation':1, 'allowlist':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'warn' ? 'log-warn' : '');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- TAB 1: SHARED STATE --- */
+        let globalUser = null;
+        async function loginUser(name) {
+            const mode = document.getElementById('archMode').value;
+            const display = document.getElementById('globalUser');
+            
+            log(`Auth request: ${name}`);
+
+            if (mode === 'shared') {
+                document.getElementById('sharedMem').classList.add('shared-active');
+                globalUser = name;
+                display.innerText = name;
+                log(`[SHARED] Writing '${name}' to Global...`, 'warn');
+                
+                await new Promise(r => setTimeout(r, 800)); // Race window
+
+                if (globalUser !== name) {
+                    document.getElementById('sharedMem').classList.add('leak-detected');
+                    log(`CRITICAL: Race Condition! ${name} got data for ${globalUser}`, 'err');
+                    document.getElementById(name === 'Alice' ? 'aliceView' : 'bobView').innerText = `SEES: ${globalUser} (LEAK)`;
+                } else {
+                    log(`Success: ${name} logged in.`);
+                    document.getElementById(name === 'Alice' ? 'aliceView' : 'bobView').innerText = `SEES: ${name}`;
+                }
+                setTimeout(() => document.getElementById('sharedMem').classList.remove('shared-active', 'leak-detected'), 500);
+            } else {
+                log(`[ISOLATED] New instance for ${name}`);
+                display.innerText = "[New Instance]";
+                await new Promise(r => setTimeout(r, 400));
+                document.getElementById(name === 'Alice' ? 'aliceView' : 'bobView').innerText = `SEES: ${name}`;
+                log(`Success: ${name} logged in.`);
+            }
+        }
+
+        /* --- TAB 2: ISOLATION --- */
+        function setIso(mode) {
+            const c = document.getElementById('isoContainer');
+            const d = document.getElementById('isoDesc');
+            
+            if(mode === 'phy') {
+                c.className = 'iso-diagram phy-mode';
+                // HTML structure manipulation for visual:
+                c.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center">
+                        <div class="vm" style="border-color:var(--phy)">App A</div>
+                        <div class="hardware" style="border-color:var(--phy)">Server 1</div>
+                    </div>
+                    <div style="width:50px"></div>
+                    <div style="display:flex; flex-direction:column; align-items:center">
+                        <div class="vm" style="border-color:var(--phy)">App B</div>
+                        <div class="hardware" style="border-color:var(--phy)">Server 2</div>
+                    </div>
+                `;
+                d.innerHTML = "<strong>Physical Isolation:</strong> Zero common mechanism (except network cables). Highest security, highest cost.";
+                log("Switched to Physical Isolation. No shared kernel.");
+            } else {
+                c.className = 'iso-diagram log-mode';
+                c.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; width:100%">
+                        <div style="display:flex; gap:50px; margin-bottom:10px">
+                             <div class="vm">App A</div>
+                             <div class="vm">App B</div>
+                        </div>
+                        <div class="hypervisor">Hypervisor (Common Mech)</div>
+                        <div class="hardware">Shared Server Hardware</div>
+                    </div>
+                `;
+                d.innerHTML = "<strong>Logical Isolation:</strong> Apps share Hardware & Hypervisor. If Hypervisor has a bug, App A can hack App B.";
+                log("Switched to Logical Isolation. Shared Hypervisor risk present.", 'warn');
+            }
+        }
+
+        /* --- TAB 3: ALLOW LIST --- */
+        let allowListEnabled = false;
+        function toggleAllowList(state) {
+            allowListEnabled = state;
+            const g = document.getElementById('gateway');
+            const s = document.getElementById('gateStatus');
+            if(state) {
+                g.style.borderColor = "var(--safe)";
+                s.innerText = "Mode: Allow List Enforced (Strict)";
+                s.className = "gate-status gate-strict";
+                log("Allow List ENABLED. Shared mechanism is now isolated restricted.");
+            } else {
+                g.style.borderColor = "var(--leak)";
+                s.innerText = "Mode: Unrestricted (Open)";
+                s.className = "gate-status gate-open";
+                log("Allow List DISABLED. Shared mechanism exposes full functionality.", 'warn');
+            }
+        }
+
+        function runCommand() {
+            const cmd = document.getElementById('cmdInput').value;
+            const safeCommands = ['get_time', 'echo hello'];
+            
+            log(`User A attempting: "${cmd}"...`);
+
+            if(allowListEnabled) {
+                if(safeCommands.includes(cmd)) {
+                    log(`✅ ALLOWED: "${cmd}" is on the list. Executing safely.`);
+                } else {
+                    log(`🛡️ BLOCKED: "${cmd}" is NOT on the Allow List. Request dropped.`, 'err');
+                    log(`Outcome: User B is unaffected. Isolation maintained.`);
+                }
+            } else {
+                if(safeCommands.includes(cmd)) {
+                    log(`Executed "${cmd}".`);
+                } else {
+                    log(`⚠️ DANGER: Executed "${cmd}". Shared Processor CRASHED/WIPED!`, 'err');
+                    log(`Outcome: User B denied service. Isolation failed due to shared mech.`);
+                }
+            }
+        }
+
+        // Init
+        setIso('phy'); 
+
+    </script>
+</body>
+</html>

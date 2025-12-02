@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Defense in Depth Simulator</title>
+    <style>
+        :root {
+            --bg: #111827;
+            --panel: #1f2937;
+            --text: #f3f4f6;
+            --accent: #3b82f6; /* Blue */
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .game-board {
+            display: grid; grid-template-columns: 300px 1fr; gap: 20px;
+            width: 100%; max-width: 1100px;
+        }
+
+        /* Controls */
+        .controls {
+            background: var(--panel); padding: 20px; border-radius: 8px;
+            border: 1px solid #374151; height: fit-content;
+        }
+        .layer-toggle {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #111; padding: 10px; margin-bottom: 8px; border-radius: 4px;
+            border-left: 4px solid #555; transition: all 0.2s;
+        }
+        .layer-toggle.active { border-left-color: var(--success); }
+        .layer-toggle.breached { border-left-color: var(--danger); background: #311; }
+        
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #555; transition: .4s; border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Visualization (The Onion) */
+        .onion-container {
+            position: relative; height: 500px; background: #000;
+            border-radius: 8px; overflow: hidden; display: flex;
+            align-items: center; justify-content: center;
+            border: 1px solid #333;
+        }
+
+        /* Concentric Circles */
+        .ring {
+            position: absolute; border-radius: 50%;
+            border: 2px dashed #444; transition: all 0.5s;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+        .ring.active { border-color: var(--success); border-style: solid; background: rgba(16, 185, 129, 0.05); }
+        .ring.breached { border-color: var(--danger); background: rgba(239, 68, 68, 0.2); }
+        
+        /* Ring Sizes */
+        #ring-physical { width: 450px; height: 450px; z-index: 1; }
+        #ring-network { width: 360px; height: 360px; z-index: 2; }
+        #ring-host { width: 270px; height: 270px; z-index: 3; }
+        #ring-app { width: 180px; height: 180px; z-index: 4; }
+        #core-data {
+            width: 90px; height: 90px; z-index: 5; background: #374151;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; border: 2px solid #fff; box-shadow: 0 0 20px white;
+            text-align: center; font-size: 0.8rem;
+        }
+        .ring-label {
+            position: absolute; top: 10px; font-size: 0.8rem; 
+            background: rgba(0,0,0,0.7); padding: 2px 5px; border-radius: 3px;
+        }
+
+        /* Attacker Particle */
+        .attack-particle {
+            width: 15px; height: 15px; background: var(--danger);
+            border-radius: 50%; position: absolute; z-index: 10;
+            box-shadow: 0 0 10px var(--danger); display: none;
+        }
+
+        /* Attack Panel */
+        .attack-panel { margin-top: 20px; padding-top: 20px; border-top: 1px solid #374151; }
+        select, button { width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 4px; }
+        button { background: var(--danger); color: white; font-weight: bold; cursor: pointer; border: none; }
+        button:hover { opacity: 0.9; }
+
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid #333; color: #10b981; font-size: 0.9rem;
+        }
+        .log-fail { color: var(--danger); }
+        .log-warn { color: var(--warning); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Defense in Depth (Onion Model)</h1>
+
+    <div class="game-board">
+        <!-- Controls -->
+        <div class="controls">
+            <h3>🛡️ Security Layers</h3>
+            
+            <div class="layer-toggle active" id="toggle-physical">
+                <span>1. Physical (Fences/Guards)</span>
+                <label class="switch"><input type="checkbox" checked onchange="updateLayers()"><span class="slider"></span></label>
+            </div>
+            
+            <div class="layer-toggle active" id="toggle-network">
+                <span>2. Network (Firewall/IPS)</span>
+                <label class="switch"><input type="checkbox" checked onchange="updateLayers()"><span class="slider"></span></label>
+            </div>
+            
+            <div class="layer-toggle active" id="toggle-host">
+                <span>3. Host (OS/Antivirus)</span>
+                <label class="switch"><input type="checkbox" checked onchange="updateLayers()"><span class="slider"></span></label>
+            </div>
+
+            <div class="layer-toggle active" id="toggle-app">
+                <span>4. App (Input Valid./Auth)</span>
+                <label class="switch"><input type="checkbox" checked onchange="updateLayers()"><span class="slider"></span></label>
+            </div>
+
+            <div class="layer-toggle active" id="toggle-data">
+                <span>5. Data (Encryption)</span>
+                <label class="switch"><input type="checkbox" checked onchange="updateLayers()"><span class="slider"></span></label>
+            </div>
+
+            <div class="attack-panel">
+                <h3>⚔️ Launch Attack</h3>
+                <label>Attack Vector:</label>
+                <select id="attackType">
+                    <option value="physical">Physical Break-In (Steal Server)</option>
+                    <option value="network">Network DDoS / Port Scan</option>
+                    <option value="malware">Windows Malware (Ransomware)</option>
+                    <option value="sqli">SQL Injection (Web App)</option>
+                </select>
+                
+                <div style="margin-bottom:10px; font-size:0.8rem; color:#aaa">
+                    <input type="checkbox" id="diversity"> Enable Technical Diversity (Linux OS)
+                </div>
+
+                <button onclick="launchAttack()">LAUNCH ATTACK</button>
+            </div>
+        </div>
+
+        <!-- Visualization -->
+        <div class="onion-container">
+            <div id="ring-physical" class="ring active"><span class="ring-label">Physical</span>
+                <div id="ring-network" class="ring active"><span class="ring-label">Network</span>
+                    <div id="ring-host" class="ring active"><span class="ring-label">Host OS</span>
+                        <div id="ring-app" class="ring active"><span class="ring-label">Application</span>
+                            <div id="core-data">
+                                DATA<br>ASSET
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="attacker" class="attack-particle"></div>
+        </div>
+
+        <!-- Logs -->
+        <div class="log-terminal" id="logs">
+            <div>> System Ready. Layers Active.</div>
+        </div>
+
+    </div>
+
+    <script>
+        // DOM Elements
+        const layers = ['physical', 'network', 'host', 'app', 'data'];
+        const rings = {};
+        const toggles = {};
+        
+        layers.forEach(l => {
+            rings[l] = document.getElementById(`ring-${l === 'data' ? 'app' : l}`); // Data is inside App logically for visual, but we handle logic separately
+            toggles[l] = document.getElementById(`toggle-${l}`);
+        });
+
+        function updateLayers() {
+            layers.forEach(l => {
+                const isActive = toggles[l].querySelector('input').checked;
+                const ring = document.getElementById(l === 'data' ? 'core-data' : `ring-${l}`);
+                
+                if(isActive) {
+                    toggles[l].classList.add('active');
+                    ring.classList.add('active');
+                    if(l === 'data') ring.style.border = "2px solid #fff";
+                } else {
+                    toggles[l].classList.remove('active');
+                    ring.classList.remove('active');
+                    if(l === 'data') ring.style.border = "2px dashed #555";
+                }
+                
+                // Reset breach colors
+                toggles[l].classList.remove('breached');
+                if(l !== 'data') ring.classList.remove('breached');
+            });
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'fail' ? 'log-fail' : (type === 'warn' ? 'log-warn' : '');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        async function launchAttack() {
+            const type = document.getElementById('attackType').value;
+            const useDiversity = document.getElementById('diversity').checked;
+            const attacker = document.getElementById('attacker');
+            const center = document.querySelector('.onion-container');
+            
+            // Reset visual state
+            updateLayers();
+            log(`-----------------------------------`);
+            log(`Initiating ${type.toUpperCase()} attack...`, 'warn');
+
+            // Animation Logic
+            // We simulate traversing layers: Physical -> Network -> Host -> App -> Data
+            
+            // 1. PHYSICAL CHECK
+            await animateMove(attacker, 220); // Move to edge
+            if (!checkLayer('physical')) {
+                log("❌ PHYSICAL BREACH: Guards sleeping. Attacker entered building.", 'fail');
+                markBreach('physical');
+            } else {
+                if(type === 'physical') {
+                    log("🛡️ BLOCKED: Physical Security (Biometrics/Guards) stopped the intruder.", 'success');
+                    return;
+                } else {
+                    log("ℹ️ Physical layer bypassed (Remote Attack).");
+                }
+            }
+
+            // 2. NETWORK CHECK
+            await animateMove(attacker, 170);
+            if (!checkLayer('network')) {
+                log("❌ NETWORK BREACH: Firewall disabled. Packets allowed.", 'fail');
+                markBreach('network');
+            } else {
+                if(type === 'network') { // DDoS
+                    log("🛡️ BLOCKED: Firewall/IPS dropped the malicious packets.", 'success');
+                    return;
+                }
+                log("ℹ️ Network layer passed (Traffic allowed on Port 80).");
+            }
+
+            // 3. HOST CHECK
+            await animateMove(attacker, 120);
+            if (!checkLayer('host')) {
+                log("❌ HOST BREACH: OS unpatched / No Antivirus.", 'fail');
+                markBreach('host');
+            } else {
+                if(type === 'malware') {
+                    if(useDiversity) {
+                        log("🛡️ BLOCKED (DIVERSITY): Windows malware failed to execute on Linux Server!", 'success');
+                        return;
+                    } else {
+                        log("🛡️ BLOCKED: Endpoint Protection caught the malware signature.", 'success');
+                        return;
+                    }
+                }
+                log("ℹ️ Host layer passed (Service running).");
+            }
+
+            // 4. APP CHECK
+            await animateMove(attacker, 70);
+            if (!checkLayer('app')) {
+                log("❌ APP BREACH: No Input Validation. Exploit successful.", 'fail');
+                markBreach('app');
+            } else {
+                if(type === 'sqli') {
+                    log("🛡️ BLOCKED: Input Validation / WAF sanitized the SQL injection.", 'success');
+                    return;
+                }
+                log("ℹ️ Application logic executed.");
+            }
+
+            // 5. DATA CHECK
+            await animateMove(attacker, 0); // Center
+            if (!checkLayer('data')) {
+                log("💀 DATA EXFILTRATED: Plaintext data stolen!", 'fail');
+                document.getElementById('core-data').style.background = "red";
+            } else {
+                if(type === 'physical') {
+                    // Even if physical was breached, if hard drive is encrypted...
+                    log("🛡️ BLOCKED: Hard drives stolen, but Disk Encryption (Data Layer) prevented access!", 'success');
+                } else {
+                    log("🛡️ BLOCKED: Database Encryption prevented reading sensitive columns.", 'success');
+                }
+            }
+        }
+
+        function checkLayer(name) {
+            return toggles[name].querySelector('input').checked;
+        }
+
+        function markBreach(name) {
+            toggles[name].classList.add('breached');
+            if(name !== 'data') document.getElementById(`ring-${name}`).classList.add('breached');
+        }
+
+        function animateMove(el, radius) {
+            return new Promise(resolve => {
+                el.style.display = 'block';
+                // Move logic simplifies to changing 'right' offset from center or similar
+                // For simplicity, we just assume movement towards center
+                // Since this is a simple sim, we pause for effect
+                setTimeout(resolve, 800);
+            });
+        }
+        
+        // Initial Draw
+        updateLayers();
+
+    </script>
+</body>
+</html>

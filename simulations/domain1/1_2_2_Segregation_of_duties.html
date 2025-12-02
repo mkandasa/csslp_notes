@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Segregation of Duties (SoD)</title>
+    <style>
+        :root {
+            --bg: #1f2937;
+            --panel: #374151;
+            --text: #f3f4f6;
+            --accent: #f472b6; /* Pink */
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .container {
+            display: grid; grid-template-columns: 300px 1fr; gap: 20px;
+            width: 100%; max-width: 1000px;
+        }
+
+        /* Identity Panel */
+        .id-card {
+            background: var(--panel); padding: 15px; border-radius: 8px;
+            border: 1px solid #4b5563; margin-bottom: 15px;
+            transition: all 0.3s; cursor: pointer; position: relative;
+        }
+        .id-card:hover { border-color: var(--accent); }
+        .id-card.active { border: 2px solid var(--accent); background: #4a1d30; }
+        .role-badge { 
+            display: inline-block; padding: 2px 8px; border-radius: 10px; 
+            font-size: 0.7rem; background: #111; margin-top: 5px; 
+        }
+
+        /* Workspace */
+        .workspace {
+            background: #111827; padding: 20px; border-radius: 8px;
+            border: 1px solid #374151; min-height: 400px;
+        }
+
+        /* Transaction Flow */
+        .step-box {
+            background: #374151; padding: 15px; border-radius: 6px;
+            margin-bottom: 15px; border-left: 4px solid #6b7280;
+        }
+        .step-box.completed { border-left-color: var(--success); }
+        .step-box.active-step { border-left-color: var(--accent); box-shadow: 0 0 10px rgba(244, 114, 182, 0.2); }
+
+        button {
+            background: var(--accent); color: white; border: none;
+            padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;
+        }
+        button:disabled { background: #555; cursor: not-allowed; }
+        button.reset { background: #4b5563; margin-top: 20px; width: 100%; }
+
+        /* Split Knowledge Input */
+        .split-key-container { display: flex; gap: 10px; margin-top: 10px; }
+        .key-input { 
+            background: #000; color: var(--success); font-family: monospace; 
+            border: 1px solid #555; padding: 5px; width: 100%; text-align: center;
+        }
+
+        .status-msg { margin-top: 10px; font-weight: bold; min-height: 24px; }
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Segregation of Duties (SoD)</h1>
+
+    <div class="container">
+        <!-- Sidebar: Identities -->
+        <div>
+            <h3 style="margin-top:0">1. Select Active User</h3>
+            
+            <div class="id-card active" onclick="setUser('alice')" id="card-alice">
+                <strong>Alice</strong><br>
+                <span class="role-badge" style="color:#60a5fa">INITIATOR</span>
+                <div style="font-size:0.8rem; color:#9ca3af; margin-top:5px">Has Vault Key Part A</div>
+            </div>
+
+            <div class="id-card" onclick="setUser('bob')" id="card-bob">
+                <strong>Bob</strong><br>
+                <span class="role-badge" style="color:#fcd34d">APPROVER</span>
+                <div style="font-size:0.8rem; color:#9ca3af; margin-top:5px">Has Vault Key Part B</div>
+            </div>
+
+            <div class="id-card" onclick="setUser('charlie')" id="card-charlie">
+                <strong>Charlie</strong><br>
+                <span class="role-badge" style="color:#a78bfa">SUPER ADMIN</span>
+                <div style="font-size:0.8rem; color:#9ca3af; margin-top:5px">Has NO Keys (SoD)</div>
+            </div>
+
+            <div class="id-card" onclick="setUser('eve')" id="card-eve">
+                <strong>Eve</strong><br>
+                <span class="role-badge" style="color:#ef4444">INSIDER THREAT</span>
+                <div style="font-size:0.8rem; color:#9ca3af; margin-top:5px">Trying to do it all</div>
+            </div>
+
+            <button class="reset" onclick="resetSim()">Reset Simulation</button>
+        </div>
+
+        <!-- Main Workspace -->
+        <div class="workspace">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="margin:0">Secure Transfer Workflow ($1M)</h3>
+                <span id="currentUserDisplay" style="color:var(--accent); font-weight:bold;">Current User: Alice</span>
+            </div>
+
+            <!-- Step 1: Initiation -->
+            <div class="step-box active-step" id="step1">
+                <h4>Step 1: Initiation</h4>
+                <p style="font-size:0.9rem">Create the transfer request. Requires 'INITIATOR' or 'ADMIN' role.</p>
+                <button onclick="initiateTransfer()" id="btnInit">Initiate Transfer</button>
+                <div class="status-msg" id="msg1"></div>
+            </div>
+
+            <!-- Step 2: Approval (SoD Check) -->
+            <div class="step-box" id="step2" style="opacity:0.5; pointer-events:none;">
+                <h4>Step 2: Approval (Multi-Party Control)</h4>
+                <p style="font-size:0.9rem">Authorize the request. <strong style="color:var(--warning)">Constraint: Approver cannot be the Initiator.</strong></p>
+                <button onclick="approveTransfer()" id="btnApprove">Approve Transfer</button>
+                <div class="status-msg" id="msg2"></div>
+            </div>
+
+            <!-- Step 3: Vault Unlock (Split Knowledge) -->
+            <div class="step-box" id="step3" style="opacity:0.5; pointer-events:none;">
+                <h4>Step 3: Vault Unlock (Split Knowledge)</h4>
+                <p style="font-size:0.9rem">Enter the dual keys to release funds.</p>
+                
+                <div class="split-key-container">
+                    <div>
+                        <label style="font-size:0.8rem">Key Part A (Alice):</label>
+                        <input type="password" class="key-input" id="keyA" placeholder="****">
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem">Key Part B (Bob):</label>
+                        <input type="password" class="key-input" id="keyB" placeholder="****">
+                    </div>
+                </div>
+                
+                <button onclick="unlockVault()" style="margin-top:10px" id="btnUnlock">Turn Keys</button>
+                <div class="status-msg" id="msg3"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let currentUser = 'alice';
+        let transferState = {
+            initiated: false,
+            initiator: null,
+            approved: false,
+            approver: null
+        };
+
+        const users = {
+            'alice': { name: 'Alice', role: 'INITIATOR', key: '1234' },
+            'bob': { name: 'Bob', role: 'APPROVER', key: '5678' },
+            'charlie': { name: 'Charlie', role: 'ADMIN', key: null }, // Admin has no keys (SoD)
+            'eve': { name: 'Eve', role: 'ADMIN', key: null } // Eve tries to cheat
+        };
+
+        function setUser(u) {
+            currentUser = u;
+            // Update UI
+            document.querySelectorAll('.id-card').forEach(c => c.classList.remove('active'));
+            document.getElementById(`card-${u}`).classList.add('active');
+            document.getElementById('currentUserDisplay').innerText = `Current User: ${users[u].name}`;
+            
+            // Auto-fill key if applicable and step 3 is active
+            if(document.getElementById('step3').style.opacity === '1') {
+                if(u === 'alice') document.getElementById('keyA').value = users[u].key;
+                if(u === 'bob') document.getElementById('keyB').value = users[u].key;
+            }
+        }
+
+        function initiateTransfer() {
+            const u = users[currentUser];
+            const msg = document.getElementById('msg1');
+
+            if (u.role === 'INITIATOR' || u.role === 'ADMIN') {
+                transferState.initiated = true;
+                transferState.initiator = currentUser;
+                
+                msg.innerHTML = `<span style="color:var(--success)">✅ Transfer ID #9981 created by ${u.name}.</span>`;
+                document.getElementById('step1').classList.remove('active-step');
+                document.getElementById('step1').classList.add('completed');
+                document.getElementById('btnInit').disabled = true;
+
+                // Unlock Step 2
+                const step2 = document.getElementById('step2');
+                step2.style.opacity = '1';
+                step2.style.pointerEvents = 'all';
+                step2.classList.add('active-step');
+            } else {
+                msg.innerHTML = `<span style="color:var(--error)">⛔ ACCESS DENIED: Role '${u.role}' cannot initiate.</span>`;
+            }
+        }
+
+        function approveTransfer() {
+            const u = users[currentUser];
+            const msg = document.getElementById('msg2');
+
+            // 1. Check Permissions
+            if (u.role !== 'APPROVER' && u.role !== 'ADMIN') {
+                msg.innerHTML = `<span style="color:var(--error)">⛔ ACCESS DENIED: Only Approvers/Admins can authorize.</span>`;
+                return;
+            }
+
+            // 2. CHECK SEGREGATION OF DUTIES (SoD)
+            if (currentUser === transferState.initiator) {
+                msg.innerHTML = `<span style="color:var(--error)">⚠️ SoD VIOLATION: You initiated this request. You cannot also approve it. Call a different user.</span>`;
+                return;
+            }
+
+            transferState.approved = true;
+            transferState.approver = currentUser;
+            
+            msg.innerHTML = `<span style="color:var(--success)">✅ Approved by ${u.name}. (SoD Verified: ${transferState.initiator} != ${currentUser})</span>`;
+            
+            document.getElementById('step2').classList.remove('active-step');
+            document.getElementById('step2').classList.add('completed');
+            document.getElementById('btnApprove').disabled = true;
+
+            // Unlock Step 3
+            const step3 = document.getElementById('step3');
+            step3.style.opacity = '1';
+            step3.style.pointerEvents = 'all';
+            step3.classList.add('active-step');
+        }
+
+        function unlockVault() {
+            const keyA = document.getElementById('keyA').value;
+            const keyB = document.getElementById('keyB').value;
+            const msg = document.getElementById('msg3');
+
+            // Simulate Split Knowledge Check
+            if (keyA === '1234' && keyB === '5678') {
+                msg.innerHTML = `<span style="color:var(--success)">💰 VAULT UNLOCKED! Funds Transferred.</span>`;
+                document.getElementById('step3').classList.remove('active-step');
+                document.getElementById('step3').classList.add('completed');
+                document.getElementById('btnUnlock').disabled = true;
+            } else {
+                let error = "";
+                if(!keyA) error += "Missing Key Part A. ";
+                if(!keyB) error += "Missing Key Part B. ";
+                if(keyA && keyA !== '1234') error += "Key Part A Incorrect. ";
+                if(keyB && keyB !== '5678') error += "Key Part B Incorrect. ";
+                
+                msg.innerHTML = `<span style="color:var(--error)">🔒 FAILED: ${error}Both parts required.</span>`;
+            }
+        }
+
+        function resetSim() {
+            currentUser = 'alice';
+            transferState = { initiated: false, initiator: null, approved: false, approver: null };
+            
+            // UI Reset
+            setUser('alice');
+            document.querySelectorAll('.status-msg').forEach(d => d.innerHTML = "");
+            document.querySelectorAll('input').forEach(i => i.value = "");
+            document.querySelectorAll('button').forEach(b => b.disabled = false);
+            
+            // Step Reset
+            ['step1', 'step2', 'step3'].forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('completed', 'active-step');
+                el.style.opacity = '0.5';
+                el.style.pointerEvents = 'none';
+            });
+            
+            const s1 = document.getElementById('step1');
+            s1.style.opacity = '1';
+            s1.style.pointerEvents = 'all';
+            s1.classList.add('active-step');
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Component Reuse & Supply Chain</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #e2e8f0;
+            --accent: #38bdf8; /* Sky Blue */
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --lib: #a78bfa;    /* Purple */
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .container {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            width: 100%; max-width: 1100px;
+        }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid #334155; margin-bottom: 20px; position: relative;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid #334155; padding-bottom: 10px; }
+
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; margin-top: 10px; width: 100%;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-scan { background: var(--warning); color: #000; }
+        .btn-fix { background: var(--success); color: #000; }
+        .btn-add { background: var(--lib); color: #000; width: auto; }
+
+        /* --- Dependency Graph --- */
+        .tree-container {
+            min-height: 250px; background: #000; border: 1px solid #444; border-radius: 6px;
+            padding: 20px; position: relative; overflow: auto;
+        }
+        .node {
+            padding: 8px 12px; border-radius: 4px; display: inline-block;
+            font-family: monospace; font-size: 0.9rem; position: relative;
+            background: #333; border: 1px solid #555; margin: 5px;
+        }
+        .node.root { background: var(--accent); color: #000; font-weight: bold; }
+        .node.vuln { border-color: var(--danger); color: var(--danger); animation: pulse 1s infinite alternate; }
+        .node.safe { border-color: var(--success); color: var(--success); }
+        
+        .connector {
+            width: 2px; background: #555; position: absolute;
+        }
+
+        @keyframes pulse { from { box-shadow: 0 0 5px var(--danger); } to { box-shadow: 0 0 15px var(--danger); } }
+
+        /* --- Project Builder --- */
+        .builder-row { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 10px; margin-bottom: 5px; border-radius: 4px;}
+        .version-select { background: #333; color: white; border: 1px solid #555; padding: 2px; }
+
+        /* --- Log --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 150px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid #334155; color: #a6e3a1; font-size: 0.9rem;
+        }
+        .log-high { color: var(--danger); font-weight: bold; }
+        .log-info { color: #aaa; }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Component Reuse & Supply Chain</h1>
+
+    <div class="container">
+        
+        <!-- BUILDER -->
+        <div class="card">
+            <h3>1. Project Manifest (package.json)</h3>
+            <p>Select components to reuse. Be careful which versions you pick.</p>
+            
+            <div class="builder-row">
+                <span>📦 <strong>auth-lib</strong> (Authentication)</span>
+                <select id="ver-auth" class="version-select" onchange="buildTree()">
+                    <option value="2.0.1">v2.0.1 (Latest)</option>
+                    <option value="1.0.0">v1.0.0 (Legacy)</option>
+                </select>
+            </div>
+
+            <div class="builder-row">
+                <span>📦 <strong>img-parser</strong> (Processing)</span>
+                <select id="ver-img" class="version-select" onchange="buildTree()">
+                    <option value="3.5.0">v3.5.0 (Latest)</option>
+                    <option value="3.1.0">v3.1.0 (Old)</option>
+                </select>
+            </div>
+
+            <div class="builder-row">
+                <span>📦 <strong>log-util</strong> (Logging)</span>
+                <select id="ver-log" class="version-select" onchange="buildTree()">
+                    <option value="4.17.0">v4.17.0 (Patched)</option>
+                    <option value="4.14.0">v4.14.0 (Vulnerable)</option>
+                </select>
+            </div>
+
+            <button class="btn-scan" onclick="runSCA()">🔍 Run SCA Scan (Identify CVEs)</button>
+        </div>
+
+        <!-- VISUALIZER -->
+        <div class="card">
+            <h3>2. Dependency Graph (SBOM)</h3>
+            <p>Visualizing the full tree, including hidden transitive dependencies.</p>
+            
+            <div class="tree-container" id="depTree">
+                <!-- Tree Injected Here -->
+            </div>
+            
+            <div id="remediationPanel" style="display:none; margin-top:10px; background:#2a1111; padding:10px; border-radius:4px; border:1px solid var(--danger);">
+                <strong style="color:var(--danger)">VULNERABILITY FOUND: CVE-2021-44228</strong>
+                <p style="font-size:0.8rem; margin:5px 0;">Component 'log-util v4.14.0' has a critical RCE vulnerability.</p>
+                <button class="btn-fix" onclick="autoFix()">✨ Auto-Fix (Upgrade to v4.17.0)</button>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="log-terminal" id="logs">
+            <div>> Project initialized.</div>
+            <div>> Waiting for dependency selection...</div>
+        </div>
+
+    </div>
+
+    <script>
+        // Definition of Dependencies
+        // "deps" = transitive dependencies
+        const libraryDB = {
+            'auth-lib': {
+                '1.0.0': { status: 'vuln', cve: 'CVE-2020-1234', deps: ['crypto-js v3.0'] },
+                '2.0.1': { status: 'safe', deps: ['crypto-js v4.1'] }
+            },
+            'img-parser': {
+                '3.1.0': { status: 'safe', deps: ['lib-png v1.0', 'zlib v1.2'] },
+                '3.5.0': { status: 'safe', deps: ['lib-png v1.2', 'zlib v1.2'] }
+            },
+            'log-util': {
+                '4.14.0': { status: 'vuln', cve: 'CVE-2021-44228', deps: [] }, // The big one
+                '4.17.0': { status: 'safe', deps: [] }
+            }
+        };
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'high' ? 'log-high' : 'log-info';
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function buildTree() {
+            const container = document.getElementById('depTree');
+            container.innerHTML = `<div class="node root">My Application</div>`;
+            document.getElementById('remediationPanel').style.display = 'none'; // Hide fix panel on rebuild
+            
+            // Get choices
+            const authVer = document.getElementById('ver-auth').value;
+            const imgVer = document.getElementById('ver-img').value;
+            const logVer = document.getElementById('ver-log').value;
+
+            const selection = [
+                { name: 'auth-lib', ver: authVer },
+                { name: 'img-parser', ver: imgVer },
+                { name: 'log-util', ver: logVer }
+            ];
+
+            let html = `<div style="margin-top:20px; display:flex; justify-content:space-around;">`;
+
+            selection.forEach(lib => {
+                const libData = libraryDB[lib.name][lib.ver];
+                // Direct Dep
+                html += `<div style="text-align:center">
+                            <div style="font-size:1.5rem">⬇</div>
+                            <div class="node direct" id="node-${lib.name}">${lib.name}<br>v${lib.ver}</div>`;
+                
+                // Transitive Deps
+                if (libData.deps.length > 0) {
+                    html += `<div style="margin-top:5px; border-left:1px dashed #555; padding-left:5px;">`;
+                    libData.deps.forEach(dep => {
+                        html += `<div class="node transitive" style="font-size:0.75rem; background:#222">${dep}</div><br>`;
+                    });
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            });
+
+            html += `</div>`;
+            container.innerHTML += html;
+            log("Dependency Graph rebuilt.");
+        }
+
+        function runSCA() {
+            log("Starting SCA Scan...", 'info');
+            let vulnFound = false;
+
+            const authVer = document.getElementById('ver-auth').value;
+            const logVer = document.getElementById('ver-log').value;
+
+            // Check Auth Lib
+            if (libraryDB['auth-lib'][authVer].status === 'vuln') {
+                log(`ALERT: auth-lib v${authVer} is vulnerable (${libraryDB['auth-lib'][authVer].cve})`, 'high');
+                document.getElementById('node-auth-lib').classList.add('vuln');
+                vulnFound = true;
+            }
+
+            // Check Log Util
+            if (libraryDB['log-util'][logVer].status === 'vuln') {
+                log(`CRITICAL: log-util v${logVer} contains known exploit (${libraryDB['log-util'][logVer].cve})`, 'high');
+                document.getElementById('node-log-util').classList.add('vuln');
+                vulnFound = true;
+                
+                // Show Fix Panel for the big one
+                document.getElementById('remediationPanel').style.display = 'block';
+            }
+
+            if (!vulnFound) {
+                log("Scan Complete: No known vulnerabilities found. (Clean SBOM)", 'success');
+                document.querySelectorAll('.node').forEach(n => {
+                    if(!n.classList.contains('root')) n.classList.add('safe');
+                });
+            } else {
+                log("Scan Complete: Issues detected. Remediation required.", 'high');
+            }
+        }
+
+        function autoFix() {
+            log("Applying patch: Upgrading log-util to v4.17.0...", 'info');
+            document.getElementById('ver-log').value = "4.17.0";
+            buildTree(); // Rebuild UI
+            
+            // Re-run scan automatically to confirm
+            setTimeout(() => {
+                runSCA();
+            }, 500);
+        }
+
+        // Init
+        buildTree();
+
+    </script>
+</body>
+</html>

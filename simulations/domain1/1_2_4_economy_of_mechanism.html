@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Economy of Mechanism (Expanded)</title>
+    <style>
+        :root {
+            --bg: #1e293b;
+            --panel: #334155;
+            --text: #f8fafc;
+            --accent: #22d3ee; /* Cyan */
+            --complex: #f87171; /* Red */
+            --simple: #4ade80; /* Green */
+            --vault: #fbbf24;   /* Gold */
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center;}
+
+        .container {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            width: 100%; max-width: 1100px;
+        }
+
+        .card {
+            background: var(--panel); padding: 20px; border-radius: 8px;
+            border: 1px solid #475569; position: relative;
+        }
+        .card h3 { margin-top: 0; border-bottom: 1px solid #475569; padding-bottom: 10px; font-size: 1.1rem; }
+        .card.complex-zone { border-left: 5px solid var(--complex); }
+        .card.simple-zone { border-left: 5px solid var(--simple); }
+        .card.vault-zone { border-left: 5px solid var(--vault); }
+
+        /* General Buttons */
+        button {
+            padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer;
+            font-weight: bold; margin-top: 10px; width: 100%; transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-simple { background: var(--simple); color: #000; }
+        .btn-complex { background: var(--complex); color: #fff; }
+        .btn-vault { background: var(--vault); color: #000; }
+
+        /* --- SSO Styles --- */
+        .app-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .app-node {
+            background: #1e293b; padding: 10px; border-radius: 6px; text-align: center;
+            border: 1px solid #64748b; font-size: 0.8rem;
+        }
+        .app-node input { 
+            width: 80%; margin-top: 5px; background: #0f172a; border: 1px solid #333; 
+            color: white; padding: 4px; font-size: 0.8rem;
+        }
+        .status-dot {
+            height: 10px; width: 10px; border-radius: 50%; background: #555;
+            display: inline-block; margin-right: 5px;
+        }
+        .status-dot.active { background: var(--simple); box-shadow: 0 0 5px var(--simple); }
+
+        /* --- Vault Styles --- */
+        .config-file {
+            font-family: monospace; background: #0f172a; padding: 10px; color: #ccc;
+            border: 1px solid #475569; border-radius: 4px; font-size: 0.8rem; margin-bottom: 10px;
+        }
+        .secret-val { color: var(--complex); }
+        .vault-val { color: var(--vault); font-weight: bold; }
+        
+        /* --- Efficiency Styles --- */
+        .progress-container { background: #0f172a; height: 15px; border-radius: 10px; overflow: hidden; margin-top: 5px; }
+        .progress-bar { height: 100%; width: 0%; transition: width 0.1s linear; }
+
+        /* --- Attack Surface --- */
+        .code-block {
+            font-family: monospace; background: #0f172a; padding: 10px;
+            border-radius: 4px; font-size: 0.8rem; height: 120px; overflow-y: auto;
+            color: #ccc; border: 1px solid #333;
+        }
+        .vuln-marker { color: var(--complex); font-weight: bold; text-decoration: underline; }
+        .meter-container { background: #000; height: 10px; border-radius: 10px; margin-top: 5px; position: relative; overflow: hidden;}
+        .meter-fill { height: 100%; width: 0%; transition: width 0.5s; }
+
+        .tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: #333; color: #aaa; }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Economy of Mechanism</h1>
+
+    <div class="container">
+        
+        <!-- ROW 1: SSO vs Siloed -->
+        <div class="card complex-zone">
+            <h3 style="color:var(--complex)">1A. Complexity (Siloed Auth)</h3>
+            <p style="font-size:0.9rem">3 Apps, 3 Login Pages, 3 Passwords to manage.</p>
+            <div class="app-grid">
+                <div class="app-node" id="legacy1">
+                    <div>App 1</div>
+                    <input type="password" placeholder="Pass1" id="p1">
+                    <button onclick="loginLegacy(1)" class="btn-complex" style="padding:4px; font-size:0.8rem">Login</button>
+                    <div id="stat1" style="font-size:0.7rem;">Locked</div>
+                </div>
+                <div class="app-node" id="legacy2">
+                    <div>App 2</div>
+                    <input type="password" placeholder="Pass2" id="p2">
+                    <button onclick="loginLegacy(2)" class="btn-complex" style="padding:4px; font-size:0.8rem">Login</button>
+                    <div id="stat2" style="font-size:0.7rem;">Locked</div>
+                </div>
+                <div class="app-node" id="legacy3">
+                    <div>App 3</div>
+                    <input type="password" placeholder="Pass3" id="p3">
+                    <button onclick="loginLegacy(3)" class="btn-complex" style="padding:4px; font-size:0.8rem">Login</button>
+                    <div id="stat3" style="font-size:0.7rem;">Locked</div>
+                </div>
+            </div>
+            <div style="margin-top:10px; font-size:0.8rem; color:#aaa">Result: High Friction, High Maintenance.</div>
+        </div>
+
+        <div class="card simple-zone">
+            <h3 style="color:var(--simple)">1B. Economy (SSO)</h3>
+            <p style="font-size:0.9rem">1 Identity Provider. 1 Password. Access Everywhere.</p>
+            <div style="background:#0f172a; padding:10px; border-radius:6px; text-align:center; margin-top:15px;">
+                <strong>Identity Provider</strong><br>
+                <input type="password" placeholder="MasterPass" id="ssoPass" style="width:60%; padding:5px; margin-top:5px;">
+                <button class="btn-simple" style="width:auto; display:inline-block;" onclick="loginSSO()">Sign In</button>
+            </div>
+            <div class="app-grid">
+                <div class="app-node"><div class="status-dot" id="dot1"></div> App 1</div>
+                <div class="app-node"><div class="status-dot" id="dot2"></div> App 2</div>
+                <div class="app-node"><div class="status-dot" id="dot3"></div> App 3</div>
+            </div>
+            <div style="margin-top:10px; font-size:0.8rem; color:#aaa">Result: 1 Mechanism covers 100 apps.</div>
+        </div>
+
+        <!-- ROW 2: VAULTS -->
+        <div class="card complex-zone">
+            <h3 style="color:var(--complex)">2A. Hardcoded Secrets (Inefficient)</h3>
+            <p style="font-size:0.9rem">Secrets are scattered in config files. Hard to rotate.</p>
+            
+            <div class="config-file">
+                // config.js<br>
+                const DB_HOST = "192.168.1.5";<br>
+                const DB_PASS = "<span class="secret-val" id="hardSecret">admin123</span>";
+            </div>
+            
+            <button class="btn-complex" onclick="compromiseHardcoded()">⚠️ Simulate Compromise</button>
+            
+            <div id="hardResult" style="margin-top:10px; font-size:0.8rem; min-height:40px;">Status: Secrets Exposed.</div>
+        </div>
+
+        <div class="card vault-zone">
+            <h3 style="color:var(--vault)">2B. Password Vault (Economic)</h3>
+            <p style="font-size:0.9rem">Secrets are centralized. Apps request them dynamically.</p>
+            
+            <div class="config-file">
+                // config.js<br>
+                const DB_HOST = "192.168.1.5";<br>
+                // Ask Vault for secret<br>
+                const DB_PASS = <span class="vault-val">Vault.get('db_pass')</span>;
+            </div>
+
+            <button class="btn-vault" onclick="rotateVault()">🔄 Rotate Secret (Zero Downtime)</button>
+            
+            <div id="vaultResult" style="margin-top:10px; font-size:0.8rem; min-height:40px;">Status: Secret is Secure.</div>
+        </div>
+
+        <!-- ROW 3: RESOURCE EFFICIENCY -->
+        <div class="card complex-zone">
+            <h3 style="color:var(--complex)">3A. Custom Code (Reinventing Wheel)</h3>
+            <p style="font-size:0.9rem">Developer wrote their own Crypto Lib. Bloated & Unverified.</p>
+            <div style="display:flex; justify-content:space-between; align-items:center">
+                <span class="tag">Size: 2500 Lines</span>
+                <span class="tag">Audit: Unsafe</span>
+            </div>
+            <button class="btn-complex" onclick="runCustomCrypto()">Encrypt Data (Custom)</button>
+            <div class="progress-container"><div class="progress-bar" id="barCustom" style="background:var(--complex)"></div></div>
+            <div id="customTime" style="font-size:0.8rem; margin-top:5px; text-align:right">Time: --</div>
+        </div>
+
+        <div class="card simple-zone">
+            <h3 style="color:var(--simple)">3B. Standard Library (Efficient)</h3>
+            <p style="font-size:0.9rem">Using proven, optimized libraries (e.g., OpenSSL, AES-NI).</p>
+            <div style="display:flex; justify-content:space-between; align-items:center">
+                <span class="tag">Size: 1 Line (Import)</span>
+                <span class="tag">Audit: Safe</span>
+            </div>
+            <button class="btn-simple" onclick="runStandardCrypto()">Encrypt Data (Standard)</button>
+            <div class="progress-container"><div class="progress-bar" id="barStandard" style="background:var(--simple)"></div></div>
+            <div id="stdTime" style="font-size:0.8rem; margin-top:5px; text-align:right">Time: --</div>
+        </div>
+
+        <!-- ROW 4: ATTACK SURFACE -->
+        <div class="card" style="grid-column: span 2">
+            <h3>4. Attack Surface Calculator</h3>
+            <p style="font-size:0.9rem">More Code = More Bugs. Economy means keeping the codebase small.</p>
+            
+            <div style="display:flex; gap:20px; align-items:center;">
+                <div style="flex-grow:1">
+                    <label>Feature Count: <span id="featCount">5</span></label>
+                    <input type="range" min="1" max="50" value="5" style="width:100%" oninput="updateSurface(this.value)">
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:1.5rem; font-weight:bold" id="bugEst">0.8</div>
+                    <div style="font-size:0.8rem; color:#aaa">Est. Critical Bugs</div>
+                </div>
+            </div>
+            
+            <div class="code-block" id="surfaceLog">
+                > System initialized. Core features only.
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /* --- SSO LOGIC --- */
+        function loginLegacy(id) {
+            const val = document.getElementById(`p${id}`).value;
+            const secrets = {1: "Pass1", 2: "Pass2", 3: "Pass3"};
+            if(val === secrets[id]) {
+                document.getElementById(`stat${id}`).innerText = "UNLOCKED";
+                document.getElementById(`stat${id}`).style.color = "var(--simple)";
+            } else {
+                document.getElementById(`stat${id}`).innerText = "FAILED";
+                document.getElementById(`stat${id}`).style.color = "var(--complex)";
+            }
+        }
+
+        function loginSSO() {
+            const val = document.getElementById('ssoPass').value;
+            if(val === "MasterPass") {
+                ['dot1', 'dot2', 'dot3'].forEach(id => document.getElementById(id).classList.add('active'));
+            } else {
+                ['dot1', 'dot2', 'dot3'].forEach(id => document.getElementById(id).classList.remove('active'));
+                alert("Invalid SSO Credentials");
+            }
+        }
+
+        /* --- VAULT LOGIC --- */
+        function compromiseHardcoded() {
+            const res = document.getElementById('hardResult');
+            const code = document.getElementById('hardSecret');
+            code.innerText = "HACKED!";
+            res.innerHTML = `
+                <span style="color:var(--complex)">CRITICAL ALERT: Password Exposed!</span><br>
+                Action Required:<br>
+                1. Edit Config file manually.<br>
+                2. Re-compile Application.<br>
+                3. Re-deploy (Downtime: 30 mins).<br>
+                <em>This is NOT Economic.</em>
+            `;
+        }
+
+        function rotateVault() {
+            const res = document.getElementById('vaultResult');
+            // Simulate API call
+            res.innerHTML = "Contacting Vault...";
+            setTimeout(() => {
+                res.innerHTML = `
+                    <span style="color:var(--simple)">SUCCESS: Secret Rotated.</span><br>
+                    - Old secret invalidated.<br>
+                    - New secret generated.<br>
+                    - Apps pick up change instantly.<br>
+                    <em>Zero code changes required.</em>
+                `;
+            }, 800);
+        }
+
+        /* --- EFFICIENCY LOGIC --- */
+        function runCustomCrypto() {
+            const bar = document.getElementById('barCustom');
+            const time = document.getElementById('customTime');
+            bar.style.width = "0%"; time.innerText = "Running...";
+            
+            // Simulate slow process
+            let width = 0;
+            const interval = setInterval(() => {
+                width += 2;
+                bar.style.width = width + "%";
+                if(width >= 100) {
+                    clearInterval(interval);
+                    time.innerText = "Time: 1200ms (Slow)";
+                    time.style.color = "var(--complex)";
+                }
+            }, 30); // Slow tick
+        }
+
+        function runStandardCrypto() {
+            const bar = document.getElementById('barStandard');
+            const time = document.getElementById('stdTime');
+            bar.style.width = "0%"; time.innerText = "Running...";
+            
+            // Simulate fast process
+            setTimeout(() => {
+                bar.style.width = "100%";
+                time.innerText = "Time: 45ms (Fast)";
+                time.style.color = "var(--simple)";
+            }, 200); // Fast
+        }
+
+        /* --- SURFACE LOGIC --- */
+        function updateSurface(val) {
+            document.getElementById('featCount').innerText = val;
+            const bugs = (val * 0.15).toFixed(1);
+            const est = document.getElementById('bugEst');
+            est.innerText = bugs;
+            
+            const log = document.getElementById('surfaceLog');
+            if(val < 10) {
+                est.style.color = "var(--simple)";
+                log.innerHTML = `> Feature set is lean.<br>> Easy to secure.`;
+            } else if (val < 30) {
+                est.style.color = "#fbbf24";
+                log.innerHTML = `> Complexity increasing.<br>> Added "Bloatware Module".`;
+            } else {
+                est.style.color = "var(--complex)";
+                log.innerHTML = `> <span class="vuln-marker">CRITICAL BLOAT</span><br>> Features interacting unpredictably.<br>> Too complex to test fully.`;
+            }
+        }
+
+    </script>
+</body>
+</html>

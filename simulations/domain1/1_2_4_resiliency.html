@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Resiliency Simulator</title>
+    <style>
+        :root {
+            --bg: #1e1e2e;
+            --panel: #2b2b3d;
+            --text: #cdd6f4;
+            --accent: #f9e2af; /* Yellow */
+            --safe: #a6e3a1;   /* Green */
+            --secure: #f38ba8; /* Red */
+            --blue: #89b4fa;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 30px; }
+
+        .container {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            width: 100%; max-width: 1100px;
+        }
+
+        .card {
+            background: var(--panel); padding: 20px; border-radius: 8px;
+            border: 1px solid #444; position: relative;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid #444; padding-bottom: 10px; }
+
+        button {
+            padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer;
+            font-weight: bold; margin-top: 10px; transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.95); }
+        .btn-crash { background: var(--secure); color: #111; width: 100%; }
+        .btn-reset { background: var(--blue); color: #111; width: 100%; margin-top: 5px; }
+        
+        select { background: #111; color: white; padding: 5px; border: 1px solid #555; width: 100%; margin-bottom: 10px; }
+
+        /* --- Module 1: Door Lock --- */
+        .door-frame {
+            height: 150px; background: #444; border-radius: 4px; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            border: 4px solid #666; transition: all 0.3s;
+        }
+        .door-status { font-size: 1.5rem; font-weight: bold; text-transform: uppercase; }
+        
+        /* --- Module 2: Firewall --- */
+        .network-vis {
+            height: 120px; background: #111; border-radius: 4px; position: relative;
+            overflow: hidden; border: 1px solid #555;
+        }
+        .packet {
+            width: 10px; height: 10px; background: var(--blue); border-radius: 50%;
+            position: absolute; top: 50px; left: -10px;
+        }
+        .firewall-barrier {
+            width: 10px; height: 100%; background: var(--safe);
+            position: absolute; left: 50%; top: 0; transition: background 0.3s;
+        }
+
+        /* --- Module 3: Failover --- */
+        .server-rack { display: flex; gap: 20px; justify-content: center; margin-top: 20px; }
+        .server {
+            width: 80px; height: 100px; background: #333; border: 2px solid #555;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border-radius: 5px; transition: all 0.3s;
+        }
+        .server.active { border-color: var(--safe); box-shadow: 0 0 15px rgba(166, 227, 161, 0.3); }
+        .server.dead { border-color: var(--secure); opacity: 0.5; background: #200; }
+        .server-led { width: 10px; height: 10px; background: #555; border-radius: 50%; margin-bottom: 5px; }
+        .server.active .server-led { background: var(--safe); box-shadow: 0 0 5px var(--safe); }
+
+        .log-box {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid #333; color: #aaa; font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Resiliency & Failure Modes</h1>
+
+    <div class="container">
+        
+        <!-- Module 1: Physical Security -->
+        <div class="card">
+            <h3>1. Fail Safe vs. Fail Secure</h3>
+            <p style="font-size:0.9rem">Configure the door lock response to a power outage.</p>
+            
+            <label>Scenario Context:</label>
+            <select id="doorContext" onchange="updateDoorDesc()">
+                <option value="safe">Fire Exit (Life Safety)</option>
+                <option value="secure">Bank Vault (Asset Security)</option>
+            </select>
+            <p id="doorDesc" style="font-size:0.8rem; color:#aaa; margin-top:-5px; margin-bottom: 10px;">Goal: People must escape.</p>
+
+            <label>Failure Mode Configuration:</label>
+            <select id="doorConfig">
+                <option value="unlock">Fail Safe (Unlock on Power Loss)</option>
+                <option value="lock">Fail Secure (Lock on Power Loss)</option>
+            </select>
+
+            <div class="door-frame" id="doorVisual">
+                <div class="door-status" id="doorText">LOCKED (POWER ON)</div>
+            </div>
+
+            <button class="btn-crash" onclick="cutPower()">✂️ CUT POWER</button>
+            <button class="btn-reset" onclick="resetDoor()">⚡ RESTORE POWER</button>
+        </div>
+
+        <!-- Module 2: Network Security -->
+        <div class="card">
+            <h3>2. Fail Open vs. Fail Closed</h3>
+            <p style="font-size:0.9rem">A firewall inspection engine crashes. Do packets pass?</p>
+            
+            <label>Firewall Configuration:</label>
+            <select id="fwConfig">
+                <option value="closed">Fail Closed (Secure - Block All)</option>
+                <option value="open">Fail Open (Availability - Allow All)</option>
+            </select>
+
+            <div class="network-vis" id="netVis">
+                <div class="firewall-barrier" id="fwBarrier"></div>
+            </div>
+
+            <button class="btn-crash" onclick="crashFirewall()">💥 CRASH FIREWALL ENGINE</button>
+            <button class="btn-reset" onclick="resetFirewall()">🔄 RESTART SERVICE</button>
+        </div>
+
+        <!-- Module 3: Failover -->
+        <div class="card" style="grid-column: span 2">
+            <h3>3. Failover & Redundancy (No SPOF)</h3>
+            <p>Traffic flows to the Primary. If it dies, the Load Balancer should detect and switch.</p>
+            
+            <div style="text-align:center; margin-bottom:10px;">
+                Traffic Directed To: <span id="lbTarget" style="font-weight:bold; color:var(--safe)">PRIMARY</span>
+            </div>
+
+            <div class="server-rack">
+                <div class="server active" id="srv1">
+                    <div class="server-led"></div>
+                    <span>Primary</span>
+                </div>
+                <div class="server" id="srv2">
+                    <div class="server-led"></div>
+                    <span>Secondary</span>
+                </div>
+            </div>
+
+            <button class="btn-crash" onclick="killPrimary()" style="width: 200px; display: block; margin: 20px auto;">☠️ KILL PRIMARY SERVER</button>
+        </div>
+
+        <!-- Logs -->
+        <div class="log-box" id="logs">
+            <div>> Resiliency Lab Initialized.</div>
+        </div>
+
+    </div>
+
+    <script>
+        function log(msg) {
+            const b = document.getElementById('logs');
+            b.innerHTML += `<div>> ${msg}</div>`;
+            b.scrollTop = b.scrollHeight;
+        }
+
+        /* --- DOOR LOGIC --- */
+        function updateDoorDesc() {
+            const ctx = document.getElementById('doorContext').value;
+            const desc = document.getElementById('doorDesc');
+            if(ctx === 'safe') desc.innerText = "Goal: Protect Human Life (Must unlock).";
+            else desc.innerText = "Goal: Protect Assets (Must stay locked).";
+        }
+
+        function cutPower() {
+            const config = document.getElementById('doorConfig').value;
+            const vis = document.getElementById('doorVisual');
+            const txt = document.getElementById('doorText');
+            const context = document.getElementById('doorContext').value;
+
+            if(config === 'unlock') {
+                vis.style.borderColor = "var(--safe)";
+                vis.style.background = "#242";
+                txt.innerText = "UNLOCKED (FAIL SAFE)";
+                txt.style.color = "var(--safe)";
+                
+                if(context === 'safe') log("✅ CORRECT: Fire exit unlocked. People are safe.");
+                else log("⚠️ RISK: Bank Vault unlocked! Assets exposed (but people safe).");
+            
+            } else {
+                vis.style.borderColor = "var(--secure)";
+                vis.style.background = "#422";
+                txt.innerText = "LOCKED (FAIL SECURE)";
+                txt.style.color = "var(--secure)";
+
+                if(context === 'safe') log("❌ DANGER: Fire exit locked! Life safety violation.");
+                else log("✅ SECURE: Bank Vault remains locked. Assets protected.");
+            }
+        }
+
+        function resetDoor() {
+            const vis = document.getElementById('doorVisual');
+            const txt = document.getElementById('doorText');
+            vis.style.borderColor = "#666";
+            vis.style.background = "#444";
+            txt.innerText = "LOCKED (POWER ON)";
+            txt.style.color = "#fff";
+            log("Power restored. System normal.");
+        }
+
+
+        /* --- FIREWALL LOGIC --- */
+        let fwInterval;
+        let fwState = 'running'; // running, open, closed
+
+        function spawnPacket() {
+            const container = document.getElementById('netVis');
+            const pkt = document.createElement('div');
+            pkt.className = 'packet';
+            container.appendChild(pkt);
+
+            let pos = -10;
+            const anim = setInterval(() => {
+                pos += 2;
+                pkt.style.left = pos + "%";
+
+                // Hit Firewall (50%)
+                if (pos > 48 && pos < 52) {
+                    if (fwState === 'running') {
+                        // Inspection works - let's say it blocks for visual effect occasionally or passes
+                        // For sim, let's assume valid traffic passes
+                    } 
+                    else if (fwState === 'closed') {
+                        pkt.style.background = "red";
+                        clearInterval(anim);
+                        pkt.remove();
+                        return;
+                    }
+                    // if open, passes through
+                }
+
+                if (pos > 100) {
+                    clearInterval(anim);
+                    pkt.remove();
+                }
+            }, 20);
+        }
+
+        function startTraffic() {
+            if(fwInterval) clearInterval(fwInterval);
+            fwInterval = setInterval(spawnPacket, 800);
+        }
+        startTraffic();
+
+        function crashFirewall() {
+            const config = document.getElementById('fwConfig').value;
+            const wall = document.getElementById('fwBarrier');
+            
+            if(config === 'closed') {
+                fwState = 'closed';
+                wall.style.background = "var(--secure)"; // Red wall
+                log("🛡️ FAIL CLOSED: Firewall crashed. Blocking ALL traffic (Availability Loss).");
+            } else {
+                fwState = 'open';
+                wall.style.background = "transparent"; // Invisible wall
+                wall.style.border = "1px dashed #555";
+                log("⚠️ FAIL OPEN: Firewall crashed. Traffic flowing UNCHECKED (Security Loss).");
+            }
+        }
+
+        function resetFirewall() {
+            fwState = 'running';
+            const wall = document.getElementById('fwBarrier');
+            wall.style.background = "var(--safe)";
+            wall.style.border = "none";
+            log("Firewall Engine restarted.");
+        }
+
+
+        /* --- FAILOVER LOGIC --- */
+        function killPrimary() {
+            const s1 = document.getElementById('srv1');
+            const s2 = document.getElementById('srv2');
+            const lbl = document.getElementById('lbTarget');
+
+            if(s1.classList.contains('dead')) return;
+
+            s1.classList.remove('active');
+            s1.classList.add('dead');
+            log("🚨 ALERT: Primary Server Heartbeat Lost!");
+
+            setTimeout(() => {
+                log("🔄 FAILOVER: Load Balancer switching to Secondary...");
+                s2.classList.add('active');
+                lbl.innerText = "SECONDARY";
+                lbl.style.color = "var(--accent)";
+            }, 1000);
+        }
+
+    </script>
+</body>
+</html>

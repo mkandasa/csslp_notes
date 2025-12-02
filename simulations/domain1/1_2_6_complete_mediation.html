@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Complete Mediation</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #e2e8f0;
+            --accent: #8b5cf6; /* Violet */
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --cache: #0ea5e9; /* Sky Blue */
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #94a3b8;
+            border: 1px solid #334155; padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 900px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid #334155; margin-bottom: 20px; position: relative;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid #334155; padding-bottom: 10px; }
+
+        /* General UI Elements */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--accent); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-cache { background: var(--cache); color: white; }
+
+        input[type="text"] {
+            background: #0f172a; border: 1px solid #475569; color: white;
+            padding: 8px; border-radius: 4px; font-family: monospace; width: 100%; box-sizing: border-box;
+        }
+
+        .status-box {
+            background: #000; padding: 10px; border-radius: 6px; 
+            margin-top: 10px; font-family: monospace; color: #10b981; min-height: 40px;
+            border: 1px solid #333; font-size: 0.9rem;
+        }
+
+        /* --- Tab 1: Revocation --- */
+        .split-view { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .user-view { border: 2px solid #333; padding: 10px; border-radius: 8px; }
+        .admin-view { border: 2px solid var(--danger); padding: 10px; border-radius: 8px; background: #2a1111; }
+
+        /* --- Tab 2: Cookies --- */
+        .cookie-editor {
+            background: #111; padding: 15px; border-radius: 6px; border: 1px dashed #666;
+        }
+        .browser-mock {
+            border: 1px solid #444; border-radius: 6px; overflow: hidden; margin-top: 20px;
+        }
+        .browser-bar { background: #333; padding: 8px; font-size: 0.8rem; display: flex; align-items: center; gap: 10px; }
+        .browser-content { padding: 20px; background: #fff; color: #000; min-height: 150px; text-align: center; }
+
+        /* --- Tab 4: Credential Caching --- */
+        .cache-diagram {
+            display: flex; gap: 20px; align-items: center; justify-content: center; margin: 20px 0;
+        }
+        .data-store {
+            width: 150px; padding: 15px; border-radius: 8px; text-align: center;
+            border: 2px solid #444; font-size: 0.9rem; position: relative;
+        }
+        .data-store strong { display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 0.8rem;}
+        
+        #dbStore { border-color: var(--success); background: #064e3b; }
+        #memCache { border-color: var(--cache); background: #0c4a6e; opacity: 0.5; }
+        
+        .arrow-right { font-size: 1.5rem; color: #666; }
+        .cache-active { opacity: 1 !important; box-shadow: 0 0 15px var(--cache); }
+        .pass-value { font-family: monospace; background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 4px; }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Complete Mediation</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('revocation')">1. Revocation Race</button>
+        <button class="tab-btn" onclick="switchTab('cookie')">2. Cookie Tampering</button>
+        <button class="tab-btn" onclick="switchTab('url')">3. Force Browsing</button>
+        <button class="tab-btn" onclick="switchTab('cred')">4. Credential Caching</button>
+    </div>
+
+    <!-- TAB 1: REVOCATION -->
+    <div id="revocation" class="tab-content active">
+        <div class="card">
+            <h3>Scenario: The Fired Employee</h3>
+            <p><strong>Context:</strong> Alice has been fired. Admin revokes access in DB. But Alice's session token is still active.</p>
+            <div class="split-view">
+                <div class="admin-view">
+                    <h4 style="margin-top:0; color:var(--danger)">Admin Console</h4>
+                    <p style="font-size:0.8rem">User: Alice (Active)</p>
+                    <button class="btn-danger" onclick="revokeAlice()">🔥 REVOKE ACCESS</button>
+                    <div id="dbStatus" style="font-size:0.8rem; margin-top:10px; color:#aaa">Database: Access ALLOWED</div>
+                </div>
+                <div class="user-view">
+                    <h4 style="margin-top:0; color:var(--accent)">Alice's Browser</h4>
+                    <p style="font-size:0.8rem">Session Token: <code>sess_12345</code></p>
+                    <label>Mediation Mode:</label>
+                    <select id="medMode" style="background:#000; color:white; border:1px solid #555; padding:5px;">
+                        <option value="incomplete">Incomplete (Trust Token)</option>
+                        <option value="complete">Complete (Check DB)</option>
+                    </select>
+                    <button class="btn-action" onclick="accessFile()">Open File</button>
+                </div>
+            </div>
+            <div class="status-box" id="revocationLog">> Waiting...</div>
+        </div>
+    </div>
+
+    <!-- TAB 2: COOKIE TAMPERING -->
+    <div id="cookie" class="tab-content">
+        <div class="card">
+            <h3>Scenario: Client-Side Trust</h3>
+            <p><strong>Context:</strong> The server trusts the cookie value "role=user" without verifying it.</p>
+            <div class="cookie-editor">
+                <label style="color:#aaa; font-size:0.8rem;">COOKIE EDITOR</label><br>
+                <div style="display:flex; gap:10px; margin-top:10px; align-items:center;">
+                    <span>Name: <code>user_role</code></span>
+                    <span>Value:</span>
+                    <input type="text" id="cookieVal" value="standard_user" style="width:150px;">
+                    <button class="btn-success" style="margin:0; font-size:0.8rem" onclick="saveCookie()">Update</button>
+                </div>
+            </div>
+            <div class="browser-mock">
+                <div class="browser-bar">
+                    <input type="text" value="https://company.com/dashboard" readonly style="width:200px; padding:2px; font-size:0.8rem;">
+                    <button style="margin:0; padding:2px 8px; font-size:0.7rem;" onclick="refreshPage()">Refresh</button>
+                </div>
+                <div class="browser-content" id="pageContent">
+                    <h2>Welcome, Standard User</h2>
+                </div>
+            </div>
+            <div class="status-box" id="cookieLog">> Try changing value to 'admin'...</div>
+        </div>
+    </div>
+
+    <!-- TAB 3: URL FORCE BROWSING -->
+    <div id="url" class="tab-content">
+        <div class="card">
+            <h3>Scenario: Forced Browsing</h3>
+            <p><strong>Context:</strong> Hiding a button isn't security. Users can guess URLs.</p>
+            <div class="browser-mock">
+                <div class="browser-bar">
+                    <span style="color:#aaa">URL:</span>
+                    <input type="text" id="urlBar" value="/home">
+                    <button style="margin:0; padding:2px 8px; font-size:0.7rem;" onclick="navigate()">Go</button>
+                </div>
+                <div class="browser-content" id="urlContent" style="display:flex; align-items:center; justify-content:center;">
+                    <div><h2>Home Page</h2><button disabled style="background:#ccc;">Admin (Hidden)</button></div>
+                </div>
+            </div>
+            <div style="margin-top:15px; display:flex; align-items:center; gap:10px;">
+                <label>Server Logic:</label>
+                <select id="serverLogic" style="padding:5px; background:#222; color:white; border:1px solid #555">
+                    <option value="weak">Weak (Check only at Login)</option>
+                    <option value="strong">Strong (Check on Every Request)</option>
+                </select>
+                <button class="btn-action" onclick="hackUrl()" style="margin:0">Try '/admin'</button>
+            </div>
+            <div class="status-box" id="urlLog">> Waiting...</div>
+        </div>
+    </div>
+
+    <!-- TAB 4: CREDENTIAL CACHING (NEW) -->
+    <div id="cred" class="tab-content">
+        <div class="card">
+            <h3>Scenario: The Stale Password</h3>
+            <p><strong>Context:</strong> To speed up "Re-Authentication" (e.g., for money transfers), the app caches password checks for 5 minutes. This creates a vulnerability window.</p>
+
+            <div class="cache-diagram">
+                <!-- Database -->
+                <div class="data-store" id="dbStore">
+                    <strong>Database (Truth)</strong>
+                    <div style="margin-top:5px">Current Pass:</div>
+                    <div class="pass-value" id="dbPass">OldPass1</div>
+                </div>
+
+                <div class="arrow-right">←</div>
+
+                <!-- Cache -->
+                <div class="data-store" id="memCache">
+                    <strong>Memory Cache</strong>
+                    <div style="margin-top:5px">Cached Pass:</div>
+                    <div class="pass-value" id="cachePass">--</div>
+                    <div style="font-size:0.7rem; color:#aaa; margin-top:5px" id="cacheTimer">TTL: 0s</div>
+                </div>
+            </div>
+
+            <div class="split-view">
+                <!-- Legitimate User -->
+                <div class="user-view" style="border-color: var(--success)">
+                    <h4 style="margin-top:0; color:var(--success)">Legitimate User</h4>
+                    <button class="btn-success" onclick="changePassword()">🔄 Change Password</button>
+                    <p style="font-size:0.8rem; color:#aaa">Update DB to 'NewPass2'.</p>
+                </div>
+
+                <!-- Attacker -->
+                <div class="admin-view">
+                    <h4 style="margin-top:0; color:var(--danger)">Attacker</h4>
+                    <p style="font-size:0.8rem">Stolen Credential: <code>OldPass1</code></p>
+                    <button class="btn-danger" onclick="attemptReAuth()">💸 Attempt Transfer</button>
+                </div>
+            </div>
+
+            <div style="margin-top:20px; background:#111; padding:10px; border-radius:6px; display:flex; align-items:center; justify-content:space-between;">
+                <div>
+                    <span style="color:#aaa">System Config:</span>
+                    <strong>Enable Caching?</strong>
+                </div>
+                <button id="toggleCacheBtn" class="btn-cache" style="margin:0; width:auto" onclick="toggleCache()">Caching: OFF</button>
+            </div>
+
+            <div class="status-box" id="credLog">> Enable Caching to see the vulnerability.</div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'revocation':0, 'cookie':1, 'url':2, 'cred':3};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        /* --- REVOCATION --- */
+        let dbAccess = true;
+        function revokeAlice() {
+            dbAccess = false;
+            document.getElementById('dbStatus').innerText = "Database: Access REVOKED";
+            document.getElementById('dbStatus').style.color = "var(--danger)";
+            log('revocationLog', "Admin fired user. DB Updated.", 'warn');
+        }
+        function accessFile() {
+            const mode = document.getElementById('medMode').value;
+            if (mode === 'incomplete') {
+                log('revocationLog', "Server trusted Session Token. ACCESS GRANTED (Fail).", 'fail');
+            } else {
+                if(dbAccess) log('revocationLog', "Server queried DB. User Active. Access Granted.");
+                else log('revocationLog', "Server queried DB. User Revoked. ACCESS DENIED (Success).", 'success');
+            }
+        }
+
+        /* --- COOKIES --- */
+        let cookieRole = "standard_user";
+        function saveCookie() {
+            cookieRole = document.getElementById('cookieVal').value;
+            log('cookieLog', `Cookie updated locally to: ${cookieRole}`);
+        }
+        function refreshPage() {
+            const content = document.getElementById('pageContent');
+            if (cookieRole === 'admin') {
+                content.innerHTML = `<h2 style="color:red">⚠️ ADMIN EXPOSED</h2><p>Incomplete Mediation!</p>`;
+                log('cookieLog', "Server trusted cookie. Admin Access Granted.", 'fail');
+            } else {
+                content.innerHTML = `<h2>Welcome, User</h2>`;
+                log('cookieLog', "Server trusted cookie. Standard access.");
+            }
+        }
+
+        /* --- URL --- */
+        function hackUrl() { document.getElementById('urlBar').value = "/admin"; navigate(); }
+        function navigate() {
+            const url = document.getElementById('urlBar').value;
+            const logic = document.getElementById('serverLogic').value;
+            const screen = document.getElementById('urlContent');
+            
+            if (url === '/admin') {
+                if (logic === 'weak') {
+                    screen.innerHTML = `<div style="color:red"><h1>SECRET PANEL</h1><p>Bypassed!</p></div>`;
+                    log('urlLog', "Force Browsing Success (Fail).", 'fail');
+                } else {
+                    screen.innerHTML = `<div><h1>🚫 403</h1><p>Access Denied.</p></div>`;
+                    log('urlLog', "Access Denied. Mediated successfully.", 'success');
+                }
+            } else {
+                screen.innerHTML = `<div><h2>Home</h2></div>`;
+            }
+        }
+
+        /* --- CREDENTIAL CACHING --- */
+        let cachingEnabled = false;
+        let currentDbPass = "OldPass1";
+        let cachedPass = null;
+
+        function toggleCache() {
+            cachingEnabled = !cachingEnabled;
+            const btn = document.getElementById('toggleCacheBtn');
+            const vis = document.getElementById('memCache');
+            
+            if(cachingEnabled) {
+                btn.innerText = "Caching: ON";
+                btn.style.background = "var(--cache)";
+                vis.classList.add('cache-active');
+                // Simulate initial cache population
+                cachedPass = currentDbPass;
+                updateCacheVis();
+                log('credLog', "Cache Enabled. System will reuse credentials for 60s.");
+            } else {
+                btn.innerText = "Caching: OFF";
+                btn.style.background = "#444";
+                vis.classList.remove('cache-active');
+                cachedPass = null;
+                updateCacheVis();
+                log('credLog', "Cache Disabled. System forces DB check every time.");
+            }
+        }
+
+        function changePassword() {
+            currentDbPass = "NewPass2";
+            document.getElementById('dbPass').innerText = currentDbPass;
+            log('credLog', "User changed password to 'NewPass2'. DB Updated.", 'success');
+            
+            // Note: In a buggy system (Incomplete Mediation), the cache is NOT cleared here.
+        }
+
+        function attemptReAuth() {
+            // Attacker uses "OldPass1"
+            const attackCred = "OldPass1";
+            
+            if(cachingEnabled) {
+                // Check Cache
+                if(cachedPass === attackCred) {
+                    log('credLog', "⚠️ FAIL: System checked CACHE. Old Password accepted! (TOCTOU)", 'fail');
+                } else {
+                    // This happens if cache expired or logic is actually correct (cache invalidation)
+                    // For this lab, we simulate the bug: Cache matches Old Password
+                    log('credLog', "Cache miss? (This shouldn't happen in this specific lab scenario)", 'warn');
+                }
+            } else {
+                // Check DB
+                if(currentDbPass === attackCred) {
+                    // Should not happen if password was changed
+                    log('credLog', "Access Granted (Logic Error).", 'fail');
+                } else {
+                    log('credLog', "✅ SUCCESS: System checked DB. Old Password rejected.", 'success');
+                }
+            }
+        }
+
+        function updateCacheVis() {
+            const el = document.getElementById('cachePass');
+            if(cachingEnabled) {
+                el.innerText = cachedPass || "--";
+                document.getElementById('cacheTimer').innerText = "TTL: 60s";
+            } else {
+                el.innerText = "DISABLED";
+                document.getElementById('cacheTimer').innerText = "";
+            }
+        }
+
+        function log(id, msg, type) {
+            const b = document.getElementById(id);
+            const color = type === 'fail' ? 'var(--danger)' : (type === 'success' ? 'var(--success)' : (type === 'warn' ? 'var(--warning)' : '#10b981'));
+            b.innerHTML = `> <span style="color:${color}">${msg}</span>`;
+        }
+
+    </script>
+</body>
+</html>

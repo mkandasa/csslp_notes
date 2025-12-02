@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Integrity & Digital Signatures</title>
+    <!-- Symmetric Crypto & Hashing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- Asymmetric RSA for Digital Signatures -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsencrypt/3.3.2/jsencrypt.min.js"></script>
+    <style>
+        :root {
+            --primary: #7c3aed; /* Violet */
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --success: #10b981;
+            --error: #ef4444;
+            --digital-sig: #3b82f6; /* Blue for Digital Sig section */
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 { color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
+        h2 { margin-top: 30px; font-size: 1.2rem; color: #334155; }
+        .container { display: grid; gap: 20px; }
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 5px solid var(--primary);
+        }
+        label { font-weight: bold; display: block; margin-bottom: 5px; margin-top: 15px; }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            box-sizing: border-box;
+        }
+        textarea { font-size: 0.8rem; }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        button.tamper { background-color: #f59e0b; }
+        button.sig-btn { background-color: var(--digital-sig); }
+        button:hover { opacity: 0.9; }
+        button:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+        
+        .hash-display {
+            font-family: monospace;
+            background: #e2e8f0;
+            padding: 10px;
+            border-radius: 4px;
+            word-break: break-all;
+            font-size: 0.85rem;
+            min-height: 24px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: white;
+            margin-top: 10px;
+        }
+        .status-match { background-color: var(--success); }
+        .status-mismatch { background-color: var(--error); }
+        .concept-note { font-size: 0.9rem; color: #64748b; margin-top: 5px; font-style: italic; }
+        
+        .workflow-step {
+            border-left: 2px solid #cbd5e1;
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+        .workflow-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: #64748b;
+            font-weight: bold;
+        }
+        .key-box {
+            font-size: 0.7rem; 
+            background: #f1f5f9; 
+            color: #475569;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP Domain 1: Integrity & Digital Signatures</h1>
+    <p>Explore how Hashing, HMACs, and Digital Signatures ensure data integrity and authenticity.</p>
+
+    <div class="container">
+        
+        <!-- Scenario 1: Simple Hashing -->
+        <div class="card">
+            <h2>1. The Avalanche Effect (Simple Hashing)</h2>
+            <p class="concept-note">Notice how changing a single character (e.g., changing $100 to $1000) completely changes the hash.</p>
+            
+            <label>Software/Data Payload:</label>
+            <textarea id="hashInput" rows="2" oninput="updateSimpleHash()">Transfer $100 to Account A</textarea>
+            
+            <label>SHA-256 Hash:</label>
+            <div id="simpleHashOutput" class="hash-display"></div>
+        </div>
+
+        <!-- Scenario 2: Integrity Check -->
+        <div class="card" style="border-left-color: #10b981;">
+            <h2>2. File Integrity Verification</h2>
+            <p class="concept-note">Simulate downloading a file. The "Vendor" provides a checksum. If the file is tampered with in transit, the checksums won't match.</p>
+            
+            <label>Original File Content (Vendor Side):</label>
+            <input type="text" id="fileContent" value="v1.0.0_Stable_Release.exe">
+            
+            <button onclick="generateVendorHash()">1. Vendor Publishes Hash</button>
+            <button onclick="tamperFile()" class="tamper">2. Simulate Man-in-the-Middle Attack</button>
+            <button onclick="verifyIntegrity()">3. Client Verification</button>
+
+            <br><br>
+            <div id="integrityResult"></div>
+        </div>
+
+        <!-- Scenario 3: HMAC (Authenticity) -->
+        <div class="card" style="border-left-color: #ec4899;">
+            <h2>3. HMAC (Integrity + Authenticity)</h2>
+            <p class="concept-note">HMAC uses a <strong>Secret Key</strong>. Without the key, you cannot generate a valid signature. Used for API requests.</p>
+            
+            <label>Message:</label>
+            <input type="text" id="hmacMessage" value="API_REQUEST: DELETE /users/1">
+            
+            <label>Secret Key (Only known to Server & Client):</label>
+            <input type="text" id="hmacKey" value="SuperSecretKey2025">
+
+            <button onclick="generateHMAC()">Generate HMAC</button>
+            
+            <br><br>
+            <label>HMAC Signature:</label>
+            <div id="hmacOutput" class="hash-display">Waiting...</div>
+        </div>
+
+        <!-- Scenario 4: Digital Signatures (New) -->
+        <div class="card" style="border-left-color: var(--digital-sig);">
+            <h2>4. Digital Signatures (Code Signing)</h2>
+            <p class="concept-note">The gold standard for software distribution. Uses <strong>Asymmetric Keys</strong>. The Private Key signs (encrypts the hash). The Public Key verifies.</p>
+            
+            <div class="workflow-step">
+                <div class="workflow-title">Step A: Key Generation</div>
+                <p>The Developer generates a Key Pair. The Private Key stays safe. The Public Key is given to everyone.</p>
+                <button onclick="generateKeys()" class="sig-btn">Generate RSA Key Pair (512 bit)</button>
+                <span id="keygenStatus" style="margin-left:10px; font-style:italic; color:#64748b;"></span>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                    <div>
+                        <label>Private Key (Signer):</label>
+                        <textarea id="privKey" rows="3" readonly class="key-box" placeholder="Generated Private Key..."></textarea>
+                    </div>
+                    <div>
+                        <label>Public Key (Verifier):</label>
+                        <textarea id="pubKey" rows="3" readonly class="key-box" placeholder="Generated Public Key..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="workflow-step">
+                <div class="workflow-title">Step B: Signing (Developer Side)</div>
+                <p>The workflow: <strong>Hash(Data) + Encrypt(Hash, PrivateKey) = Signature</strong></p>
+                <label>Software to Sign:</label>
+                <input type="text" id="signInput" value="System_Update_v2.msi">
+                
+                <button onclick="signData()" class="sig-btn" id="signBtn" disabled>Sign Data</button>
+                <br><br>
+                <label>Digital Signature:</label>
+                <div id="signatureOutput" class="hash-display" style="font-size: 0.7rem; height: 60px; overflow-y: auto;">Waiting for signature...</div>
+            </div>
+
+            <div class="workflow-step">
+                <div class="workflow-title">Step C: Verification (Client Side)</div>
+                <p>The workflow: <strong>Decrypt(Signature, PublicKey) == Hash(Data)</strong></p>
+                
+                <label>Data Received:</label>
+                <input type="text" id="verifyInput" value="System_Update_v2.msi">
+                <button onclick="tamperSigData()" class="tamper">Simulate Tampering</button>
+                
+                <br><br>
+                <button onclick="verifySignature()" class="sig-btn" id="verifyBtn" disabled>Verify Signature</button>
+                
+                <div id="sigVerifyResult"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        // --- 1. Simple Hash ---
+        function updateSimpleHash() {
+            const input = document.getElementById('hashInput').value;
+            const hash = CryptoJS.SHA256(input).toString();
+            document.getElementById('simpleHashOutput').innerText = hash;
+        }
+
+        // --- 2. Integrity Check ---
+        let vendorChecksum = "";
+
+        function generateVendorHash() {
+            const content = document.getElementById('fileContent').value;
+            vendorChecksum = CryptoJS.SHA256(content).toString();
+            document.getElementById('integrityResult').innerHTML = 
+                `<strong>Vendor Checksum:</strong> ${vendorChecksum} <br> <em>(Client downloads this value)</em>`;
+        }
+
+        function tamperFile() {
+            const current = document.getElementById('fileContent');
+            current.value = current.value + "_MALWARE_INJECTED";
+            alert("Network attack simulated! File content modified.");
+        }
+
+        function verifyIntegrity() {
+            if(!vendorChecksum) { alert("Generate Vendor Hash first."); return; }
+            const currentContent = document.getElementById('fileContent').value;
+            const clientHash = CryptoJS.SHA256(currentContent).toString();
+            const resultDiv = document.getElementById('integrityResult');
+            
+            if (clientHash === vendorChecksum) {
+                resultDiv.innerHTML = `<span class="status-badge status-match">INTEGRITY VERIFIED</span><br>Hashes match.`;
+            } else {
+                 resultDiv.innerHTML = `<span class="status-badge status-mismatch">INTEGRITY FAILED</span><br>Hashes do not match!`;
+            }
+        }
+
+        // --- 3. HMAC ---
+        function generateHMAC() {
+            const msg = document.getElementById('hmacMessage').value;
+            const key = document.getElementById('hmacKey').value;
+            const hmac = CryptoJS.HmacSHA256(msg, key).toString();
+            document.getElementById('hmacOutput').innerText = hmac;
+        }
+
+        // --- 4. Digital Signatures (RSA) ---
+        let rsaKey = null;
+
+        function generateKeys() {
+            document.getElementById('keygenStatus').innerText = "Generating Keys (this may take a moment)...";
+            
+            // Use a timeout to allow UI to render the "Generating" message
+            setTimeout(() => {
+                // Using JSEncrypt to generate keys
+                rsaKey = new JSEncrypt({default_key_size: 512});
+                rsaKey.getKey(() => {
+                    document.getElementById('privKey').value = rsaKey.getPrivateKey();
+                    document.getElementById('pubKey').value = rsaKey.getPublicKey();
+                    document.getElementById('keygenStatus').innerText = "Done!";
+                    
+                    // Enable buttons
+                    document.getElementById('signBtn').disabled = false;
+                    document.getElementById('verifyBtn').disabled = false;
+                });
+            }, 100);
+        }
+
+        function signData() {
+            if(!rsaKey) return;
+            const data = document.getElementById('signInput').value;
+            
+            // 1. Hash the data (JSEncrypt usually handles this internally in sign(), but we show the concept)
+            // 2. Encrypt hash with Private Key
+            // JSEncrypt's sign method does SHA256 + RSA Signing
+            const signature = rsaKey.sign(data, CryptoJS.SHA256, "sha256");
+            
+            document.getElementById('signatureOutput').innerText = signature;
+            // Reset verification input to match for a clean start
+            document.getElementById('verifyInput').value = data; 
+            document.getElementById('sigVerifyResult').innerHTML = "";
+        }
+
+        function tamperSigData() {
+            const input = document.getElementById('verifyInput');
+            input.value = input.value + "_trojan";
+            alert("Tampered with the software package!");
+        }
+
+        function verifySignature() {
+            const data = document.getElementById('verifyInput').value;
+            const signature = document.getElementById('signatureOutput').innerText;
+            const pubKey = document.getElementById('pubKey').value;
+
+            if(!signature || signature === "Waiting for signature...") {
+                alert("Please sign data first.");
+                return;
+            }
+
+            // Create a verify object
+            const verify = new JSEncrypt();
+            verify.setPublicKey(pubKey);
+            
+            // Verify logic: Decrypt Sig with Public Key -> Compare with Hash(Data)
+            const isValid = verify.verify(data, signature, CryptoJS.SHA256);
+            
+            const resultDiv = document.getElementById('sigVerifyResult');
+            if(isValid) {
+                resultDiv.innerHTML = `
+                    <span class="status-badge status-match">SIGNATURE VALID</span><br>
+                    <small>1. Signature decrypted with Public Key.<br>
+                    2. Extracted Hash matches Hash of "${data}".<br>
+                    3. Origin verified: Only the Private Key holder could create this.</small>`;
+            } else {
+                resultDiv.innerHTML = `
+                    <span class="status-badge status-mismatch">SIGNATURE INVALID</span><br>
+                    <small>The data has been changed OR the key is wrong.</small>`;
+            }
+        }
+
+        // Init
+        updateSimpleHash();
+    </script>
+</body>
+</html>

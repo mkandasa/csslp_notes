@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 1: Accountability (Auditing & Logging)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --text: #d4d4d4;
+            --accent: #007acc;
+            --log-text: #4ec9b0;
+            --error: #f44336;
+            --warn: #ff9800;
+            --success: #4caf50;
+        }
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; width: 100%; max-width: 900px; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 5px; margin-bottom: 20px; width: 100%; max-width: 900px; }
+        .tab-btn {
+            background: var(--panel); color: #888;
+            border: none; padding: 10px 20px;
+            cursor: pointer; border-top: 2px solid transparent;
+            font-family: inherit; font-weight: bold;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #333; }
+        .tab-btn.active { background: #333; color: white; border-top-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 900px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Cards */
+        .card {
+            background: var(--panel);
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        input, button, select {
+            padding: 8px; border-radius: 4px; border: 1px solid #444;
+            background: #3c3c3c; color: white; font-family: inherit; margin: 5px 0;
+        }
+        button.action-btn { background: var(--accent); border: none; cursor: pointer; font-weight: bold; }
+        button.action-btn:hover { opacity: 0.9; }
+        
+        /* Module 1: Bad Logging */
+        .log-console {
+            background: #101010; padding: 15px; height: 150px; overflow-y: auto;
+            border: 1px solid #333; font-size: 0.9rem; color: #ccc; margin-top: 10px;
+        }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #222; padding-bottom: 2px; }
+        .log-leak { color: var(--error); font-weight: bold; border: 1px dashed var(--error); padding: 2px;}
+        .log-safe { color: var(--success); }
+
+        /* Module 2: Blockchain Logs */
+        .chain-container { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        .block {
+            background: #333; padding: 10px; border-left: 5px solid var(--success);
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            font-size: 0.8rem;
+        }
+        .block.tampered { border-left-color: var(--error); background: #3a1a1a; }
+        .hash-val { color: var(--warn); word-break: break-all; }
+
+        /* Module 3: SIEM */
+        .siem-grid { display: grid; grid-template-columns: 1fr 300px; gap: 20px; }
+        .siem-row { 
+            display: grid; grid-template-columns: 80px 100px 1fr; 
+            padding: 5px; border-bottom: 1px solid #333; cursor: pointer;
+        }
+        .siem-row:hover { background: #333; }
+        .siem-row.selected { background: #444; border-left: 3px solid var(--accent); }
+        
+        .alert-badge { 
+            display: inline-block; padding: 5px 10px; background: var(--error); 
+            color: white; border-radius: 4px; font-size: 0.8rem; display: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Accountability Workbench</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('gen')">1. Secure Logging (Generation)</button>
+        <button class="tab-btn" onclick="switchTab('integrity')">2. Log Integrity (Chaining)</button>
+        <button class="tab-btn" onclick="switchTab('audit')">3. The Auditor (SIEM)</button>
+    </div>
+
+    <!-- TAB 1: GENERATION -->
+    <div id="gen" class="tab-content active">
+        <div class="card">
+            <h2>The "Anti-Pattern" Detector</h2>
+            <p><strong>Scenario:</strong> You are coding a login function. Developers often log too much info for debugging.</p>
+            
+            <div style="display: flex; gap: 20px; align-items: flex-end;">
+                <div>
+                    <label>Username:</label><br>
+                    <input type="text" id="logUser" value="admin_alice">
+                </div>
+                <div>
+                    <label>Password:</label><br>
+                    <input type="text" id="logPass" value="SuperSecret123!">
+                </div>
+                <div>
+                    <label>Logging Mode:</label><br>
+                    <select id="logMode">
+                        <option value="unsafe">❌ Unsafe (Debug Mode)</option>
+                        <option value="safe">✅ Secure (Production)</option>
+                    </select>
+                </div>
+                <button class="action-btn" onclick="generateLog()">Attempt Login</button>
+            </div>
+
+            <div class="log-console" id="logOutput">
+                <div class="log-entry" style="color:#666">// System Logs initialized...</div>
+            </div>
+            
+            <div id="logFeedback" style="margin-top:10px; min-height: 20px;"></div>
+        </div>
+    </div>
+
+    <!-- TAB 2: INTEGRITY -->
+    <div id="integrity" class="tab-content">
+        <div class="card">
+            <h2>Log Chain of Custody</h2>
+            <p><strong>Concept:</strong> To prevent admins from deleting their own tracks, we use "Hash Chaining." Each log entry contains the hash of the <em>previous</em> entry. If you edit the past, the chain breaks.</p>
+            
+            <div class="chain-container" id="blockContainer">
+                <!-- Blocks generated by JS -->
+            </div>
+            
+            <button class="action-btn" style="margin-top: 20px;" onclick="addChainEntry()">+ Add New Event</button>
+        </div>
+    </div>
+
+    <!-- TAB 3: AUDIT -->
+    <div id="audit" class="tab-content">
+        <div class="card">
+            <h2>SIEM Simulator (Security Information & Event Management)</h2>
+            <p><strong>Task:</strong> Analyze the log stream. Find the <strong>Brute Force</strong> attack pattern and flag it.</p>
+            
+            <div class="siem-grid">
+                <!-- Log List -->
+                <div style="border:1px solid #333; height: 300px; overflow-y: auto;">
+                    <div style="background:#222; padding:5px; font-weight:bold; position:sticky; top:0;">
+                        <span>Time</span> | <span>Event</span> | <span>Details</span>
+                    </div>
+                    <div id="siemList">
+                        <!-- Rows injected here -->
+                    </div>
+                </div>
+
+                <!-- Detail Panel -->
+                <div style="background:#222; padding:15px; border-left:1px solid #333;">
+                    <h3>Event Details</h3>
+                    <div id="siemDetails" style="font-size:0.9rem; color:#aaa;">Select an event...</div>
+                    <br>
+                    <button class="action-btn" onclick="flagIncident()" id="flagBtn" disabled>🚩 Flag as Incident</button>
+                    <div id="auditResult" style="margin-top:10px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            // Highlight button
+            const map = {'gen':0, 'integrity':1, 'audit':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        // --- MODULE 1: GENERATION ---
+        function generateLog() {
+            const u = document.getElementById('logUser').value;
+            const p = document.getElementById('logPass').value;
+            const mode = document.getElementById('logMode').value;
+            const console = document.getElementById('logOutput');
+            const fb = document.getElementById('logFeedback');
+            
+            const ts = new Date().toISOString();
+            let msg = "";
+
+            if(mode === 'unsafe') {
+                // BAD LOGGING
+                msg = `<span class="log-entry">[INFO] AuthController: Processing login for User: <b>${u}</b> with Pass: <span class="log-leak">${p}</span></span>`;
+                fb.innerHTML = `<span style="color:var(--error)">⚠️ SECURITY VIOLATION: You logged credentials in plaintext! This violates OWASP and PCI-DSS.</span>`;
+            } else {
+                // GOOD LOGGING
+                msg = `<span class="log-entry">[INFO] AuthController: Processing login for User: <b>${u}</b>. Password validated.</span>`;
+                fb.innerHTML = `<span style="color:var(--success)">✅ Good Job: Sensitive data was sanitized before logging.</span>`;
+            }
+
+            console.innerHTML += `<div><span style="color:#888">[${ts}]</span> ${msg}</div>`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+
+        // --- MODULE 2: INTEGRITY ---
+        let chain = [
+            { id: 1, data: "System Boot", prevHash: "0000000000", currentHash: "" }
+        ];
+
+        function initChain() {
+            chain[0].currentHash = CryptoJS.SHA256(chain[0].id + chain[0].data + chain[0].prevHash).toString().substring(0, 10);
+            renderChain();
+        }
+
+        function addChainEntry() {
+            const actions = ["User Login", "File Accessed", "Config Change", "Logout"];
+            const action = actions[Math.floor(Math.random() * actions.length)];
+            const prev = chain[chain.length-1];
+            
+            const newBlock = {
+                id: chain.length + 1,
+                data: action,
+                prevHash: prev.currentHash,
+                currentHash: ""
+            };
+            newBlock.currentHash = CryptoJS.SHA256(newBlock.id + newBlock.data + newBlock.prevHash).toString().substring(0, 10);
+            chain.push(newBlock);
+            renderChain();
+        }
+
+        function tamperBlock(index) {
+            const b = chain[index];
+            b.data = "Malicious Edit";
+            // Note: We DO NOT update the hash immediately to show the mismatch
+            renderChain();
+        }
+
+        function renderChain() {
+            const container = document.getElementById('blockContainer');
+            container.innerHTML = "";
+            
+            for(let i=0; i<chain.length; i++) {
+                const b = chain[i];
+                // Verify Integrity
+                const calcHash = CryptoJS.SHA256(b.id + b.data + b.prevHash).toString().substring(0, 10);
+                const isTampered = (b.currentHash !== calcHash);
+                
+                // Check if Previous Hash matches previous block's current
+                let brokenLink = false;
+                if(i > 0) {
+                    if(b.prevHash !== chain[i-1].currentHash) brokenLink = true;
+                }
+
+                const div = document.createElement('div');
+                div.className = `block ${(isTampered || brokenLink) ? 'tampered' : ''}`;
+                
+                div.innerHTML = `
+                    <div>
+                        <strong>Log #${b.id}</strong><br>
+                        Data: <input type="text" value="${b.data}" style="width:120px; padding:2px; background:#222; border:none; color:white" onchange="tamperData(${i}, this.value)">
+                    </div>
+                    <div style="text-align:right">
+                        Prev: <span class="hash-val">${b.prevHash}</span><br>
+                        Hash: <span class="hash-val">${b.currentHash}</span><br>
+                        ${(isTampered || brokenLink) ? '<strong style="color:red">INTEGRITY BROKEN</strong>' : '<span style="color:lime">Verified</span>'}
+                    </div>
+                `;
+                container.appendChild(div);
+            }
+        }
+        
+        // Helper to update data model from UI input
+        window.tamperData = function(index, val) {
+            chain[index].data = val;
+            renderChain(); // Re-render to show the red "Broken" state
+        }
+
+
+        // --- MODULE 3: AUDIT ---
+        const siemData = [
+            { time: "10:00:01", event: "Login Success", user: "alice", src: "192.168.1.5", type: "normal" },
+            { time: "10:05:22", event: "File Access", user: "bob", src: "192.168.1.6", type: "normal" },
+            { time: "10:12:01", event: "Login Failed", user: "admin", src: "10.0.0.99", type: "attack" },
+            { time: "10:12:02", event: "Login Failed", user: "admin", src: "10.0.0.99", type: "attack" },
+            { time: "10:12:03", event: "Login Failed", user: "admin", src: "10.0.0.99", type: "attack" },
+            { time: "10:12:04", event: "Login Failed", user: "admin", src: "10.0.0.99", type: "attack" },
+            { time: "10:12:05", event: "Login Success", user: "admin", src: "10.0.0.99", type: "attack" }, // Breach
+            { time: "10:15:00", event: "Logout", user: "alice", src: "192.168.1.5", type: "normal" },
+        ];
+        
+        let selectedEvent = null;
+
+        function renderSiem() {
+            const list = document.getElementById('siemList');
+            siemData.forEach((d, i) => {
+                const el = document.createElement('div');
+                el.className = 'siem-row';
+                el.innerHTML = `
+                    <span style="color:#888">${d.time}</span>
+                    <span style="${d.event.includes('Fail') ? 'color:orange' : ''}">${d.event}</span>
+                    <span>${d.user}</span>
+                `;
+                el.onclick = () => selectEvent(i, el);
+                list.appendChild(el);
+            });
+        }
+
+        function selectEvent(index, el) {
+            // UI Selection
+            document.querySelectorAll('.siem-row').forEach(r => r.classList.remove('selected'));
+            el.classList.add('selected');
+            
+            selectedEvent = siemData[index];
+            const detailBox = document.getElementById('siemDetails');
+            
+            detailBox.innerHTML = `
+                <strong>Timestamp:</strong> ${selectedEvent.time}<br>
+                <strong>Event Type:</strong> ${selectedEvent.event}<br>
+                <strong>User ID:</strong> ${selectedEvent.user}<br>
+                <strong>Source IP:</strong> <span style="color:#fff">${selectedEvent.src}</span><br>
+                <hr style="border:0; border-bottom:1px solid #444">
+                <p>Analyse the sequence. Does this look like normal user behavior or an automated script?</p>
+            `;
+            
+            document.getElementById('flagBtn').disabled = false;
+            document.getElementById('auditResult').innerHTML = "";
+        }
+
+        function flagIncident() {
+            const res = document.getElementById('auditResult');
+            if(selectedEvent.type === 'attack') {
+                res.innerHTML = `<div style="background:#133; color:#4fc; padding:10px; border-left:4px solid #4fc">
+                    <strong>CORRECT!</strong><br>
+                    You identified a Brute Force attack (Multiple failures followed by success from the same IP).
+                    <br>This requires immediate Incident Response.
+                </div>`;
+            } else {
+                res.innerHTML = `<div style="background:#311; color:#f88; padding:10px; border-left:4px solid #f88">
+                    <strong>False Positive</strong><br>
+                    This looks like normal user activity. Look for high-frequency failures.
+                </div>`;
+            }
+        }
+
+        // Init
+        initChain();
+        renderSiem();
+
+    </script>
+</body>
+</html>
