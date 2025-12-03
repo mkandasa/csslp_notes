@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Secure Error Handling Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --err-red: #ef4444;
+            --log-gold: #f59e0b;
+            --safe-green: #22c55e;
+            --code-bg: #0d1117;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--err-red);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--err-red); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* LEFT: USER INTERFACE */
+        .user-view {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .browser-window {
+            background: #fff;
+            color: #000;
+            border-radius: 4px;
+            height: 300px;
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .browser-bar {
+            background: #e2e8f0;
+            padding: 8px;
+            border-bottom: 1px solid #cbd5e1;
+            font-size: 0.8rem;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+        }
+        .url-box {
+            background: #fff;
+            padding: 4px 10px;
+            border-radius: 15px;
+            width: 70%;
+            margin-left: 10px;
+            border: 1px solid #cbd5e1;
+        }
+        .browser-content {
+            padding: 20px;
+            font-family: sans-serif;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        /* Error Styles within Browser */
+        .stack-trace {
+            font-family: 'Courier New', monospace;
+            background: #fff5f5;
+            border: 1px solid #feb2b2;
+            color: #c53030;
+            padding: 10px;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+        }
+        .generic-error {
+            text-align: center;
+            padding: 40px;
+        }
+        .error-icon { font-size: 3rem; color: #cbd5e1; margin-bottom: 10px; }
+
+        /* Controls */
+        .controls {
+            margin-top: 20px;
+            border-top: 1px solid var(--border);
+            padding-top: 15px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            background: #334155;
+            color: white;
+            transition: 0.2s;
+        }
+        button:hover { filter: brightness(1.1); }
+        .btn-trigger { background: var(--err-red); }
+        .btn-fix { background: var(--safe-green); color: black; }
+
+        /* RIGHT: BACKEND LOGS & CONFIG */
+        .backend-view {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .config-toggle {
+            background: #161b22;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #30363d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .toggle-label { font-weight: bold; color: #c9d1d9; }
+        .status-pill {
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: #333;
+            color: #aaa;
+        }
+        .status-pill.secure { background: rgba(34, 197, 94, 0.2); color: var(--safe-green); border: 1px solid var(--safe-green); }
+        .status-pill.insecure { background: rgba(239, 68, 68, 0.2); color: var(--err-red); border: 1px solid var(--err-red); }
+
+        .log-window {
+            flex-grow: 1;
+            background: #000;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #8b949e;
+            overflow-y: auto;
+        }
+        .log-entry { margin-bottom: 8px; border-bottom: 1px solid #21262d; padding-bottom: 4px; word-break: break-all; }
+        .log-time { color: #58a6ff; margin-right: 8px; }
+        .log-lvl-err { color: var(--err-red); font-weight: bold; }
+        .log-lvl-info { color: var(--safe-green); font-weight: bold; }
+        .log-sensitive { color: var(--log-gold); text-decoration: underline; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure Error Handling Lab</h1>
+    <p>Preventing Information Leakage via Exception Management</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- USER SIDE -->
+    <div class="user-view">
+        <h3 style="color:var(--text); margin-top:0;">User Perspective (Browser)</h3>
+        
+        <div class="browser-window">
+            <div class="browser-bar">
+                <span>🔒 Secure Browser</span>
+                <div class="url-box">https://bank-api.com/transfer</div>
+            </div>
+            <div class="browser-content" id="browser-body">
+                <h2>Welcome to Online Banking</h2>
+                <p>Please select an action below.</p>
+            </div>
+        </div>
+
+        <div class="controls">
+            <h4 style="color:#aaa; margin-bottom:10px;">Trigger Exception</h4>
+            <button class="btn-trigger" onclick="triggerError('db')">1. Database Error (SQLi)</button>
+            <button class="btn-trigger" onclick="triggerError('file')">2. File System Error (Path)</button>
+            
+            <h4 style="color:#aaa; margin-bottom:10px; margin-top:15px;">Architectural Control</h4>
+            <button class="btn-fix" id="btn-toggle" onclick="toggleSecurity()">🛡️ Enable Global Exception Handler</button>
+        </div>
+    </div>
+
+    <!-- BACKEND SIDE -->
+    <div class="backend-view">
+        <h3 style="color:var(--text); margin-top:0;">Backend Perspective (Server)</h3>
+
+        <div class="config-toggle">
+            <div>
+                <div class="toggle-label">Error Handling Mode</div>
+                <div style="font-size:0.8rem; color:#8b949e;">Controls verbosity of HTTP 500 responses</div>
+            </div>
+            <div class="status-pill insecure" id="config-status">DEVELOPMENT (VERBOSE)</div>
+        </div>
+
+        <h4 style="color:#aaa; margin:0 0 10px 0;">Server Logs (/var/log/app.log)</h4>
+        <div class="log-window" id="server-logs">
+            <div class="log-entry">> Server started on port 8080.</div>
+            <div class="log-entry">> Waiting for requests...</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let isSecure = false;
+
+    function log(msg, level) {
+        const box = document.getElementById('server-logs');
+        const div = document.createElement('div');
+        div.className = "log-entry";
+        
+        const time = new Date().toISOString().split('T')[1].split('.')[0];
+        const lvlSpan = level === 'ERROR' ? '<span class="log-lvl-err">ERROR</span>' : '<span class="log-lvl-info">INFO</span>';
+        
+        div.innerHTML = `<span class="log-time">[${time}]</span> ${lvlSpan} ${msg}`;
+        box.prepend(div);
+    }
+
+    function toggleSecurity() {
+        isSecure = !isSecure;
+        const btn = document.getElementById('btn-toggle');
+        const status = document.getElementById('config-status');
+
+        if (isSecure) {
+            btn.innerText = "🔓 Disable Exception Handler (Revert to Dev)";
+            btn.style.backgroundColor = "#334155";
+            btn.style.color = "#ccc";
+            
+            status.innerText = "PRODUCTION (SECURE)";
+            status.className = "status-pill secure";
+            log("CONFIG: Switched to Secure Mode. Verbose errors suppressed.", "INFO");
+        } else {
+            btn.innerText = "🛡️ Enable Global Exception Handler";
+            btn.style.backgroundColor = "var(--safe-green)";
+            btn.style.color = "black";
+
+            status.innerText = "DEVELOPMENT (VERBOSE)";
+            status.className = "status-pill insecure";
+            log("CONFIG: Switched to Dev Mode. Stack traces exposed.", "INFO");
+        }
+    }
+
+    function triggerError(type) {
+        const browser = document.getElementById('browser-body');
+        const uuid = crypto.randomUUID();
+
+        // Simulate Processing
+        browser.innerHTML = `<div style="text-align:center; padding:20px; color:#666;">Processing Request...</div>`;
+
+        setTimeout(() => {
+            if (isSecure) {
+                // SECURE RESPONSE
+                handleSecureError(browser, type, uuid);
+            } else {
+                // INSECURE RESPONSE
+                handleInsecureError(browser, type);
+            }
+        }, 600);
+    }
+
+    function handleInsecureError(container, type) {
+        let errorTitle = "";
+        let trace = "";
+        
+        if (type === 'db') {
+            errorTitle = "HTTP 500 - Internal Server Error";
+            trace = `java.sql.SQLException: Syntax error in SQL statement "SELECT * FROM users WHERE id = " + input + ""; 
+expected "number", got "1 OR 1=1"
+    at com.bank.dao.UserDAO.getUser(UserDAO.java:42)
+    at com.bank.controller.AccountController.transfer(AccountController.java:15)
+    ... 28 more
+Caused by: org.h2.jdbc.JdbcSQLException: Column "SSN" not found in table "USERS"
+    at org.h2.message.DbException.getJdbcSQLException(DbException.java:345)
+    ...`;
+            log("Uncaught Exception: java.sql.SQLException (SQL Syntax Error)", "ERROR");
+        } 
+        else if (type === 'file') {
+            errorTitle = "HTTP 500 - System Error";
+            trace = `java.io.FileNotFoundException: /var/www/uploads/receipts/../../../../etc/passwd (Permission denied)
+    at java.io.FileInputStream.open0(Native Method)
+    at java.io.FileInputStream.open(FileInputStream.java:195)
+    at com.bank.service.FileService.readReceipt(FileService.java:88)
+    at com.bank.api.ReceiptEndpoint.get(ReceiptEndpoint.java:22)
+    ... 15 more
+Server Info: Apache Tomcat/9.0.31 (Ubuntu)
+User: app_service_user (uid=1001)`;
+            log("Uncaught Exception: java.io.FileNotFoundException (Access Denied)", "ERROR");
+        }
+
+        // Render Dangerous UI
+        container.innerHTML = `
+            <h1 style="color:#c53030; font-size:1.5rem; margin-top:0;">${errorTitle}</h1>
+            <p>An exception occurred while processing your request.</p>
+            <div class="stack-trace"><strong>Stack Trace:</strong><br>${trace}</div>
+            <p style="font-size:0.8rem; color:gray;"><i>Tip: Fix the code at UserDAO.java:42</i></p>
+        `;
+    }
+
+    function handleSecureError(container, type, uuid) {
+        // Secure Logic: Log the detail, Show the generic
+        let logMsg = "";
+        
+        if (type === 'db') {
+            logMsg = `[Ref:${uuid}] SQLException in UserDAO: Syntax error in query. Input: '1 OR 1=1'. DB User: 'db_admin'.`;
+        } else {
+            logMsg = `[Ref:${uuid}] IOException in FileService: Failed to open path '/var/www/uploads/../etc/passwd'. Permission denied.`;
+        }
+        
+        log(logMsg, "ERROR"); // This goes to Splunk/SIEM (Right Panel)
+
+        // Render Safe UI
+        container.innerHTML = `
+            <div class="generic-error">
+                <div class="error-icon">⚠️</div>
+                <h3>Something went wrong.</h3>
+                <p style="color:#64748b;">We couldn't complete your request. Our support team has been notified.</p>
+                <div style="background:#f1f5f9; padding:10px; border-radius:4px; font-family:monospace; margin-top:20px; display:inline-block;">
+                    Error Reference: <strong>${uuid}</strong>
+                </div>
+            </div>
+        `;
+    }
+
+</script>
+
+</body>
+</html>

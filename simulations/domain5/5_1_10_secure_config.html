@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Secure Configuration Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --config-blue: #3b82f6;
+            --alert-red: #ef4444;
+            --safe-green: #22c55e;
+            --warn-yellow: #eab308;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--config-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--config-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .action-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+            text-align: left;
+            padding-left: 15px;
+        }
+        .btn-scan { background: var(--config-blue); text-align: center; padding-left: 0; }
+        .btn-harden { background: #334155; border: 1px solid #555; color: #ccc; }
+        .btn-harden:hover { background: #475569; }
+        .btn-harden.active { background: var(--safe-green); color: black; border-color: var(--safe-green); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Server State View */
+        .server-box {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+        }
+        .server-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .compliance-score {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--alert-red);
+        }
+
+        /* Config Items */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .config-item {
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid var(--alert-red);
+            font-size: 0.85rem;
+            transition: 0.3s;
+        }
+        .config-item.secure { border-left-color: var(--safe-green); background: rgba(34, 197, 94, 0.1); }
+        .config-label { font-weight: bold; margin-bottom: 5px; display: block; }
+        .config-val { color: #aaa; font-family: monospace; }
+
+        /* File Viewer (Secrets) */
+        .file-viewer {
+            background: #0d1117;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #c9d1d9;
+            height: 150px;
+            overflow-y: auto;
+        }
+        .file-line { margin-bottom: 5px; }
+        .secret-leak { color: var(--alert-red); background: rgba(239, 68, 68, 0.1); padding: 0 2px; }
+        .secret-safe { color: var(--safe-green); }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-info { color: var(--config-blue); }
+        .log-pass { color: var(--safe-green); }
+        .log-fail { color: var(--alert-red); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure Configuration Lab</h1>
+    <p>Hardening Baselines & Secrets Management</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Audit & Assess</div>
+        <button class="btn-scan" onclick="runAudit()">🔍 Run Compliance Scan (CIS)</button>
+        
+        <div class="section-title" style="margin-top:20px;">2. Remediation Actions</div>
+        <div class="action-group">
+            <button class="btn-harden" id="btn-ssh" onclick="applyFix('ssh')">
+                🔐 Disable Root SSH Login
+            </button>
+            <button class="btn-harden" id="btn-telnet" onclick="applyFix('telnet')">
+                🚫 Disable Telnet Service
+            </button>
+            <button class="btn-harden" id="btn-pw" onclick="applyFix('pw')">
+                🔑 Enforce Password Complexity
+            </button>
+            <button class="btn-harden" id="btn-vault" onclick="applyFix('vault')">
+                🏦 Migrate Secrets to Vault
+            </button>
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- SERVER CONFIG STATE -->
+        <div class="server-box">
+            <div class="server-header">
+                <strong>Production Server: web-01</strong>
+                <span class="compliance-score" id="score-display">0% Compliant</span>
+            </div>
+            
+            <div class="config-grid">
+                <div class="config-item" id="item-ssh">
+                    <span class="config-label">SSH Root Login</span>
+                    <span class="config-val">PermitRootLogin yes</span>
+                </div>
+                <div class="config-item" id="item-telnet">
+                    <span class="config-label">Legacy Services</span>
+                    <span class="config-val">Telnet (Port 23): LISTENING</span>
+                </div>
+                <div class="config-item" id="item-pw">
+                    <span class="config-label">Password Policy</span>
+                    <span class="config-val">MinLength: 0 (None)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- APP CONFIG FILE -->
+        <div style="font-size:0.8rem; color:#aaa; margin-bottom:-15px;">/etc/app/config.yaml</div>
+        <div class="file-viewer" id="config-file">
+            <div class="file-line">server:</div>
+            <div class="file-line">&nbsp;&nbsp;port: 8080</div>
+            <div class="file-line">database:</div>
+            <div class="file-line">&nbsp;&nbsp;host: db-prod</div>
+            <div class="file-line" id="line-secret">&nbsp;&nbsp;password: <span class="secret-leak">"SuperSecret123!"</span></div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Waiting for audit...</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let compliance = 0;
+    const fixes = {
+        ssh: { applied: false, points: 25 },
+        telnet: { applied: false, points: 25 },
+        pw: { applied: false, points: 25 },
+        vault: { applied: false, points: 25 }
+    };
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='pass'?'log-pass':(type==='fail'?'log-fail':'log-info')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function runAudit() {
+        log("AUDIT: Starting CIS Benchmark Scan...", "info");
+        
+        // Reset Visuals temporarily to show scanning effect if desired
+        // For simplicity, we just evaluate current state
+        
+        let failures = 0;
+        if (!fixes.ssh.applied) { log("FAIL: SSH Root Login is ENABLED.", "fail"); failures++; }
+        if (!fixes.telnet.applied) { log("FAIL: Telnet Service is ACTIVE.", "fail"); failures++; }
+        if (!fixes.pw.applied) { log("FAIL: Weak Password Policy detected.", "fail"); failures++; }
+        if (!fixes.vault.applied) { log("FAIL: Hardcoded credentials found in config.yaml.", "fail"); failures++; }
+
+        if (failures === 0) {
+            log("PASS: All checks passed. System is Hardened.", "pass");
+        } else {
+            log(`AUDIT COMPLETE: ${failures} Critical Issues found. Remediation required.`, "warn");
+        }
+        updateScore();
+    }
+
+    function applyFix(id) {
+        if (fixes[id].applied) return; // Already done
+
+        fixes[id].applied = true;
+        document.getElementById(`btn-${id}`).classList.add('active');
+        
+        // Update Visuals
+        if (id === 'ssh') {
+            const el = document.getElementById('item-ssh');
+            el.className = "config-item secure";
+            el.querySelector('.config-val').innerText = "PermitRootLogin no";
+            log("REMEDIATION: SSH Root Login disabled.", "pass");
+        }
+        else if (id === 'telnet') {
+            const el = document.getElementById('item-telnet');
+            el.className = "config-item secure";
+            el.querySelector('.config-val').innerText = "Telnet: DISABLED";
+            log("REMEDIATION: Telnet service stopped and disabled.", "pass");
+        }
+        else if (id === 'pw') {
+            const el = document.getElementById('item-pw');
+            el.className = "config-item secure";
+            el.querySelector('.config-val').innerText = "MinLength: 12, Complexity: ON";
+            log("REMEDIATION: PAM Password Quality module configured.", "pass");
+        }
+        else if (id === 'vault') {
+            const line = document.getElementById('line-secret');
+            line.innerHTML = `&nbsp;&nbsp;password: <span class="secret-safe">{{ vault.db_password }}</span>`;
+            log("REMEDIATION: Secret replaced with Vault reference.", "pass");
+        }
+
+        updateScore();
+    }
+
+    function updateScore() {
+        let total = 0;
+        for (let k in fixes) {
+            if (fixes[k].applied) total += fixes[k].points;
+        }
+        
+        const disp = document.getElementById('score-display');
+        disp.innerText = `${total}% Compliant`;
+        
+        if (total === 100) {
+            disp.style.color = "var(--safe-green)";
+        } else if (total > 0) {
+            disp.style.color = "var(--warn-yellow)";
+        } else {
+            disp.style.color = "var(--alert-red)";
+        }
+    }
+
+</script>
+
+</body>
+</html>

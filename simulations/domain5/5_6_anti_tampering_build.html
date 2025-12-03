@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Anti-Tampering Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --tamper-pink: #ec4899;
+            --hacker-green: #10b981; /* Matrix */
+            --os-blue: #3b82f6;
+            --text: #f1f5f9;
+            --border: #334155;
+            --canary-gold: #facc15;
+            --nx-blue: #06b6d4;
+            --fail-red: #ef4444;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--tamper-pink);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--tamper-pink); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            overflow-y: auto;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Build Options */
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #0f172a;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--tamper-pink); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Compiler Switches */
+        #cfg-canary:checked + .slider { background-color: var(--canary-gold); }
+        #cfg-nx:checked + .slider { background-color: var(--nx-blue); }
+
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn-build { background: var(--tamper-pink); color: white; margin-bottom: 20px; }
+        .btn-attack { background: var(--hacker-green); color: black; margin-bottom: 10px; }
+        
+        button:hover { filter: brightness(1.1); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Binary View */
+        .binary-container {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 200px;
+            position: relative;
+        }
+
+        .file-icon {
+            width: 100px; height: 120px;
+            background: #1e293b;
+            border: 2px solid #fff;
+            border-radius: 8px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 2.5rem;
+            position: relative;
+            transition: 0.3s;
+        }
+        .file-label { font-size: 0.8rem; margin-top: 10px; font-weight: bold; }
+        
+        .seal {
+            position: absolute; bottom: -10px; right: -10px;
+            background: gold; border-radius: 50%; width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; box-shadow: 0 0 10px gold;
+            display: none;
+        }
+        
+        /* Attacker View */
+        .hex-editor {
+            background: #0d1117;
+            border: 1px solid var(--hacker-green);
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: var(--hacker-green);
+            height: 150px;
+            overflow-y: auto;
+            position: relative;
+        }
+        .hex-title { position: absolute; top: 0; right: 0; background: var(--hacker-green); color: black; padding: 2px 6px; font-size: 0.7rem; }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+            margin-top: auto;
+        }
+        .log-sys { color: var(--tamper-pink); }
+        .log-hack { color: var(--hacker-green); }
+        .log-os { color: var(--os-blue); }
+
+        /* Stack Visual */
+        #stack-log {
+            color: var(--fail-red);
+            font-weight: bold;
+            padding: 5px;
+            border: 1px dashed var(--fail-red);
+            margin-top: 10px;
+            display: none;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Anti-Tampering Lab</h1>
+    <p>Code Signing, Obfuscation & Integrity Checks</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Build Configuration</div>
+        
+        <div class="toggle-row">
+            <div>
+                <div style="font-weight:bold;">Code Signing</div>
+                <div style="font-size:0.7rem; color:#aaa;">Digital Signature (Cert)</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="cfg-sign"><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+            <div>
+                <div style="font-weight:bold;">Obfuscation</div>
+                <div style="font-size:0.7rem; color:#aaa;">Rename vars, flatten flow</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="cfg-obf"><span class="slider"></span></label>
+        </div>
+        
+        <div class="section-title">2. Compiler Hardening</div>
+
+        <div class="toggle-row">
+            <div>
+                <div style="font-weight:bold; color:var(--canary-gold);">Stack Protection (Canary)</div>
+                <div style="font-size:0.7rem; color:#aaa;">Mitigates Stack Overflows</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="cfg-canary"><span class="slider"></span></label>
+        </div>
+
+        <div class="toggle-row">
+            <div>
+                <div style="font-weight:bold; color:var(--nx-blue);">NX/DEP (Non-Execute)</div>
+                <div style="font-size:0.7rem; color:#aaa;">Blocks code execution on stack</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="cfg-nx"><span class="slider"></span></label>
+        </div>
+
+
+        <button class="btn-build" onclick="buildApp()">🛠️ Build Application</button>
+
+        <div class="section-title">3. Attack Simulation</div>
+        <button class="btn-attack" onclick="attackMod()" id="btn-mod" disabled>🔧 Modify Binary (Crack)</button>
+        <button class="btn-attack" onclick="attackReverse()" id="btn-rev" disabled>👁️ Reverse Engineer</button>
+        <button class="btn-attack" onclick="attackStack()" id="btn-stack" disabled>💥 Launch Stack Exploit</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- BINARY -->
+        <div class="binary-container">
+            <div class="file-icon" id="app-file">
+                🎮
+                <div class="file-label">Game.exe</div>
+                <div class="seal" id="app-seal">📜</div>
+            </div>
+            <div id="stack-log"></div>
+            <div style="text-align:center; color:#aaa; font-size:0.8rem; position:absolute; bottom:10px;">
+                STATUS: <span id="app-status" style="color:white; font-weight:bold;">NOT BUILT</span>
+            </div>
+        </div>
+
+        <!-- HEX EDITOR -->
+        <div class="hex-editor" id="hex-view">
+            <div class="hex-title">IDA PRO / HEX EDIT</div>
+            <div id="hex-content">Waiting for target binary...</div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Build Server Ready. Configure options.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let isSigned = false;
+    let isObfuscated = false;
+    let isBuilt = false;
+    let isCanary = false;
+    let isNX = false;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='hack'?'log-hack':(type==='os'?'log-os':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function buildApp() {
+        isSigned = document.getElementById('cfg-sign').checked;
+        isObfuscated = document.getElementById('cfg-obf').checked;
+        isCanary = document.getElementById('cfg-canary').checked;
+        isNX = document.getElementById('cfg-nx').checked;
+        isBuilt = true;
+
+        // UI Update
+        document.getElementById('app-seal').style.display = isSigned ? 'flex' : 'none';
+        document.getElementById('app-status').innerText = "READY (v1.0)";
+        
+        // Enable Attacks
+        document.getElementById('btn-mod').disabled = false;
+        document.getElementById('btn-rev').disabled = false;
+        document.getElementById('btn-stack').disabled = false;
+
+
+        // Update Hex View Preview
+        let code = "";
+        if (isObfuscated) {
+            code = "0x4A 0x9F 0x11 ... (Unreadable)\nvar a = _0x4f2a('0x1');\nif (a == 0x9) { b(); }";
+        } else {
+            code = "0x53 0x63 0x6F ... (Readable)\nif (user.score > 1000) {\n  grantReward();\n}";
+        }
+        document.getElementById('hex-content').innerText = code;
+        document.getElementById('stack-log').style.display = 'none';
+
+
+        log(`BUILD: Success. Signed=${isSigned}, Obfuscated=${isObfuscated}.`, "sys");
+        log(`COMPILER: Canary=${isCanary}, NX=${isNX}.`, "sys");
+    }
+
+    function attackMod() {
+        if (!isBuilt) return;
+        
+        log("ATTACK: Injecting 'Infinite Lives' cheat into binary...", "hack");
+        
+        const file = document.getElementById('app-file');
+        file.style.borderColor = "var(--hacker-green)";
+        
+        setTimeout(() => {
+            if (isSigned) {
+                log("OS: Integrity Check Failed! Signature invalid.", "os");
+                log("OS: Execution Blocked. Windows SmartScreen / Gatekeeper intervened.", "os");
+                file.style.borderColor = "var(--tamper-pink)"; // Reset to safe color (or indicate blocked)
+            } else {
+                log("OS: Running binary...", "os");
+                log("GAME: Cheat Active! Attack Successful.", "hack");
+                file.style.borderColor = "var(--hacker-green)"; // Stay hacked
+            }
+        }, 800);
+    }
+
+    function attackReverse() {
+        if (!isBuilt) return;
+
+        log("ATTACK: Decompiling source code to find API Keys...", "hack");
+        
+        setTimeout(() => {
+            if (isObfuscated) {
+                log("ATTACKER: Code is spaghetti. Variable names are stripped.", "hack");
+                log("ATTACKER: Giving up. Cost to reverse > Value of target.", "hack");
+            } else {
+                log("ATTACKER: Found 'grantReward()'. Logic copied.", "hack");
+                log("ATTACKER: Found API Key 'AIzaSy...'. Stolen.", "hack");
+            }
+        }, 800);
+    }
+
+    function attackStack() {
+        if (!isBuilt) return;
+        
+        log("ATTACK: Launching Buffer Overflow Exploit (RCE)...", "hack");
+        const stackLog = document.getElementById('stack-log');
+        stackLog.style.display = 'block';
+        stackLog.style.backgroundColor = "var(--fail-red)";
+
+        setTimeout(() => {
+            if (isCanary) {
+                // Scenario 1: Canary detects overwrite
+                log("RUNTIME: Canary value overwritten! ABORTING.", "os");
+                stackLog.innerText = "🚨 STACK CLASH DETECTED (Canary Failed)";
+                stackLog.style.backgroundColor = "var(--canary-gold)";
+            } else {
+                // Scenario 2: Exploit proceeds to NX/DEP check
+                if (isNX) {
+                    // NX detects shellcode execution
+                    log("OS: Attempted execution on non-executable stack memory.", "os");
+                    log("OS: ACCESS VIOLATION (NX Bit). Exploit Blocked.", "os");
+                    stackLog.innerText = "🛑 EIP HIJACKED, EXECUTION BLOCKED (NX)";
+                    stackLog.style.backgroundColor = "var(--nx-blue)";
+                } else {
+                    // Full Exploit Success
+                    log("CRITICAL: Buffer Overflow successful. RCE achieved.", "hack");
+                    stackLog.innerText = "💥 REMOTE CODE EXECUTION (No Defenses)";
+                    stackLog.style.backgroundColor = "var(--fail-red)";
+                }
+            }
+        }, 800);
+        
+        // Reset after simulation
+        setTimeout(() => {
+            stackLog.style.display = 'none';
+        }, 3000);
+    }
+
+</script>
+
+</body>
+</html>

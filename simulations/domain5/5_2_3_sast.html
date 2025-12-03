@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: SAST Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --sast-purple: #a855f7;
+            --vuln-red: #ef4444;
+            --safe-green: #22c55e;
+            --code-bg: #0d1117;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--sast-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--sast-purple); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* EDITOR */
+        .editor-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .editor-header {
+            background: #161b22;
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-tab { font-size: 0.8rem; background: #333; padding: 5px 10px; border-radius: 4px; }
+
+        .code-area {
+            flex-grow: 1;
+            background: var(--code-bg);
+            color: #c9d1d9;
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            border: none;
+            outline: none;
+            resize: none;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            white-space: pre;
+        }
+
+        /* ANALYSIS PANEL */
+        .analysis-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-scan { background: var(--sast-purple); }
+        .btn-template { background: #334155; color: #ccc; border: 1px solid #555; }
+        
+        button:hover { filter: brightness(1.1); }
+
+        /* VISUALIZATION */
+        .viz-box {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            flex-grow: 1;
+            margin-top: 20px;
+            padding: 10px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        /* Findings */
+        .finding {
+            background: #1e293b;
+            border-left: 4px solid var(--vuln-red);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            animation: slideIn 0.3s;
+        }
+        .finding.safe { border-left-color: var(--safe-green); }
+        
+        .finding-title { font-weight: bold; font-size: 0.9rem; color: #fff; }
+        .finding-detail { font-size: 0.8rem; color: #aaa; margin-top: 5px; }
+        .line-ref { font-family: monospace; background: #333; padding: 2px 4px; border-radius: 3px; }
+
+        /* Taint Flow Graph (Simplified) */
+        .taint-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+            padding: 10px;
+            background: #0d1117;
+            border-radius: 4px;
+        }
+        .node { padding: 5px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; }
+        .node-src { background: #eab308; color: black; }
+        .node-sink { background: var(--vuln-red); color: white; }
+        .node-san { background: var(--safe-green); color: black; }
+        .arrow { color: #555; margin: 0 5px; }
+
+        /* LOGS */
+        .console {
+            margin-top: auto;
+            background: #000;
+            border-top: 1px solid #333;
+            height: 100px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-sys { color: var(--sast-purple); }
+
+        @keyframes slideIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Static Analysis (SAST) Lab</h1>
+    <p>Automated Code Scanning: Taint Analysis & Source-to-Sink</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CODE EDITOR -->
+    <div class="editor-panel">
+        <div class="editor-header">
+            <span class="file-tab">LoginController.java</span>
+            <span style="font-size:0.8rem; color:#aaa;">Line: <span id="line-num">1</span></span>
+        </div>
+        <textarea class="code-area" id="code-input" spellcheck="false" onkeyup="updateLineNum()">
+public void login(HttpServletRequest req) {
+    
+    // Source: Untrusted Input
+    String user = req.getParameter("username");
+    
+    // Sink: Database Execution
+    String query = "SELECT * FROM users WHERE name = '" + user + "'";
+    db.execute(query);
+
+}
+        </textarea>
+    </div>
+
+    <!-- ANALYSIS CONTROLS -->
+    <div class="analysis-panel">
+        <div class="section-title">1. Code Templates</div>
+        <button class="btn-template" onclick="loadTemplate('vuln')">📝 Load Vulnerable Code</button>
+        <button class="btn-template" onclick="loadTemplate('safe')">🛡️ Load Secure Code (Sanitized)</button>
+        <button class="btn-template" onclick="loadTemplate('false')">❓ Load Complex (False Negative)</button>
+
+        <div class="section-title" style="margin-top:20px;">2. Scan Engine</div>
+        <button class="btn-scan" onclick="runScan()">🔍 Run SAST Scan</button>
+
+        <div class="section-title" style="margin-top:20px;">3. Findings Report</div>
+        <div class="viz-box" id="report-area">
+            <div style="text-align:center; color:#555; margin-top:50px;">
+                No scan results yet.
+            </div>
+        </div>
+
+        <div class="console" id="logger">
+            <div>> SAST Engine Initialized. Ruleset: OWASP Top 10.</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='sys'?'log-sys':''}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function updateLineNum() {
+        const area = document.getElementById('code-input');
+        const line = area.value.substr(0, area.selectionStart).split("\n").length;
+        document.getElementById('line-num').innerText = line;
+    }
+
+    function loadTemplate(type) {
+        const area = document.getElementById('code-input');
+        if (type === 'vuln') {
+            area.value = `public void login(HttpServletRequest req) {
+    
+    // Source
+    String user = req.getParameter("username");
+    
+    // Sink (Vulnerable)
+    String query = "SELECT * FROM users WHERE name = '" + user + "'";
+    db.execute(query);
+
+}`;
+        } else if (type === 'safe') {
+            area.value = `public void login(HttpServletRequest req) {
+    
+    // Source
+    String user = req.getParameter("username");
+    
+    // Sanitizer (Parameterized)
+    String query = "SELECT * FROM users WHERE name = ?";
+    
+    // Sink (Safe)
+    PreparedStatement ps = conn.prepareStatement(query);
+    ps.setString(1, user);
+    ps.execute();
+
+}`;
+        } else if (type === 'false') {
+            area.value = `public void login(HttpServletRequest req) {
+    
+    String user = req.getParameter("username");
+    
+    // Complex flow confusing the parser?
+    String part1 = "SELECT * ";
+    String part2 = "FROM users ";
+    String part3 = "WHERE name = '" + user + "'";
+    
+    // Indirect Sink
+    executeWrapper(part1 + part2 + part3);
+}`;
+        }
+        log("TEMPLATE: Code loaded.", "sys");
+    }
+
+    function runScan() {
+        const code = document.getElementById('code-input').value;
+        const report = document.getElementById('report-area');
+        
+        log("SCAN: Parsing AST...", "sys");
+        report.innerHTML = `<div style="text-align:center; color:#aaa;">Scanning...</div>`;
+
+        setTimeout(() => {
+            report.innerHTML = ""; // Clear
+            
+            // SIMULATED ENGINE LOGIC
+            // 1. Detect Source
+            const hasSource = code.includes('getParameter');
+            
+            // 2. Detect Sink
+            const hasSink = code.includes('execute') || code.includes('executeQuery');
+            
+            // 3. Detect Sanitizer
+            const hasSanitizer = code.includes('prepareStatement') || code.includes('?'); // Simplified check
+
+            // 4. Detect Concatenation (Danger Signal)
+            const hasConcat = code.includes(" + user") || code.includes(" + \"'");
+
+            if (hasSource && hasSink) {
+                if (hasSanitizer && !hasConcat) {
+                    // Safe
+                    addFinding("No Issues Found", "Code appears secure. Input is parameterized.", "safe", [
+                        { type: 'src', label: 'Input' },
+                        { type: 'san', label: 'PreparedStatement' },
+                        { type: 'sink', label: 'DB' }
+                    ]);
+                    log("RESULT: Scan Clean.", "sys");
+                } 
+                else if (hasConcat) {
+                    // Vulnerable
+                    addFinding("CWE-89: SQL Injection", "Untrusted input concatenated into SQL query.", "vuln", [
+                        { type: 'src', label: 'Input' },
+                        { type: 'sink', label: 'DB Execute' }
+                    ]);
+                    log("RESULT: Critical Vulnerability Found.", "sys");
+                }
+                else {
+                    // Ambiguous / False Negative simulation
+                    // If complex template loaded
+                    if (code.includes('executeWrapper')) {
+                        addFinding("Warning: Complex Flow", "Potential Injection detected in helper method. Manual review required.", "vuln", []);
+                        log("RESULT: Possible Issue (Low Confidence).", "sys");
+                    } else {
+                        addFinding("No Issues Found", "Analysis inconclusive.", "safe", []);
+                    }
+                }
+            } else {
+                addFinding("No Entry Point", "No Source/Sink pair detected.", "safe", []);
+            }
+
+        }, 1000);
+    }
+
+    function addFinding(title, desc, type, flow) {
+        const report = document.getElementById('report-area');
+        const div = document.createElement('div');
+        div.className = `finding ${type}`;
+        
+        let flowHtml = "";
+        if (flow.length > 0) {
+            flowHtml = `<div class="taint-flow">`;
+            flow.forEach((node, idx) => {
+                flowHtml += `<span class="node node-${node.type}">${node.label}</span>`;
+                if(idx < flow.length - 1) flowHtml += `<span class="arrow">➔</span>`;
+            });
+            flowHtml += `</div>`;
+        }
+
+        div.innerHTML = `
+            <div class="finding-title">${title}</div>
+            <div class="finding-detail">${desc}</div>
+            ${flowHtml}
+        `;
+        report.appendChild(div);
+    }
+
+</script>
+
+</body>
+</html>

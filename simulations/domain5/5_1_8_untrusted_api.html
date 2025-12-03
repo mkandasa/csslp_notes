@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Trusted Libraries Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --api-purple: #8b5cf6;
+            --malware-red: #ef4444;
+            --safe-green: #22c55e;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--api-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--api-purple); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #0f172a;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .toggle-label { font-weight: bold; font-size: 0.9rem; }
+        
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--api-purple); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        button.action-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--malware-red);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button.action-btn:hover { filter: brightness(1.1); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Network Flow */
+        .network-map {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 250px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .node {
+            position: absolute;
+            width: 100px; height: 100px;
+            border-radius: 8px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 0.8rem;
+            z-index: 10;
+            border: 2px solid #555;
+            background: #1e293b;
+        }
+        #node-browser { left: 50px; top: 75px; border-color: var(--safe-green); }
+        #node-cdn { right: 50px; top: 75px; border-color: var(--api-purple); }
+
+        .file-packet {
+            position: absolute;
+            width: 40px; height: 40px;
+            background: white;
+            color: black;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+            font-size: 0.7rem;
+            top: 105px; left: 600px; /* Start at CDN */
+            opacity: 0;
+            box-shadow: 0 0 10px white;
+        }
+        .file-packet.malware { background: var(--malware-red); color: white; box-shadow: 0 0 15px var(--malware-red); }
+
+        /* Browser Console */
+        .console {
+            background: #000;
+            height: 200px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-info { color: var(--api-purple); }
+        .log-err { color: var(--malware-red); }
+        .log-ok { color: var(--safe-green); }
+
+        /* Code View */
+        .code-view {
+            background: #0d1117;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #ccc;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+        }
+        .tag { color: #7ee787; }
+        .attr { color: #79c0ff; }
+        .val { color: #a5d6a7; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Supply Chain Security Lab</h1>
+    <p>Subresource Integrity (SRI) & CDN Defense</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Development Config</div>
+        
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">Enable SRI</div>
+                <div style="font-size:0.7rem; color:#aaa;">integrity="sha384..."</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-sri" onchange="updateCode()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="code-view" id="code-viz">
+            <!-- Code injected here -->
+        </div>
+
+        <div class="section-title">2. Attack Simulation</div>
+        <button class="action-btn" onclick="runLoad('clean')">Load Clean Library (v1.0)</button>
+        <button class="action-btn" style="background:var(--malware-red)" onclick="runLoad('malware')">Simulate CDN Hack (Modified v1.0)</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- NETWORK MAP -->
+        <div class="network-map">
+            <div class="node" id="node-browser">
+                APP BROWSER
+                <div style="font-size:2rem;">💻</div>
+            </div>
+            
+            <div class="node" id="node-cdn">
+                PUBLIC CDN
+                <div style="font-size:2rem;">☁️</div>
+            </div>
+
+            <!-- Path Line -->
+            <div style="position:absolute; top:125px; left:150px; right:150px; height:2px; background:#333; z-index:0;"></div>
+
+            <div class="file-packet" id="packet">LIB.JS</div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Browser Console Ready.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    const CLEAN_HASH = "sha384-AbCdEf123456...";
+    
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':'log-info')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function updateCode() {
+        const sri = document.getElementById('cfg-sri').checked;
+        const view = document.getElementById('code-viz');
+        
+        if (sri) {
+            view.innerHTML = `
+&lt;<span class="tag">script</span> <span class="attr">src</span>=<span class="val">"cdn.com/lib.js"</span><br>
+&nbsp;&nbsp;<span class="attr">integrity</span>=<span class="val">"${CLEAN_HASH}"</span><br>
+&nbsp;&nbsp;<span class="attr">crossorigin</span>=<span class="val">"anonymous"</span>&gt;&lt;/<span class="tag">script</span>&gt;`;
+        } else {
+            view.innerHTML = `
+&lt;<span class="tag">script</span> <span class="attr">src</span>=<span class="val">"cdn.com/lib.js"</span>&gt;&lt;/<span class="tag">script</span>&gt;`;
+        }
+    }
+
+    function runLoad(type) {
+        const sri = document.getElementById('cfg-sri').checked;
+        const pkt = document.getElementById('packet');
+        const browser = document.getElementById('node-browser');
+        const cdn = document.getElementById('node-cdn');
+
+        log(`NETWORK: Requesting lib.js from CDN...`, "info");
+
+        // Visual Reset
+        pkt.style.left = "calc(100% - 150px)"; // At CDN
+        pkt.style.opacity = "1";
+        browser.style.borderColor = "#555";
+        cdn.style.borderColor = "#8b5cf6"; // Default Purple
+
+        if (type === 'malware') {
+            pkt.classList.add('malware');
+            pkt.innerText = "HACKED.JS";
+            cdn.style.borderColor = "var(--malware-red)";
+            log("CDN: Serving COMPROMISED file (Modified content).", "err");
+        } else {
+            pkt.classList.remove('malware');
+            pkt.innerText = "LIB.JS";
+            log("CDN: Serving clean file.", "info");
+        }
+
+        // Animate
+        setTimeout(() => {
+            pkt.style.transition = "left 1s ease-in-out";
+            pkt.style.left = "150px"; // To Browser
+
+            setTimeout(() => {
+                pkt.style.opacity = "0";
+                pkt.style.transition = "none"; // Reset for next run
+
+                // Browser Logic
+                if (type === 'clean') {
+                    // Always works (SRI hash matches)
+                    log("BROWSER: Script loaded successfully.", "ok");
+                    browser.style.borderColor = "var(--safe-green)";
+                } else {
+                    // Malware
+                    if (sri) {
+                        // SRI Catch
+                        log("BROWSER ERROR: Subresource Integrity check failed!", "err");
+                        log("BROWSER: Computed hash does not match expected hash. Execution Blocked.", "ok");
+                        browser.style.borderColor = "var(--safe-green)"; // Safe because blocked
+                    } else {
+                        // No SRI -> Fail
+                        log("BROWSER: Script executed. Supply Chain Attack Successful!", "err");
+                        browser.style.borderColor = "var(--malware-red)";
+                        alert("Your application just executed malicious code from the CDN!");
+                    }
+                }
+
+            }, 1000);
+        }, 100);
+    }
+
+    // Init
+    updateCode();
+
+</script>
+
+</body>
+</html>

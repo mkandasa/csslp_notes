@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Isolation Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --iso-cyan: #06b6d4;
+            --danger: #ef4444;
+            --safe-green: #22c55e;
+            --warn: #f59e0b;
+            --skpp-gold: #facc15;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--iso-cyan);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--iso-cyan); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Strategy Selector */
+        .strategy-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .strat-btn {
+            padding: 15px;
+            background: #0f172a;
+            border: 2px solid #333;
+            color: #aaa;
+            cursor: pointer;
+            border-radius: 6px;
+            text-align: left;
+            transition: 0.2s;
+        }
+        .strat-btn:hover { border-color: var(--iso-cyan); }
+        .strat-btn.active {
+            border-color: var(--iso-cyan);
+            background: rgba(6, 182, 212, 0.1);
+            color: white;
+            font-weight: bold;
+        }
+        .strat-desc { font-size: 0.7rem; color: #64748b; margin-top: 5px; }
+
+        /* SKPP Button Style */
+        #btn-skpp.active { border-color: var(--skpp-gold); background: rgba(250, 204, 21, 0.1); color: var(--skpp-gold); }
+
+        button.action-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--danger);
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button.action-btn:hover { filter: brightness(1.1); }
+        
+        button.reset-btn {
+            background: #334155;
+            margin-top: 10px;
+        }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Architecture Stack */
+        .stack-container {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 400px;
+            position: relative;
+            padding: 20px;
+            display: flex;
+            flex-direction: column-reverse; /* Bottom up */
+            align-items: center;
+            justify-content: flex-start;
+            gap: 5px;
+        }
+
+        .layer {
+            width: 80%;
+            height: 50px;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: 0.3s;
+            position: relative;
+            z-index: 10;
+        }
+        
+        #layer-hw { background: #333; border: 2px solid #555; color: #888; }
+        #layer-host-os { background: #1e3a8a; border: 2px solid #3b82f6; color: white; }
+        #layer-hyp { background: #4c1d95; border: 2px solid #8b5cf6; color: white; display: none; }
+        #layer-engine { background: #065f46; border: 2px solid #10b981; color: white; display: none; }
+        #layer-skpp { background: #422006; border: 2px solid var(--skpp-gold); color: var(--skpp-gold); display: none; } /* Microkernel */
+        
+        /* Workload Container */
+        .workload {
+            width: 60%;
+            height: 100px;
+            background: #1f2937;
+            border: 2px dashed #ccc;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: 0.3s;
+        }
+        
+        /* SKPP Partitions */
+        .partition-row {
+            display: flex;
+            gap: 20px;
+            width: 90%;
+            margin-bottom: 10px;
+            display: none; /* Only for SKPP mode */
+        }
+        .partition {
+            flex: 1;
+            height: 120px;
+            border: 2px solid #555;
+            background: #1e293b;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .partition-label { font-size: 0.7rem; color: #aaa; position: absolute; top: 5px; }
+        .part-secure { border-color: var(--safe-green); }
+        .part-untrusted { border-color: var(--warn); }
+
+        /* Inner OS for VMs */
+        .guest-os {
+            width: 90%;
+            height: 30px;
+            background: #7c2d12;
+            color: white;
+            font-size: 0.7rem;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 5px;
+            display: none;
+        }
+
+        /* Exploit Visuals */
+        .exploit-blob {
+            width: 20px; height: 20px;
+            background: var(--danger);
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 10px red;
+            display: none;
+            z-index: 100;
+        }
+
+        .compromised {
+            background: #450a0a !important;
+            border-color: var(--danger) !important;
+            color: var(--danger) !important;
+            animation: shake 0.5s;
+        }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-info { color: var(--iso-cyan); }
+        .log-crit { color: var(--danger); }
+        .log-ok { color: var(--safe-green); }
+        .log-skpp { color: var(--skpp-gold); }
+
+        @keyframes shake {
+            0% { transform: translateX(0); } 25% { transform: translateX(3px); }
+            75% { transform: translateX(-3px); } 100% { transform: translateX(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Isolation Architecture Lab</h1>
+    <p>Bare Metal vs. Containers vs. Virtual Machines vs. SKPP</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Select Isolation Level</div>
+        <div class="strategy-list">
+            <div class="strat-btn active" onclick="setMode('bare')" id="btn-bare">
+                🖥️ Bare Metal (Native)
+                <div class="strat-desc">App runs directly on Host OS as root. Zero Isolation.</div>
+            </div>
+            <div class="strat-btn" onclick="setMode('container')" id="btn-container">
+                📦 Container (Docker)
+                <div class="strat-desc">Shared Kernel. Namespaced Process. Medium Isolation.</div>
+            </div>
+            <div class="strat-btn" onclick="setMode('vm')" id="btn-vm">
+                ☁️ Virtual Machine
+                <div class="strat-desc">Separate Kernel. Hypervisor. Strong Isolation.</div>
+            </div>
+            <div class="strat-btn" onclick="setMode('skpp')" id="btn-skpp">
+                🛡️ Separation Kernel (SKPP)
+                <div class="strat-desc">Rigid Partitions (Time/Space). Critical Systems (EAL 6+).</div>
+            </div>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">2. Simulation</div>
+        <button class="action-btn" onclick="runExploit()">🧨 Execute Kernel Exploit</button>
+        <button class="action-btn reset-btn" onclick="resetLab()">🔄 Reset System</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- STACK -->
+        <div class="stack-container" id="stack">
+            
+            <!-- PHYSICAL -->
+            <div class="layer" id="layer-hw">HARDWARE (CPU/RAM/DISK)</div>
+            
+            <!-- HOST OS (Standard) -->
+            <div class="layer" id="layer-host-os">HOST OS KERNEL (Ring 0)</div>
+
+            <!-- INTERMEDIATE (Engine/Hypervisor/Microkernel) -->
+            <div class="layer" id="layer-engine">CONTAINER ENGINE</div>
+            <div class="layer" id="layer-hyp">HYPERVISOR</div>
+            <div class="layer" id="layer-skpp">MICROKERNEL (SKPP EAL 6+)</div>
+
+            <!-- STANDARD WORKLOAD -->
+            <div class="workload" id="app-box">
+                <div class="guest-os" id="guest-os">GUEST KERNEL</div>
+                <div style="font-size:1.2rem;">📦 APP</div>
+                <div style="font-size:0.7rem; color:#aaa;">(Malicious Payload)</div>
+            </div>
+
+            <!-- SKPP PARTITIONS (Hidden by default) -->
+            <div class="partition-row" id="skpp-partitions">
+                <div class="partition part-secure" id="part-A">
+                    <div class="partition-label">PARTITION A (Critical)</div>
+                    <div>Flight Control</div>
+                </div>
+                <div class="partition part-untrusted" id="part-B">
+                    <div class="partition-label">PARTITION B (Untrusted)</div>
+                    <div>WiFi / Ent.</div>
+                    <div style="font-size:0.7rem; color:var(--danger); margin-top:5px;">(Malware Here)</div>
+                </div>
+            </div>
+
+            <div class="exploit-blob" id="virus"></div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Mode: Bare Metal.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let mode = 'bare';
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='crit'?'log-crit':(type==='skpp'?'log-skpp':'log-info'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function setMode(m) {
+        mode = m;
+        document.querySelectorAll('.strat-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + m).classList.add('active');
+        
+        resetVisuals();
+
+        const engine = document.getElementById('layer-engine');
+        const hyp = document.getElementById('layer-hyp');
+        const skpp = document.getElementById('layer-skpp');
+        const host = document.getElementById('layer-host-os');
+        const app = document.getElementById('app-box');
+        const parts = document.getElementById('skpp-partitions');
+        const guest = document.getElementById('guest-os');
+
+        // Defaults
+        engine.style.display = 'none';
+        hyp.style.display = 'none';
+        skpp.style.display = 'none';
+        host.style.display = 'flex';
+        app.style.display = 'flex';
+        parts.style.display = 'none';
+        guest.style.display = 'none';
+
+        if (mode === 'bare') {
+            log("ARCH: Switched to Bare Metal. App talks directly to Host Kernel.", "info");
+        } 
+        else if (mode === 'container') {
+            engine.style.display = 'flex';
+            log("ARCH: Switched to Container. Namespaces active. Kernel Shared.", "info");
+        }
+        else if (mode === 'vm') {
+            hyp.style.display = 'flex';
+            guest.style.display = 'flex';
+            host.style.display = 'none'; // Hypervisor replaces Host OS visual in Type 1 usually, or sits on top. Let's hide Host OS to simplify Type 1 model.
+            log("ARCH: Switched to VM. Hardware Emulation. Separate Kernel.", "info");
+        }
+        else if (mode === 'skpp') {
+            skpp.style.display = 'flex';
+            host.style.display = 'none';
+            app.style.display = 'none'; // Hide standard app box
+            parts.style.display = 'flex'; // Show partitions
+            log("ARCH: Switched to SKPP. Rigid Time/Space Partitioning enforced by Microkernel.", "skpp");
+        }
+    }
+
+    function resetLab() {
+        resetVisuals();
+        log("SYSTEM: Reset complete. Integrity restored.", "info");
+    }
+
+    function resetVisuals() {
+        document.querySelectorAll('.layer, .workload, .partition').forEach(el => {
+            el.classList.remove('compromised');
+        });
+        document.getElementById('virus').style.display = 'none';
+    }
+
+    function runExploit() {
+        const virus = document.getElementById('virus');
+        
+        virus.style.display = 'block';
+        virus.style.opacity = '1';
+
+        // START POSITIONS
+        if (mode === 'skpp') {
+            // Start inside Partition B (Untrusted)
+            const partB = document.getElementById('part-B');
+            const pRect = partB.getBoundingClientRect();
+            const stackRect = document.getElementById('stack').getBoundingClientRect();
+            
+            // Relative logic for SKPP: Virus tries to jump LEFT to Partition A
+            // Visual pos relative to stack
+            virus.style.left = (partB.offsetLeft + 40) + 'px'; 
+            virus.style.top = (partB.offsetTop + 40) + 'px'; 
+            
+            log("ATTACK: Malware in Partition B attempting lateral movement to Flight Control (Part A)...", "crit");
+
+            // Animate Horizontal
+            let currentLeft = parseInt(virus.style.left);
+            const targetLeft = document.getElementById('part-A').offsetLeft + 50;
+            
+            const interval = setInterval(() => {
+                currentLeft -= 2;
+                virus.style.left = currentLeft + 'px';
+
+                // Hit Partition Wall? (Visual check)
+                if (currentLeft <= (partB.offsetLeft - 10)) {
+                    clearInterval(interval);
+                    log("BLOCKED: Microkernel denied memory access across partition boundary.", "skpp");
+                    log("SUCCESS: SKPP enforced Space Partitioning. Flight Control unaffected.", "ok");
+                    
+                    // Bounce effect
+                    virus.style.transform = "translateX(20px)";
+                    setTimeout(() => virus.style.display = 'none', 500);
+                }
+            }, 10);
+
+        } else {
+            // Vertical Stack Logic (Bare/Cont/VM)
+            const appBox = document.getElementById('app-box');
+            virus.style.left = '50%';
+            virus.style.top = (appBox.offsetTop + 40) + 'px'; 
+            virus.style.transform = "none";
+
+            log("ATTACK: Payload executed. Attempting Privilege Escalation...", "crit");
+
+            // Animate Down
+            let pos = parseInt(virus.style.top);
+            const interval = setInterval(() => {
+                pos += 2;
+                virus.style.top = pos + 'px';
+
+                // Collision Logic
+                // Approximate heights based on CSS
+                // App Top ~20px inside stack? No, using offsetTop.
+                
+                // Check if hit bottom layer (HW or Kernel)
+                const targetLayer = mode === 'vm' ? document.getElementById('layer-hyp') : document.getElementById('layer-host-os');
+                
+                // If targetLayer is hidden (e.g. Host OS in VM mode), check specific logic
+                const crashPoint = targetLayer.offsetTop;
+
+                if (pos >= crashPoint + 10) {
+                    clearInterval(interval);
+                    evaluateImpact();
+                }
+            }, 10);
+        }
+    }
+
+    function evaluateImpact() {
+        if (mode === 'bare') {
+            document.getElementById('layer-host-os').classList.add('compromised');
+            document.getElementById('layer-hw').classList.add('compromised');
+            log("FAILURE: ROOT COMPROMISE! App ran as root on Host. File system wiped.", "crit");
+        } 
+        else if (mode === 'container') {
+            document.getElementById('layer-host-os').classList.add('compromised');
+            document.getElementById('layer-engine').classList.add('compromised');
+            log("FAILURE: CONTAINER BREAKOUT! Shared Kernel Exploit used. Host Owned.", "crit");
+        } 
+        else if (mode === 'vm') {
+            const guest = document.getElementById('guest-os');
+            guest.classList.add('compromised');
+            document.getElementById('app-box').classList.add('compromised');
+            
+            log("DEFENSE: Guest Kernel Crashed (Blue Screen).", "warn");
+            log("SUCCESS: Hypervisor Isolation held. Host Hardware remains secure.", "ok");
+            
+            document.getElementById('virus').style.display = 'none';
+        }
+    }
+
+    // Init
+    setMode('bare');
+
+</script>
+
+</body>
+</html>

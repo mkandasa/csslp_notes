@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Tokenization Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --token-gold: #f59e0b;
+            --encrypt-blue: #3b82f6;
+            --data-red: #ef4444;
+            --safe-green: #22c55e;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--token-gold);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--token-gold); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Mode Selection */
+        .mode-toggle {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .mode-btn {
+            padding: 12px;
+            background: #334155;
+            border: 2px solid transparent;
+            color: #aaa;
+            cursor: pointer;
+            border-radius: 4px;
+            text-align: left;
+            transition: 0.2s;
+        }
+        .mode-btn:hover { background: #475569; }
+        .mode-btn.active {
+            background: rgba(245, 158, 11, 0.1);
+            color: white;
+            font-weight: bold;
+            border-color: var(--token-gold);
+        }
+
+        /* Input Simulation */
+        .input-group {
+            margin-bottom: 20px;
+            border-top: 1px solid #333;
+            padding-top: 15px;
+        }
+        label { display: block; font-size: 0.8rem; margin-bottom: 5px; }
+        input {
+            width: 100%;
+            padding: 10px;
+            background: #0f172a;
+            border: 1px solid #475569;
+            color: white;
+            border-radius: 4px;
+            font-family: monospace;
+            box-sizing: border-box;
+        }
+
+        button.action-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--token-gold);
+            color: black;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        button.action-btn:hover { filter: brightness(1.1); }
+        button.attack-btn {
+            background: var(--data-red);
+            color: white;
+            margin-top: 15px;
+        }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Architecture Map */
+        .arch-map {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 300px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .node {
+            position: absolute;
+            width: 120px; height: 100px;
+            border-radius: 8px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 0.8rem;
+            z-index: 10;
+            border: 2px solid #555;
+            background: #1e293b;
+            text-align: center;
+            transition: 0.3s;
+        }
+        #node-app { left: 30px; top: 100px; border-color: var(--encrypt-blue); }
+        #node-db { right: 30px; top: 100px; border-color: #555; }
+        
+        #node-vault {
+            left: 50%; top: -120px; /* Initially hidden */
+            transform: translateX(-50%);
+            border-color: var(--token-gold);
+            background: #3e2723;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+            transition: top 0.5s ease-out;
+        }
+        #node-vault.active { top: 20px; }
+
+        /* Data Packet */
+        .packet {
+            position: absolute;
+            padding: 5px 10px;
+            background: white;
+            color: black;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            opacity: 0;
+            z-index: 20;
+            box-shadow: 0 0 10px white;
+            white-space: nowrap;
+        }
+        .pkt-raw { background: var(--data-red); color: white; border: 1px solid white; }
+        .pkt-enc { background: var(--encrypt-blue); color: white; border: 1px solid white; }
+        .pkt-tok { background: var(--token-gold); color: black; border: 1px solid white; }
+
+        /* Database View */
+        .db-view {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 15px;
+            flex-grow: 1;
+        }
+        table { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 0.85rem; }
+        th { text-align: left; color: #94a3b8; border-bottom: 1px solid #475569; padding: 5px; }
+        td { padding: 8px 5px; border-bottom: 1px solid #333; word-break: break-all; }
+        .val-sensitive { color: var(--data-red); }
+        .val-secure { color: var(--safe-green); }
+        .val-token { color: var(--token-gold); }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 120px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-info { color: var(--encrypt-blue); }
+        .log-err { color: var(--data-red); }
+        .log-ok { color: var(--safe-green); }
+        .log-sys { color: var(--token-gold); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Tokenization Lab</h1>
+    <p>Data Protection Strategies: Encryption vs. Tokenization</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Architecture Strategy</div>
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="setMode('encrypt')" id="btn-enc">
+                🔐 Encryption
+                <div style="font-size:0.7rem; color:#aaa;">Data stored as ciphertext. Key on App Server.</div>
+            </button>
+            <button class="mode-btn" onclick="setMode('token')" id="btn-tok">
+                🎫 Tokenization
+                <div style="font-size:0.7rem; color:#aaa;">Data replaced by Reference ID. Vault isolated.</div>
+            </button>
+        </div>
+
+        <div class="input-group">
+            <label>Credit Card Number (PAN):</label>
+            <input type="text" id="pan-input" value="4111-2222-3333-4444" readonly>
+            <button class="action-btn" onclick="processPayment()">Process Transaction</button>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">2. Threat Simulation</div>
+        <button class="action-btn attack-btn" onclick="runBreach()">💥 Simulate App Server Breach</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- ARCHITECTURE MAP -->
+        <div class="arch-map">
+            <div class="node" id="node-vault">
+                TOKEN VAULT<br>
+                <span style="font-size:0.6rem; color:#ccc;">(Highly Secure)</span>
+                <div style="font-size:2rem;">🏦</div>
+            </div>
+
+            <div class="node" id="node-app">
+                APP SERVER<br>
+                <span id="key-status" style="font-size:0.6rem; color:var(--encrypt-blue);">Has Key: YES</span>
+                <div style="font-size:2rem;">⚙️</div>
+            </div>
+            
+            <div class="node" id="node-db">
+                APP DATABASE<br>
+                <span style="font-size:0.6rem; color:#ccc;">(Storage)</span>
+                <div style="font-size:2rem;">🛢️</div>
+            </div>
+
+            <div class="packet" id="packet">DATA</div>
+        </div>
+
+        <!-- DATABASE STATE -->
+        <div class="db-view">
+            <h3 style="margin-top:0; color:#aaa; font-size:0.9rem;">App Database Content (Simulated)</h3>
+            <table id="db-table">
+                <thead>
+                    <tr><th>User</th><th>Stored Value</th><th>Status</th></tr>
+                </thead>
+                <tbody id="db-rows">
+                    <tr><td colspan="3" style="text-align:center; color:#555;">No Data</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Default: Encryption Mode.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let mode = 'encrypt';
+    const REAL_PAN = "4111-2222-3333-4444";
+    const ENC_PAN = "AES:U2FsdGVkX1+...";
+    const TOKEN = "TOK-9876-XJ29";
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':(type==='sys'?'log-sys':'log-info'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function setMode(m) {
+        mode = m;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        
+        const vault = document.getElementById('node-vault');
+        const keyStatus = document.getElementById('key-status');
+
+        if (mode === 'encrypt') {
+            document.getElementById('btn-enc').classList.add('active');
+            vault.classList.remove('active');
+            keyStatus.innerText = "Has Key: YES"; // App needs key to decrypt
+            keyStatus.style.color = "var(--encrypt-blue)";
+            log("CONFIG: Switched to Encryption Mode. App holds keys.", "info");
+        } else {
+            document.getElementById('btn-tok').classList.add('active');
+            vault.classList.add('active');
+            keyStatus.innerText = "Has Key: NO"; // App has no key, relies on Vault
+            keyStatus.style.color = "#aaa";
+            log("CONFIG: Switched to Tokenization. Vault Active. Keys removed from App.", "sys");
+        }
+        
+        // Clear DB
+        document.getElementById('db-rows').innerHTML = '<tr><td colspan="3" style="text-align:center; color:#555;">No Data</td></tr>';
+    }
+
+    function processPayment() {
+        const pkt = document.getElementById('packet');
+        const app = document.getElementById('node-app');
+        const db = document.getElementById('node-db');
+        const vault = document.getElementById('node-vault');
+
+        // Reset
+        pkt.style.transition = 'none';
+        pkt.style.opacity = 1;
+        
+        // 1. Ingest (Raw)
+        pkt.style.left = '30px';
+        pkt.style.top = '100px';
+        pkt.className = 'packet pkt-raw';
+        pkt.innerText = REAL_PAN;
+        log("INGEST: Receiving Credit Card Data...", "info");
+
+        // Animate
+        setTimeout(() => {
+            if (mode === 'encrypt') {
+                // Encryption Logic: App encrypts immediately
+                log("APP: Encrypting Data with Local AES Key.", "info");
+                pkt.className = 'packet pkt-enc';
+                pkt.innerText = "AES(...)";
+                
+                // Move to DB
+                moveTo(pkt, db, () => {
+                    log("DB: Storing Ciphertext.", "ok");
+                    addToDB("Ciphertext", ENC_PAN, "val-secure");
+                    pkt.style.opacity = 0;
+                });
+
+            } else {
+                // Tokenization Logic: App sends to Vault
+                log("APP: Sending PAN to Vault for Tokenization.", "sys");
+                
+                moveTo(pkt, vault, () => {
+                    // Vault Swap
+                    log("VAULT: Generating Token. Mapping saved.", "sys");
+                    pkt.className = 'packet pkt-tok';
+                    pkt.innerText = TOKEN;
+                    
+                    // Return to App then DB
+                    moveTo(pkt, app, () => {
+                        moveTo(pkt, db, () => {
+                            log("DB: Storing Token. No sensitive data.", "ok");
+                            addToDB("Token", TOKEN, "val-token");
+                            pkt.style.opacity = 0;
+                        });
+                    });
+                });
+            }
+        }, 100);
+    }
+
+    function moveTo(element, target, callback) {
+        element.style.transition = "top 0.8s ease-in-out, left 0.8s ease-in-out";
+        const tRect = target.getBoundingClientRect();
+        const cRect = document.querySelector('.viz-area').getBoundingClientRect();
+        
+        // Calculate relative position inside viz-area
+        // Note: This relies on fixed sizing/positioning in CSS for simplicity
+        // Using computed style offsets from the node definitions
+        const targetLeft = target.offsetLeft + 30; // Center
+        const targetTop = target.offsetTop + 40; 
+
+        element.style.left = targetLeft + 'px';
+        element.style.top = targetTop + 'px';
+
+        setTimeout(callback, 800);
+    }
+
+    function addToDB(type, val, classname) {
+        const row = `<tr><td>User_1</td><td class="${classname}">${val}</td><td>Stored</td></tr>`;
+        document.getElementById('db-rows').innerHTML = row;
+    }
+
+    function runBreach() {
+        const dbContent = document.getElementById('db-rows').innerText;
+        if (dbContent.includes("No Data")) {
+            log("ATTACK: Nothing to steal.", "err");
+            return;
+        }
+
+        log("ALERT: Attackers compromised the App Server and dumped the Database!", "err");
+
+        if (mode === 'encrypt') {
+            // App Server had the keys. Game Over.
+            log("FAILURE: Encryption Keys found in App memory. Data Decrypted.", "err");
+            log(`STOLEN DATA: ${REAL_PAN}`, "err");
+            alert("DATA BREACH! Attackers used the stolen key to decrypt the credit card numbers.");
+        } else {
+            // App Server had no keys. Tokens are useless.
+            log("DEFENSE: Attackers stole Tokens. Vault is isolated and secure.", "ok");
+            log(`STOLEN DATA: ${TOKEN} (Useless to attacker)`, "sys");
+            alert("ATTACK MITIGATED. The stolen tokens cannot be used outside your system.");
+        }
+    }
+
+</script>
+
+</body>
+</html>

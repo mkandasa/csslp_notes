@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Concurrency & Race Conditions</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --thread-cyan: #06b6d4;
+            --thread-pink: #ec4899;
+            --lock-gold: #fbbf24;
+            --danger: #ef4444;
+            --success: #10b981;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--thread-cyan);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--thread-cyan); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .toggle-row {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+            text-align: left;
+            padding-left: 15px;
+        }
+        .btn-mode { background: #334155; border-left: 4px solid #aaa; color: #ccc; }
+        .btn-mode:hover { background: #475569; }
+        .btn-mode.active { background: #1e293b; border-color: var(--thread-cyan); color: white; }
+
+        .btn-action { 
+            background: var(--thread-cyan); 
+            text-align: center; 
+            margin-top: 20px; 
+            color: black;
+        }
+        .btn-reset { background: #475569; text-align: center; margin-top: 10px; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Database Row */
+        .db-container {
+            background: #1e293b;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            padding: 20px;
+            width: 300px;
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        .db-val { font-size: 2rem; font-weight: bold; color: var(--success); }
+        .db-ver { font-size: 0.8rem; color: #aaa; }
+        
+        .lock-icon {
+            position: absolute;
+            top: -15px; right: -15px;
+            font-size: 2rem;
+            display: none;
+        }
+
+        /* Threads */
+        .thread-track {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            height: 300px;
+            position: relative;
+        }
+        
+        .thread-lane {
+            width: 40%;
+            border: 1px dashed #333;
+            border-radius: 4px;
+            position: relative;
+            background: rgba(255,255,255,0.02);
+        }
+        .lane-label {
+            text-align: center;
+            padding: 5px;
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+        }
+        .lane-a { border-color: var(--thread-cyan); color: var(--thread-cyan); }
+        .lane-b { border-color: var(--thread-pink); color: var(--thread-pink); }
+
+        /* Operation Blocks */
+        .op-block {
+            width: 80%;
+            padding: 10px;
+            margin: 10px auto;
+            background: #334155;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: 0.3s;
+            position: relative;
+        }
+        .op-block.active { opacity: 1; transform: scale(1.05); background: #475569; color: white; border: 1px solid white; }
+        
+        /* LOGS */
+        .console {
+            margin-top: auto;
+            width: 100%;
+            height: 120px;
+            background: #0f172a;
+            border-top: 1px solid #333;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-sys { color: #94a3b8; }
+        .log-err { color: var(--danger); }
+        .log-ok { color: var(--success); }
+        .log-warn { color: var(--lock-gold); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Concurrency & Race Condition Lab</h1>
+    <p>Simulating Thread Safety: Unsafe vs. Pessimistic vs. Optimistic Locking</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">Locking Strategy</div>
+        <div class="toggle-group">
+            <button class="btn-mode active" onclick="setMode('unsafe')" id="btn-unsafe">1. No Lock (Unsafe)</button>
+            <button class="btn-mode" onclick="setMode('pessimistic')" id="btn-pessimistic">2. Pessimistic Lock (Mutex)</button>
+            <button class="btn-mode" onclick="setMode('optimistic')" id="btn-optimistic">3. Optimistic Lock (Version)</button>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">Scenario</div>
+        <p style="font-size:0.85rem; color:#ccc;">
+            <strong>Objective:</strong> Two threads attempt to withdraw $100 simultaneously. 
+            Account Balance: $100.
+        </p>
+        <p style="font-size:0.85rem; color:#ccc;">
+            <strong>Expected (Secure):</strong> One succeeds, one fails (Insufficient Funds). Balance: $0.
+        </p>
+        <p style="font-size:0.85rem; color:#ccc;">
+            <strong>Result (Insecure):</strong> Both succeed. Balance: -$100 (Money created!).
+        </p>
+
+        <button class="btn-action" onclick="runSimulation()">▶ Run Simulation</button>
+        <button class="btn-reset" onclick="resetLab()">🔄 Reset</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- DB -->
+        <div class="db-container">
+            <div>ACCOUNT BALANCE</div>
+            <div class="db-val" id="balance-display">$100</div>
+            <div class="db-ver" id="version-display">Ver: 1</div>
+            <div class="lock-icon" id="lock-viz">🔒</div>
+        </div>
+
+        <!-- THREADS -->
+        <div class="thread-track">
+            
+            <!-- THREAD A -->
+            <div class="thread-lane lane-a">
+                <div class="lane-label">THREAD A</div>
+                <div class="op-block" id="a-read">1. READ Balance ($100)</div>
+                <div class="op-block" id="a-check">2. CHECK (100 >= 100)</div>
+                <div class="op-block" id="a-write">3. WRITE (New: $0)</div>
+                <div class="op-block" id="a-result" style="background:none; border:none; font-weight:bold;"></div>
+            </div>
+
+            <!-- THREAD B -->
+            <div class="thread-lane lane-b">
+                <div class="lane-label">THREAD B</div>
+                <div class="op-block" id="b-read">1. READ Balance ($100)</div>
+                <div class="op-block" id="b-check">2. CHECK (100 >= 100)</div>
+                <div class="op-block" id="b-write">3. WRITE (New: $0)</div>
+                <div class="op-block" id="b-result" style="background:none; border:none; font-weight:bold;"></div>
+            </div>
+
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Select a strategy.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let mode = 'unsafe';
+    let balance = 100;
+    let version = 1;
+    let isRunning = false;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':(type==='warn'?'log-warn':'log-sys'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function setMode(m) {
+        if(isRunning) return;
+        mode = m;
+        document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + m).classList.add('active');
+        resetLab();
+        log(`MODE SWITCH: ${m.toUpperCase()}`, "sys");
+    }
+
+    function resetLab() {
+        balance = 100;
+        version = 1;
+        document.getElementById('balance-display').innerText = "$100";
+        document.getElementById('balance-display').style.color = "var(--success)";
+        document.getElementById('version-display').innerText = "Ver: 1";
+        document.getElementById('lock-viz').style.display = 'none';
+        
+        document.querySelectorAll('.op-block').forEach(el => {
+            el.classList.remove('active');
+            el.innerText = el.innerText.split(' [')[0]; // reset text
+            if(el.id.includes('result')) el.innerText = "";
+        });
+    }
+
+    async function runSimulation() {
+        if(isRunning) return;
+        isRunning = true;
+        resetLab();
+        log("SIMULATION STARTED...", "sys");
+
+        if (mode === 'unsafe') await runUnsafe();
+        else if (mode === 'pessimistic') await runPessimistic();
+        else if (mode === 'optimistic') await runOptimistic();
+
+        isRunning = false;
+    }
+
+    // --- UNSAFE (INTERLEAVED) ---
+    async function runUnsafe() {
+        // Step 1: Both Read at same time
+        activate('a-read'); activate('b-read');
+        log("RACE: Both threads read Balance = $100.", "warn");
+        await wait(1000);
+
+        // Step 2: Both Check
+        activate('a-check'); activate('b-check');
+        log("RACE: Both threads verify sufficient funds.", "warn");
+        await wait(1000);
+
+        // Step 3: A Writes
+        activate('a-write');
+        balance = 0;
+        updateDisplay();
+        document.getElementById('a-result').innerText = "SUCCESS";
+        document.getElementById('a-result').style.color = "var(--success)";
+        log("Thread A withdraws $100. Balance = $0.", "ok");
+        await wait(1000);
+
+        // Step 4: B Writes (Overwrites A's update based on stale read)
+        activate('b-write');
+        // In a true race, B calculated $100 - $100 = $0.
+        // But let's simulate the accounting error more visually:
+        // Ideally, B sees $0 now. But B *already* decided to write based on step 1.
+        // B writes $0. Effectively A's transaction is lost? 
+        // Or "Double Spending": B thinks it took $100. A thinks it took $100. Total taken $200.
+        // Let's set balance to -100 to show the logic flaw clearly.
+        balance = -100; 
+        updateDisplay();
+        document.getElementById('b-result').innerText = "SUCCESS";
+        document.getElementById('b-result').style.color = "var(--success)";
+        log("CRITICAL FAIL: Thread B withdraws $100 based on stale read. Balance = -$100.", "err");
+    }
+
+    // --- PESSIMISTIC (MUTEX) ---
+    async function runPessimistic() {
+        // A Acquires Lock
+        document.getElementById('lock-viz').style.display = 'block';
+        log("LOCK: Thread A acquires Row Lock (Mutex). Thread B blocked.", "warn");
+        
+        activate('a-read');
+        await wait(500);
+        activate('a-check');
+        await wait(500);
+        activate('a-write');
+        balance = 0;
+        updateDisplay();
+        document.getElementById('a-result').innerText = "SUCCESS";
+        document.getElementById('a-result').style.color = "var(--success)";
+        log("Thread A completes. Releasing Lock.", "ok");
+        
+        document.getElementById('lock-viz').style.display = 'none';
+        await wait(500);
+
+        // B Starts (Sequential)
+        log("LOCK: Thread B acquires Lock.", "warn");
+        document.getElementById('lock-viz').style.display = 'block';
+        activate('b-read');
+        // B reads $0
+        document.getElementById('b-read').innerText = "1. READ Balance ($0)";
+        await wait(500);
+        
+        activate('b-check');
+        document.getElementById('b-check').innerText = "2. CHECK (0 >= 100) -> FAIL";
+        document.getElementById('b-check').style.borderColor = "var(--danger)";
+        await wait(500);
+
+        document.getElementById('b-result').innerText = "FAILED (Insufficient Funds)";
+        document.getElementById('b-result').style.color = "var(--danger)";
+        log("Thread B transaction denied. Logic preserved.", "ok");
+        document.getElementById('lock-viz').style.display = 'none';
+    }
+
+    // --- OPTIMISTIC (VERSIONING) ---
+    async function runOptimistic() {
+        // Both Read (Non-blocking)
+        activate('a-read'); activate('b-read');
+        document.getElementById('a-read').innerText += " [Ver:1]";
+        document.getElementById('b-read').innerText += " [Ver:1]";
+        log("OPTIMISTIC: Both read Balance $100 with Version 1.", "sys");
+        await wait(1000);
+
+        // A Saves first
+        activate('a-check'); activate('a-write');
+        balance = 0;
+        version = 2;
+        updateDisplay();
+        document.getElementById('a-result').innerText = "SUCCESS";
+        document.getElementById('a-result').style.color = "var(--success)";
+        log("Thread A commits. DB Version updated to 2.", "ok");
+        await wait(1000);
+
+        // B Tries to Save
+        activate('b-check'); 
+        await wait(500);
+        activate('b-write');
+        log("Thread B attempting commit with Expected Version: 1...", "warn");
+        
+        await wait(500);
+        // DB Check: Current Version (2) != Expected (1)
+        document.getElementById('b-write').style.backgroundColor = "var(--danger)";
+        document.getElementById('b-result').innerText = "OptimisticLockException";
+        document.getElementById('b-result').style.color = "var(--danger)";
+        log("DB REJECT: Version Mismatch (Current: 2, Provided: 1). Rollback.", "ok");
+    }
+
+    function activate(id) {
+        document.getElementById(id).classList.add('active');
+    }
+
+    function updateDisplay() {
+        const balEl = document.getElementById('balance-display');
+        balEl.innerText = "$" + balance;
+        document.getElementById('version-display').innerText = "Ver: " + version;
+        
+        if(balance < 0) balEl.style.color = "var(--danger)";
+        else balEl.style.color = "var(--success)";
+    }
+
+    function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+</script>
+
+</body>
+</html>

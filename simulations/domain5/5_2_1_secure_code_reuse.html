@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Secure Code Reuse Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --reuse-blue: #3b82f6;
+            --risk-red: #ef4444;
+            --safe-green: #22c55e;
+            --warn-yellow: #f59e0b;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--reuse-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--reuse-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .lib-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .lib-card {
+            background: #334155;
+            padding: 15px;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .lib-card:hover { border-color: var(--reuse-blue); transform: translateX(5px); }
+        .lib-card.active { border-color: var(--reuse-blue); background: rgba(59, 130, 246, 0.2); }
+        
+        .lib-name { font-weight: bold; font-size: 1rem; color: white; }
+        .lib-meta { font-size: 0.8rem; color: #aaa; margin-top: 5px; }
+
+        .decision-box {
+            margin-top: 30px;
+            border-top: 1px solid #444;
+            padding-top: 20px;
+            display: none; /* Hidden until selection */
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+            margin-bottom: 10px;
+        }
+        .btn-approve { background: var(--safe-green); color: black; }
+        .btn-reject { background: var(--risk-red); }
+        
+        button:hover { filter: brightness(1.1); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Scan Report */
+        .report-panel {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        /* Loading Spinner */
+        .scanner {
+            width: 100%; height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .scan-line {
+            width: 80%; height: 4px; background: #333;
+            position: relative; overflow: hidden; margin-bottom: 10px;
+        }
+        .scan-beam {
+            position: absolute; top:0; left:0; height:100%; width: 30%;
+            background: var(--reuse-blue);
+            animation: scan 1s infinite alternate;
+        }
+
+        /* Report Content */
+        .report-content {
+            width: 100%;
+            display: none; /* Hidden until scan done */
+        }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .metric-box {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #444;
+        }
+        .metric-val { font-size: 1.5rem; font-weight: bold; }
+        .metric-label { font-size: 0.8rem; color: #aaa; }
+
+        .vuln-list {
+            width: 100%;
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 6px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .vuln-item {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid var(--risk-red);
+            padding: 8px;
+            margin-bottom: 5px;
+            font-size: 0.85rem;
+            color: #ffadad;
+        }
+        .safe-msg { color: var(--safe-green); text-align: center; padding: 20px; font-weight: bold; }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-sys { color: var(--reuse-blue); }
+        .log-pass { color: var(--safe-green); }
+        .log-fail { color: var(--risk-red); }
+
+        @keyframes scan { from { left:0%; } to { left:70%; } }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure Code Reuse Lab</h1>
+    <p>Software Composition Analysis (SCA) & Selection Criteria</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Select Candidate Library</div>
+        <div class="lib-list">
+            <div class="lib-card" onclick="selectLib('libA', this)">
+                <div class="lib-name">📦 easy-upload-v1</div>
+                <div class="lib-meta">Source: npm | Age: 4 years</div>
+            </div>
+            
+            <div class="lib-card" onclick="selectLib('libB', this)">
+                <div class="lib-name">📦 super-uploader-x</div>
+                <div class="lib-meta">Source: unknown | Age: 2 days</div>
+            </div>
+
+            <div class="lib-card" onclick="selectLib('libC', this)">
+                <div class="lib-name">📦 secure-file-handler</div>
+                <div class="lib-meta">Source: Verified Org | Age: 2 months</div>
+            </div>
+        </div>
+
+        <div class="decision-box" id="decision-panel">
+            <div class="section-title">2. Auditor Decision</div>
+            <button class="btn-approve" onclick="makeDecision('approve')">✅ Approve for Merge</button>
+            <button class="btn-reject" onclick="makeDecision('reject')">❌ Reject Dependency</button>
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <div class="report-panel" id="main-display">
+            <div style="color:#666;">Select a library to run SCA Scan...</div>
+            
+            <div class="scanner" id="scanner-anim">
+                <div class="scan-line"><div class="scan-beam"></div></div>
+                <div>Scanning Dependency Graph...</div>
+            </div>
+
+            <div class="report-content" id="report-view">
+                <h2 id="rep-name" style="margin-top:0; border-bottom:1px solid #444; padding-bottom:10px;">Lib Name</h2>
+                
+                <div class="metric-grid">
+                    <div class="metric-box">
+                        <div class="metric-val" id="met-cve">--</div>
+                        <div class="metric-label">Known Vulnerabilities</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-val" id="met-maint">--</div>
+                        <div class="metric-label">Maintenance Score</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-val" id="met-lic">--</div>
+                        <div class="metric-label">License Type</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-val" id="met-pop">--</div>
+                        <div class="metric-label">Weekly Downloads</div>
+                    </div>
+                </div>
+
+                <div style="font-weight:bold; margin-bottom:5px;">Vulnerability Audit:</div>
+                <div class="vuln-list" id="vuln-list">
+                    <!-- Injected -->
+                </div>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> SCA Engine Ready. Waiting for input.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let currentLib = null;
+    
+    // Lib Data
+    const database = {
+        libA: {
+            name: "easy-upload-v1",
+            cve: 8,
+            maint: "F (Abandoned)",
+            lic: "MIT",
+            pop: "200",
+            vulns: [
+                "CVE-2019-102: Directory Traversal",
+                "CVE-2020-551: Arbitrary File Write",
+                "WARN: Last commit was 1,400 days ago"
+            ],
+            safe: false
+        },
+        libB: {
+            name: "super-uploader-x",
+            cve: 0,
+            maint: "A (Active)",
+            lic: "UNKNOWN",
+            pop: "5",
+            vulns: [
+                "WARN: Typosquatting Suspected (Similar to 'super-uploader')",
+                "WARN: New Author Account (Created yesterday)",
+                "WARN: Obfuscated code detected in install script"
+            ],
+            safe: false
+        },
+        libC: {
+            name: "secure-file-handler",
+            cve: 0,
+            maint: "A (Active)",
+            lic: "Apache-2.0",
+            pop: "500k",
+            vulns: [], // Safe
+            safe: true
+        }
+    };
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='pass'?'log-pass':(type==='fail'?'log-fail':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function selectLib(id, card) {
+        currentLib = database[id];
+        
+        // UI Updates
+        document.querySelectorAll('.lib-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        document.getElementById('decision-panel').style.display = 'none';
+        
+        // Run Scan Animation
+        const display = document.getElementById('main-display');
+        const scanner = document.getElementById('scanner-anim');
+        const content = document.getElementById('report-view');
+        
+        // Hide content, show scanner
+        Array.from(display.children).forEach(c => {
+            if(c !== scanner && c !== content) c.style.display = 'none';
+        });
+        content.style.display = 'none';
+        scanner.style.display = 'flex';
+        
+        log(`SCAN: Analyzing metadata for '${currentLib.name}'...`, "sys");
+
+        setTimeout(() => {
+            scanner.style.display = 'none';
+            renderReport(currentLib);
+            document.getElementById('decision-panel').style.display = 'block';
+        }, 1200);
+    }
+
+    function renderReport(lib) {
+        const content = document.getElementById('report-view');
+        content.style.display = 'block';
+        
+        document.getElementById('rep-name').innerText = lib.name;
+        
+        // Metrics
+        const cveEl = document.getElementById('met-cve');
+        cveEl.innerText = lib.cve;
+        cveEl.style.color = lib.cve > 0 ? "var(--risk-red)" : "var(--safe-green)";
+
+        const maintEl = document.getElementById('met-maint');
+        maintEl.innerText = lib.maint;
+        maintEl.style.color = lib.maint.includes("F") ? "var(--risk-red)" : "var(--safe-green)";
+
+        document.getElementById('met-lic').innerText = lib.lic;
+        document.getElementById('met-pop').innerText = lib.pop;
+
+        // Vulns
+        const list = document.getElementById('vuln-list');
+        list.innerHTML = "";
+        
+        if (lib.vulns.length === 0) {
+            list.innerHTML = `<div class="safe-msg">✅ No Risks Detected.</div>`;
+        } else {
+            lib.vulns.forEach(v => {
+                const item = document.createElement('div');
+                item.className = "vuln-item";
+                item.innerText = v;
+                list.appendChild(item);
+            });
+        }
+    }
+
+    function makeDecision(decision) {
+        if (!currentLib) return;
+
+        if (decision === 'approve') {
+            if (currentLib.safe) {
+                log(`AUDIT SUCCESS: '${currentLib.name}' merged. Validated secure.`, "pass");
+            } else {
+                log(`AUDIT FAIL: You merged a vulnerable/malicious library! Security Incident imminent.`, "fail");
+            }
+        } else {
+            // Reject
+            if (!currentLib.safe) {
+                log(`AUDIT SUCCESS: Vulnerable library '${currentLib.name}' correctly rejected.`, "pass");
+            } else {
+                log(`AUDIT WARNING: You rejected a safe library. Development blocked unnecessarily.`, "fail"); // "fail" color but text implies operational issue
+            }
+        }
+        
+        // Hide panel to force re-select
+        document.getElementById('decision-panel').style.display = 'none';
+    }
+
+</script>
+
+</body>
+</html>

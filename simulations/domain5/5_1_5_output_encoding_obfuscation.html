@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Output Sanitization Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --code-bg: #0d1117;
+            --xss-red: #ef4444;
+            --safe-green: #10b981;
+            --enc-blue: #3b82f6;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--enc-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--enc-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 0.85rem; }
+        textarea {
+            width: 100%; height: 80px; padding: 10px; background: #0f172a;
+            border: 1px solid #475569; color: white; border-radius: 4px;
+            font-family: monospace; box-sizing: border-box;
+        }
+
+        /* Encoding Toggles */
+        .encoding-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .enc-btn {
+            padding: 10px;
+            background: #334155;
+            border: 1px solid #555;
+            color: #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            transition: 0.2s;
+        }
+        .enc-btn:hover { border-color: var(--enc-blue); }
+        .enc-btn.active { background: rgba(59, 130, 246, 0.2); border-color: var(--enc-blue); color: white; font-weight: bold; }
+
+        button.post-btn {
+            width: 100%; padding: 12px; background: var(--enc-blue);
+            color: white; font-weight: bold; border: none; border-radius: 4px;
+            cursor: pointer; margin-top: 20px;
+        }
+        button.post-btn:hover { filter: brightness(1.1); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Feed Display (Browser View) */
+        .browser-window {
+            background: #fff;
+            color: #000;
+            border-radius: 4px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #999;
+        }
+        .browser-bar {
+            background: #e2e8f0;
+            padding: 8px;
+            border-bottom: 1px solid #cbd5e1;
+            font-size: 0.8rem;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+        }
+        .url-box {
+            background: #fff;
+            padding: 4px 10px;
+            border-radius: 15px;
+            width: 70%;
+            margin-left: 10px;
+            border: 1px solid #cbd5e1;
+        }
+        .feed-content {
+            padding: 20px;
+            font-family: sans-serif;
+            overflow-y: auto;
+            background: #f8fafc;
+            flex-grow: 1;
+        }
+
+        .comment-box {
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .user-name { font-weight: bold; color: #334155; font-size: 0.9rem; }
+        .comment-text { color: #475569; margin-top: 5px; }
+
+        /* Source Code View */
+        .source-view {
+            background: var(--code-bg);
+            border: 1px solid #475569;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #c9d1d9;
+            height: 150px;
+            overflow-y: auto;
+        }
+        .tag { color: #7ee787; }
+        .attr { color: #79c0ff; }
+        .val { color: #a5d6a7; }
+        .bad-script { color: var(--xss-red); font-weight: bold; background: rgba(239, 68, 68, 0.1); }
+        .safe-entity { color: var(--safe-green); font-weight: bold; }
+
+        /* Alert Overlay */
+        .xss-alert {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 2px solid #ccc;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            width: 300px;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+            z-index: 100;
+            color: black;
+            font-family: sans-serif;
+        }
+        .alert-header { background: #f0f0f0; padding: 10px; font-weight: bold; border-bottom: 1px solid #ccc; }
+        .alert-body { padding: 20px; text-align: center; }
+        .alert-btn { margin-top: 15px; padding: 8px 20px; background: #0ea5e9; color: white; border: none; border-radius: 4px; cursor: pointer; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Output Sanitization Lab</h1>
+    <p>Defending against XSS with Context-Aware Encoding</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Malicious Input</div>
+        <div class="form-group">
+            <label>Comment Payload:</label>
+            <textarea id="payload">&lt;img src=x onerror=alert('XSS')&gt;</textarea>
+        </div>
+        
+        <div class="section-title">2. Defense Strategy</div>
+        <div class="encoding-options">
+            <div class="enc-btn active" onclick="setMode('none')" id="btn-none">
+                🚫 No Encoding (Raw)
+                <div style="font-size:0.75rem; color:#aaa;">Vulnerable. Browser executes tags.</div>
+            </div>
+            <div class="enc-btn" onclick="setMode('html')" id="btn-html">
+                🛡️ HTML Entity Encoding
+                <div style="font-size:0.75rem; color:#aaa;">Converts &lt; to &amp;lt;</div>
+            </div>
+            <div class="enc-btn" onclick="setMode('attr')" id="btn-attr">
+                🛡️ Attribute Encoding
+                <div style="font-size:0.75rem; color:#aaa;">For values inside quotes.</div>
+            </div>
+        </div>
+
+        <button class="post-btn" onclick="postComment()">Post Comment</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- BROWSER -->
+        <div class="browser-window">
+            <div class="browser-bar">
+                <span>🌎 Social Feed</span>
+                <div class="url-box">https://social.app/feed</div>
+            </div>
+            <div class="feed-content" id="feed">
+                <!-- Comments go here -->
+                <div class="comment-box">
+                    <div class="user-name">Alice</div>
+                    <div class="comment-text">Hello World! This is a safe comment.</div>
+                </div>
+            </div>
+            
+            <!-- FAKE ALERT -->
+            <div class="xss-alert" id="popup">
+                <div class="alert-header">embedded page says</div>
+                <div class="alert-body">
+                    <div style="font-size:1.2rem; margin-bottom:10px;">XSS</div>
+                    <div style="color:#666;">You have been hacked!</div>
+                    <button class="alert-btn" onclick="closeAlert()">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SOURCE CODE VIEW -->
+        <div class="source-view" id="source-viz">
+            &lt;!-- HTML Source View --&gt;<br>
+            &lt;div class="comment"&gt;Waiting for input...&lt;/div&gt;
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let mode = 'none';
+
+    function setMode(m) {
+        mode = m;
+        document.querySelectorAll('.enc-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + m).classList.add('active');
+    }
+
+    function postComment() {
+        const rawInput = document.getElementById('payload').value;
+        const feed = document.getElementById('feed');
+        const sourceViz = document.getElementById('source-viz');
+        
+        // 1. Process Input based on Mode
+        let processed = "";
+        let sourceHtml = "";
+
+        if (mode === 'none') {
+            // RAW (Vulnerable)
+            processed = rawInput;
+            sourceHtml = escapeHtml(rawInput).replace(/&lt;script&gt;/g, '<span class="bad-script">&lt;script&gt;</span>');
+            // Check for simple execution simulation
+            if (rawInput.includes("alert") || rawInput.includes("<script") || rawInput.includes("<img")) {
+                setTimeout(() => document.getElementById('popup').style.display = 'block', 500);
+            }
+        } 
+        else if (mode === 'html') {
+            // HTML ENTITY ENCODE
+            processed = escapeHtml(rawInput);
+            sourceHtml = processed.replace(/&amp;/g, '<span class="safe-entity">&amp;amp;</span>')
+                                  .replace(/&lt;/g, '<span class="safe-entity">&amp;lt;</span>')
+                                  .replace(/&gt;/g, '<span class="safe-entity">&amp;gt;</span>');
+        }
+        else if (mode === 'attr') {
+            // ATTRIBUTE ENCODE (Simulating injection into an input value)
+            // Ideally we'd change the DOM structure for this, but for sim we'll just encode quotes
+            processed = escapeAttr(rawInput);
+            sourceHtml = processed; 
+        }
+
+        // 2. Render to Feed (DOM Injection)
+        const comment = document.createElement('div');
+        comment.className = 'comment-box';
+        comment.innerHTML = `
+            <div class="user-name">You</div>
+            <div class="comment-text">${processed}</div>
+        `;
+        feed.appendChild(comment);
+        feed.scrollTop = feed.scrollHeight;
+
+        // 3. Render Source
+        sourceViz.innerHTML = `
+            &lt;!-- Rendered HTML --&gt;<br>
+            <span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="val">"comment-text"</span><span class="tag">&gt;</span><br>
+            &nbsp;&nbsp;${sourceHtml}<br>
+            <span class="tag">&lt;/div&gt;</span>
+        `;
+    }
+
+    function closeAlert() {
+        document.getElementById('popup').style.display = 'none';
+    }
+
+    // Helper: Basic HTML Escaping
+    function escapeHtml(text) {
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // Helper: Attribute Escaping
+    function escapeAttr(text) {
+        // Aggressive encoding for attributes
+        return text.replace(/[^a-zA-Z0-9 ]/g, function(c) {
+            return '&#' + c.charCodeAt(0) + ';';
+        });
+    }
+
+</script>
+
+</body>
+</html>

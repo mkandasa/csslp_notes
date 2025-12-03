@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Trust Zones Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --zone-red: #ef4444;    /* Untrusted */
+            --zone-yellow: #f59e0b; /* DMZ */
+            --zone-green: #22c55e;  /* Trusted */
+            --gate-blue: #3b82f6;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--zone-green);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--zone-green); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #0f172a;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .toggle-label { font-weight: bold; font-size: 0.9rem; }
+        
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--gate-blue); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        button.action-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--zone-red);
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button.action-btn:hover { filter: brightness(1.1); }
+        button.reset-btn { background: #334155; color: #ccc; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ZONES */
+        .zone-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 300px;
+            position: relative;
+        }
+
+        .zone {
+            width: 25%;
+            height: 100%;
+            border: 2px dashed #555;
+            border-radius: 8px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .zone-label {
+            position: absolute;
+            top: -10px;
+            background: #000;
+            padding: 0 5px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        #zone-internet { border-color: var(--zone-red); background: rgba(239, 68, 68, 0.05); }
+        #zone-dmz { border-color: var(--zone-yellow); background: rgba(245, 158, 11, 0.05); }
+        #zone-internal { border-color: var(--zone-green); background: rgba(34, 197, 94, 0.05); }
+
+        /* NODES */
+        .node {
+            width: 80px; height: 80px;
+            background: #1e293b;
+            border: 2px solid #fff;
+            border-radius: 6px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 2rem;
+            position: relative;
+            z-index: 10;
+        }
+        .node-label { font-size: 0.7rem; margin-top: 5px; color: #aaa; text-align: center; }
+        
+        .node.compromised {
+            border-color: var(--zone-red);
+            background: #3e0a0a;
+            box-shadow: 0 0 15px var(--zone-red);
+            animation: pulse 1s infinite;
+        }
+
+        /* GATES */
+        .gate {
+            width: 10px; height: 100px;
+            background: #333;
+            border: 1px solid #555;
+            position: absolute;
+            top: 50%; transform: translateY(-50%);
+            transition: 0.3s;
+            z-index: 5;
+        }
+        .gate.active {
+            background: var(--gate-blue);
+            box-shadow: 0 0 15px var(--gate-blue);
+            height: 100%; /* Full wall */
+        }
+        
+        #gate-1 { left: 30%; } /* Internet -> DMZ */
+        #gate-2 { right: 30%; } /* DMZ -> Internal */
+
+        /* ATTACKER PACKET */
+        .packet {
+            width: 20px; height: 20px;
+            background: var(--zone-red);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%; left: 50px;
+            transform: translateY(-50%);
+            box-shadow: 0 0 10px red;
+            display: none;
+            z-index: 20;
+        }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-sys { color: var(--gate-blue); }
+        .log-err { color: var(--zone-red); }
+        .log-ok { color: var(--zone-green); }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Trust Zone Architecture Lab</h1>
+    <p>Enforcing Boundaries with Gates and Segmentation</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Boundary Configuration</div>
+        
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">Perimeter Firewall</div>
+                <div style="font-size:0.7rem; color:#aaa;">Protects DMZ from Internet</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-fw1" checked disabled>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">Internal Trust Gate</div>
+                <div style="font-size:0.7rem; color:#aaa;">Segregates App/Data from DMZ</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-fw2" onchange="toggleGate()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">2. Simulation</div>
+        <button class="action-btn" onclick="runAttack()">🚀 Launch Pivot Attack</button>
+        <button class="action-btn reset-btn" onclick="resetLab()">🔄 Reset System</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <div class="zone-container">
+            
+            <!-- ZONE 1: INTERNET -->
+            <div class="zone" id="zone-internet">
+                <div class="zone-label" style="color:var(--zone-red)">UNTRUSTED (Internet)</div>
+                <div class="node" id="node-hacker">
+                    👾
+                    <div class="node-label">Attacker</div>
+                </div>
+            </div>
+
+            <!-- GATE 1 -->
+            <div class="gate active" id="gate-1"></div>
+
+            <!-- ZONE 2: DMZ -->
+            <div class="zone" id="zone-dmz">
+                <div class="zone-label" style="color:var(--zone-yellow)">SEMI-TRUSTED (DMZ)</div>
+                <div class="node" id="node-web">
+                    🌐
+                    <div class="node-label">Web Server</div>
+                </div>
+            </div>
+
+            <!-- GATE 2 -->
+            <div class="gate" id="gate-2"></div>
+
+            <!-- ZONE 3: INTERNAL -->
+            <div class="zone" id="zone-internal">
+                <div class="zone-label" style="color:var(--zone-green)">TRUSTED (Internal)</div>
+                <div class="node" id="node-db">
+                    🛢️
+                    <div class="node-label">Core DB</div>
+                </div>
+            </div>
+
+            <!-- Packet -->
+            <div class="packet" id="packet"></div>
+
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Default: Flat Internal Network (Gate 2 Open).</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let gate2Active = false;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function toggleGate() {
+        gate2Active = !gate2Active;
+        const gate = document.getElementById('gate-2');
+        
+        if (gate2Active) {
+            gate.classList.add('active');
+            log("CONFIG: Internal Trust Gate Activated. Segmentation Enforced.", "sys");
+        } else {
+            gate.classList.remove('active');
+            log("CONFIG: Internal Trust Gate Deactivated. Flat Network Mode.", "err");
+        }
+    }
+
+    function resetLab() {
+        document.querySelectorAll('.node').forEach(n => n.classList.remove('compromised'));
+        document.getElementById('packet').style.display = 'none';
+        log("SYSTEM: Lab Reset.", "sys");
+    }
+
+    function runAttack() {
+        resetLab(); // clean start
+        log("ATTACK: Initiating Exploit Chain...", "err");
+
+        const pkt = document.getElementById('packet');
+        const internet = document.getElementById('zone-internet');
+        const dmz = document.getElementById('zone-dmz');
+        const internal = document.getElementById('zone-internal');
+        
+        // Setup Packet
+        pkt.style.display = 'block';
+        pkt.style.left = '50px'; // Hacker pos
+        
+        // STEP 1: Attack Web Server (DMZ)
+        // Public facing servers are always "attackable". Firewall allows port 80/443.
+        
+        log("ATTACK: Targeting Web Server via Port 443...", "err");
+        
+        // Animate to Web
+        const webPos = dmz.offsetLeft + (dmz.offsetWidth / 2);
+        
+        animatePacket(pkt, webPos, () => {
+            // Web Compromise
+            document.getElementById('node-web').classList.add('compromised');
+            log("BREACH: Web Server Compromised (RCE Exploit).", "err");
+            log("ATTACK: Attempting Lateral Movement to Core DB...", "err");
+
+            // STEP 2: Pivot to DB (Internal)
+            const dbPos = internal.offsetLeft + (internal.offsetWidth / 2);
+            
+            // Check Gate 2
+            const gatePos = document.getElementById('gate-2').offsetLeft;
+            
+            animatePacket(pkt, dbPos, () => {
+                // If we got here, check if blocked mid-way
+                // Actually easier to check logic inside animation or just logic check here
+                if (!gate2Active) {
+                    // Success (Bad)
+                    document.getElementById('node-db').classList.add('compromised');
+                    log("CRITICAL FAILURE: Database Compromised. No Trust Boundary detected.", "err");
+                }
+            }, gate2Active ? gatePos : null); 
+        });
+    }
+
+    function animatePacket(el, targetX, onComplete, blockAtX) {
+        let currentX = parseInt(el.style.left) || 50;
+        
+        const interval = setInterval(() => {
+            currentX += 5;
+            el.style.left = currentX + 'px';
+
+            // Check Block
+            if (blockAtX && currentX >= blockAtX) {
+                clearInterval(interval);
+                log("DEFENSE: Trust Gate blocked unauthorized lateral movement.", "ok");
+                
+                // Bounce Effect
+                el.style.transform = "translateY(-50%) scale(2)";
+                el.style.opacity = "0";
+                setTimeout(() => {
+                    el.style.display = "none";
+                    el.style.transform = "translateY(-50%) scale(1)";
+                    el.style.opacity = "1";
+                }, 500);
+                return;
+            }
+
+            // Check Arrival
+            if (currentX >= targetX) {
+                clearInterval(interval);
+                onComplete();
+            }
+        }, 10);
+    }
+
+</script>
+
+</body>
+</html>

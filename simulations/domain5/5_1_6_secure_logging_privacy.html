@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Secure Logging Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --log-green: #22c55e;
+            --log-red: #ef4444;
+            --log-yellow: #facc15;
+            --log-blue: #3b82f6;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--log-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--log-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Toggles */
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #0f172a;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .toggle-label { font-weight: bold; font-size: 0.9rem; }
+        
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--log-blue); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Filter Buttons */
+        .filter-group { display: flex; gap: 5px; margin-bottom: 20px; }
+        .btn-filter {
+            flex: 1;
+            padding: 8px;
+            background: #334155;
+            border: 1px solid #555;
+            color: #ccc;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        .btn-filter:hover { background: #475569; }
+        .btn-filter.active { background: var(--log-blue); color: white; border-color: var(--log-blue); }
+
+        /* Attack Sim */
+        button.btn-attack {
+            width: 100%;
+            padding: 12px;
+            background: var(--log-red);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button.btn-attack:hover { filter: brightness(1.1); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Log Console */
+        .log-header {
+            background: #1e293b;
+            padding: 10px 15px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .log-status { font-size: 0.8rem; color: #aaa; }
+
+        .log-stream {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #ccc;
+            scroll-behavior: smooth;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 5px;
+            border-left: 3px solid transparent;
+            word-break: break-all;
+            display: flex;
+            align-items: flex-start;
+        }
+        .log-ts { color: #64748b; margin-right: 10px; min-width: 140px; }
+        .log-lvl { font-weight: bold; margin-right: 10px; min-width: 50px; }
+        .log-msg { color: #e2e8f0; }
+
+        /* Level Colors */
+        .lvl-info { color: var(--log-blue); border-left-color: var(--log-blue); }
+        .lvl-warn { color: var(--log-yellow); border-left-color: var(--log-yellow); }
+        .lvl-err { color: var(--log-red); border-left-color: var(--log-red); background: rgba(239, 68, 68, 0.1); }
+        .lvl-audit { color: var(--log-green); border-left-color: var(--log-green); }
+
+        /* Highlights */
+        .pii-leak { background: rgba(239, 68, 68, 0.2); color: #ffadad; text-decoration: underline; }
+        .masked { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure Logging & Auditing Lab</h1>
+    <p>Simulating Log Aggregation, Privacy Leaks & Data Masking</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Log Configuration</div>
+        
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">PII Masking</div>
+                <div style="font-size:0.7rem; color:#aaa;">Redacts SSN, Passwords</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-mask">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">Audit Mode</div>
+                <div style="font-size:0.7rem; color:#aaa;">Records Security Events</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-audit" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">2. Analysis Filter</div>
+        <div class="filter-group">
+            <button class="btn-filter active" onclick="setFilter('ALL')">ALL</button>
+            <button class="btn-filter" onclick="setFilter('ERROR')">ERROR</button>
+            <button class="btn-filter" onclick="setFilter('AUDIT')">AUDIT</button>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">3. Simulate Activity</div>
+        <button class="btn-attack" onclick="genTraffic('login_fail')">⚠️ Brute Force Attempt</button>
+        <button class="btn-attack" style="background:#0ea5e9;" onclick="genTraffic('debug_dump')">🐛 Developer Debug Dump</button>
+        <button class="btn-attack" style="background:#10b981;" onclick="genTraffic('normal')">✅ Normal Transaction</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <div class="log-header">
+            <strong>SIEM Console (Live Stream)</strong>
+            <div class="log-status" id="log-status">Receiving Events...</div>
+        </div>
+
+        <div class="log-stream" id="log-stream">
+            <!-- Logs go here -->
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let filter = 'ALL';
+    let logCount = 0;
+
+    function setFilter(f) {
+        filter = f;
+        document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        renderFilter();
+    }
+
+    function renderFilter() {
+        const logs = document.querySelectorAll('.log-entry');
+        logs.forEach(log => {
+            if (filter === 'ALL') {
+                log.style.display = 'flex';
+            } else {
+                if (log.classList.contains('type-' + filter)) {
+                    log.style.display = 'flex';
+                } else {
+                    log.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    function genTraffic(type) {
+        const mask = document.getElementById('cfg-mask').checked;
+        const audit = document.getElementById('cfg-audit').checked;
+        
+        let level = "INFO";
+        let msg = "";
+        let typeClass = "type-INFO";
+
+        if (type === 'normal') {
+            level = "INFO";
+            const amt = Math.floor(Math.random() * 500);
+            msg = `Transaction processed. Amount: $${amt}. UserID: 1005.`;
+            typeClass = "type-INFO";
+        }
+        else if (type === 'login_fail') {
+            if (!audit) return; // If auditing off, maybe we don't log this security event?
+            level = "AUDIT";
+            const ip = `192.168.1.${Math.floor(Math.random() * 255)}`;
+            msg = `Login Failed. User: 'admin'. SrcIP: ${ip}. Reason: Bad Password.`;
+            typeClass = "type-AUDIT";
+        }
+        else if (type === 'debug_dump') {
+            level = "DEBUG";
+            typeClass = "type-ERROR"; // Treat as error/risk for viz
+            
+            // Sensitive Data Simulation
+            const pass = "SuperSecret123";
+            const ssn = "999-00-1111";
+            
+            if (mask) {
+                // Secure
+                msg = `Dumping User Object: { user: "alice", pass: "<span class='masked'>[REDACTED]</span>", ssn: "<span class='masked'>***-**-****</span>" }`;
+            } else {
+                // Insecure
+                msg = `Dumping User Object: { user: "alice", pass: "<span class='pii-leak'>${pass}</span>", ssn: "<span class='pii-leak'>${ssn}</span>" }`;
+            }
+        }
+
+        addLog(level, msg, typeClass);
+    }
+
+    function addLog(level, msg, typeClass) {
+        const stream = document.getElementById('log-stream');
+        const entry = document.createElement('div');
+        
+        let lvlClass = "lvl-info";
+        if (level === 'ERROR' || level === 'DEBUG') lvlClass = "lvl-err";
+        if (level === 'AUDIT') lvlClass = "lvl-audit";
+        if (level === 'WARN') lvlClass = "lvl-warn";
+
+        entry.className = `log-entry ${lvlClass} ${typeClass}`;
+        
+        const ts = new Date().toISOString();
+        
+        entry.innerHTML = `
+            <span class="log-ts">${ts}</span>
+            <span class="log-lvl">[${level}]</span>
+            <span class="log-msg">${msg}</span>
+        `;
+
+        stream.prepend(entry);
+        
+        // Keep buffer small
+        if (stream.children.length > 50) {
+            stream.lastChild.remove();
+        }
+
+        // Apply filter immediately
+        renderFilter();
+    }
+
+    // Auto-generate background noise
+    setInterval(() => {
+        if(Math.random() > 0.7) genTraffic('normal');
+    }, 2000);
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Risk Strategy Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --risk-red: #ef4444;
+            --mitigate-green: #22c55e;
+            --transfer-blue: #3b82f6;
+            --accept-gray: #94a3b8;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--risk-red);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--risk-red); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .budget-box {
+            background: #000;
+            border: 2px solid var(--safe-green);
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .budget-val { font-size: 2rem; font-weight: bold; color: var(--safe-green); }
+        .budget-label { font-size: 0.8rem; color: #aaa; }
+
+        /* Strategies */
+        .strategy-grid { display: grid; gap: 10px; }
+        
+        button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            text-align: left;
+            transition: 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-mitigate { background: #064e3b; border: 1px solid var(--mitigate-green); }
+        .btn-mitigate:hover { background: var(--mitigate-green); }
+        
+        .btn-avoid { background: #450a0a; border: 1px solid var(--risk-red); }
+        .btn-avoid:hover { background: var(--risk-red); }
+
+        .btn-transfer { background: #1e3a8a; border: 1px solid var(--transfer-blue); }
+        .btn-transfer:hover { background: var(--transfer-blue); }
+
+        .btn-accept { background: #333; border: 1px solid #777; color: #ccc; }
+        .btn-accept:hover { background: #555; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Risk Card */
+        .risk-card {
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            padding: 20px;
+            animation: fadeIn 0.5s;
+        }
+        .risk-header { font-size: 1.2rem; font-weight: bold; margin-bottom: 10px; color: white; }
+        .risk-meta { display: flex; gap: 15px; font-size: 0.8rem; color: #aaa; margin-bottom: 15px; }
+        .risk-desc { line-height: 1.5; color: #ccc; }
+        .vuln-badge { background: var(--risk-red); color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; }
+
+        /* Outcome Area */
+        .outcome-box {
+            flex-grow: 1;
+            background: #0d1117;
+            border: 1px dashed #333;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+        .outcome-icon { font-size: 4rem; margin-bottom: 10px; }
+        .outcome-text { font-size: 1.1rem; color: white; margin-bottom: 5px; }
+        .outcome-detail { color: #888; font-size: 0.9rem; }
+
+        /* Progress */
+        .progress-dots { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+        .dot { width: 12px; height: 12px; background: #333; border-radius: 50%; }
+        .dot.active { background: var(--transfer-blue); }
+        .dot.done { background: var(--safe-green); }
+
+        @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Risk Strategy Simulator</h1>
+    <p>Mitigate, Transfer, Avoid, or Accept?</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="budget-box">
+            <div class="budget-label">SECURITY BUDGET</div>
+            <div class="budget-val" id="budget-display">$100k</div>
+        </div>
+
+        <div class="section-title">Select Strategy</div>
+        <div class="strategy-grid">
+            <button class="btn-mitigate" onclick="chooseStrategy('mitigate')">
+                <span>🛠️ MITIGATE (Patch/Fix)</span>
+                <span id="cost-mitigate" style="font-size:0.8rem;">-$10k</span>
+            </button>
+            <button class="btn-transfer" onclick="chooseStrategy('transfer')">
+                <span>☂️ TRANSFER (Insurance/SaaS)</span>
+                <span id="cost-transfer" style="font-size:0.8rem;">-$25k</span>
+            </button>
+            <button class="btn-avoid" onclick="chooseStrategy('avoid')">
+                <span>🚫 AVOID (Remove Feature)</span>
+                <span id="cost-avoid" style="font-size:0.8rem;">$0</span>
+            </button>
+            <button class="btn-accept" onclick="chooseStrategy('accept')">
+                <span>🤷 ACCEPT (Do Nothing)</span>
+                <span id="cost-accept" style="font-size:0.8rem;">$0</span>
+            </button>
+        </div>
+        
+        <button style="margin-top:20px; background:#333; text-align:center; justify-content:center;" onclick="nextScenario()" id="btn-next" disabled>Next Scenario ➔</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <div class="progress-dots">
+            <div class="dot active" id="dot-0"></div>
+            <div class="dot" id="dot-1"></div>
+            <div class="dot" id="dot-2"></div>
+        </div>
+
+        <!-- RISK CARD -->
+        <div class="risk-card" id="card-display">
+            <!-- Injected -->
+        </div>
+
+        <!-- OUTCOME -->
+        <div class="outcome-box" id="outcome-display">
+            <div style="color:#555;">Select a strategy to see the result.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let budget = 100000;
+    let currentIdx = 0;
+    
+    const scenarios = [
+        {
+            title: "SQL Injection in Payment Gateway",
+            meta: "Critical | Asset: Customer DB | Impact: High",
+            desc: "A penetration test revealed a SQLi vulnerability in the main checkout page. Attackers can dump the entire credit card database.",
+            costs: { mitigate: 15000, transfer: 50000, avoid: 0, accept: 0 },
+            best: 'mitigate',
+            outcomes: {
+                mitigate: { icon: "✅", title: "Secure & Online", desc: "You patched the code. It cost $15k but the business is safe." },
+                transfer: { icon: "⚠️", title: "Costly Band-aid", desc: "You bought a WAF ($50k). It blocks attacks, but the bug remains. Expensive." },
+                avoid: { icon: "📉", title: "Revenue Lost", desc: "You removed the Checkout page. Zero risk, but zero revenue. The CEO is furious." },
+                accept: { icon: "💀", title: "Data Breach!", desc: "You accepted the risk. Hackers stole 1M credit cards. Fine: $5M. Game Over." }
+            }
+        },
+        {
+            title: "DDoS Threat (100 Gbps)",
+            meta: "High | Asset: Availability | Impact: Medium",
+            desc: "Competitors are launching massive DDoS attacks. Your on-prem firewall (10 Gbps) is melting.",
+            costs: { mitigate: 80000, transfer: 20000, avoid: 0, accept: 0 },
+            best: 'transfer',
+            outcomes: {
+                mitigate: { icon: "💸", title: "Over Budget", desc: "You tried to build a massive data center ($80k). It worked, but you are broke." },
+                transfer: { icon: "☁️", title: "Cloud Protection", desc: "You hired Cloudflare ($20k). They absorbed the traffic. Perfect strategy." },
+                avoid: { icon: "📉", title: "Service Down", desc: "You shut down the servers to stop the attack. Availability = 0%." },
+                accept: { icon: "🔥", title: "Server Melted", desc: "The attack crashed your network for 3 days. Customers left." }
+            }
+        },
+        {
+            title: "Info Leak on Test Server",
+            meta: "Low | Asset: Cafeteria Menu | Impact: Low",
+            desc: "An internal test server running the 'Lunch Menu' app leaks its PHP version. The server has no sensitive data.",
+            costs: { mitigate: 5000, transfer: 10000, avoid: 0, accept: 0 },
+            best: 'accept',
+            outcomes: {
+                mitigate: { icon: "😐", title: "Waste of Money", desc: "You spent $5k patching a lunch menu. You are safe, but poor." },
+                transfer: { icon: "😂", title: "Overkill", desc: "You bought insurance for a menu? Finance laughs at you." },
+                avoid: { icon: "🤷", title: "Feature Removed", desc: "You deleted the menu app. Now employees are hungry." },
+                accept: { icon: "👍", title: "Business as Usual", desc: "You accepted the risk. No data was lost. Budget saved for real threats." }
+            }
+        }
+    ];
+
+    function init() {
+        loadScenario(0);
+    }
+
+    function loadScenario(idx) {
+        const s = scenarios[idx];
+        const card = document.getElementById('card-display');
+        
+        card.innerHTML = `
+            <div class="risk-header"><span class="vuln-badge">VULN</span> ${s.title}</div>
+            <div class="risk-meta">${s.meta}</div>
+            <div class="risk-desc">${s.desc}</div>
+        `;
+
+        // Update Costs
+        document.getElementById('cost-mitigate').innerText = `-$${s.costs.mitigate/1000}k`;
+        document.getElementById('cost-transfer').innerText = `-$${s.costs.transfer/1000}k`;
+        document.getElementById('cost-avoid').innerText = `$0`;
+        document.getElementById('cost-accept').innerText = `$0`;
+
+        // Reset UI
+        document.getElementById('outcome-display').innerHTML = `<div style="color:#555;">Select a strategy to see the result.</div>`;
+        document.getElementById('btn-next').disabled = true;
+        
+        // Update Dots
+        document.querySelectorAll('.dot').forEach((d, i) => {
+            d.className = i === idx ? 'dot active' : (i < idx ? 'dot done' : 'dot');
+        });
+    }
+
+    function chooseStrategy(type) {
+        const s = scenarios[currentIdx];
+        const res = s.outcomes[type];
+        const cost = s.costs[type];
+
+        // Deduct Budget
+        if (budget - cost < 0) {
+            alert("Insufficient Funds! You cannot afford this strategy.");
+            return;
+        }
+        
+        // Show Result
+        const outBox = document.getElementById('outcome-display');
+        const color = type === s.best ? "var(--safe-green)" : (type === 'accept' && s.best !== 'accept' ? "var(--risk-red)" : "var(--text)");
+        
+        outBox.innerHTML = `
+            <div class="outcome-icon">${res.icon}</div>
+            <div class="outcome-text" style="color:${color}">${res.title}</div>
+            <div class="outcome-detail">${res.desc}</div>
+        `;
+
+        // If critical fail, shake
+        if (type === 'accept' && s.best !== 'accept') {
+            outBox.style.borderColor = "var(--risk-red)";
+            // budget -= 50000; // Fine
+        } else if (type !== s.best) {
+             outBox.style.borderColor = "orange";
+        } else {
+             outBox.style.borderColor = "var(--safe-green)";
+             budget -= cost;
+        }
+
+        updateBudget();
+        document.getElementById('btn-next').disabled = false;
+    }
+
+    function updateBudget() {
+        document.getElementById('budget-display').innerText = `$${budget/1000}k`;
+    }
+
+    function nextScenario() {
+        currentIdx++;
+        if (currentIdx < scenarios.length) {
+            loadScenario(currentIdx);
+        } else {
+            document.querySelector('.dashboard').innerHTML = `
+                <div style="text-align:center; padding:50px;">
+                    <h1>Simulation Complete</h1>
+                    <p>Final Budget: $${budget/1000}k</p>
+                    <button onclick="location.reload()" style="width:200px; margin:20px auto; background:#333;">Restart</button>
+                </div>
+            `;
+        }
+    }
+
+    // Start
+    init();
+
+</script>
+
+</body>
+</html>

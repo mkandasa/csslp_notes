@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Input Validation Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --input-teal: #14b8a6;
+            --attack-red: #ef4444;
+            --safe-green: #22c55e;
+            --code-bg: #0d1117;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--input-teal);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--input-teal); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 5px; margin-bottom: 15px; }
+        .tab-btn {
+            flex: 1; padding: 10px; border: none; cursor: pointer;
+            background: #333; color: #ccc; border-radius: 4px;
+        }
+        .tab-btn.active { background: var(--input-teal); color: black; font-weight: bold; }
+
+        /* Input Form */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 0.85rem; }
+        input[type=text], textarea {
+            width: 100%; padding: 10px; background: #0f172a;
+            border: 1px solid #475569; color: white; border-radius: 4px;
+            font-family: monospace; box-sizing: border-box;
+        }
+        
+        /* Toggles */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #0f172a;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            border: 1px solid #333;
+        }
+        .toggle-switch {
+            position: relative; display: inline-block; width: 34px; height: 20px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #555; transition: .4s; border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--input-teal); }
+        input:checked + .slider:before { transform: translateX(14px); }
+
+        button.action-btn {
+            width: 100%; padding: 12px; background: var(--input-teal);
+            color: black; font-weight: bold; border: none; border-radius: 4px;
+            cursor: pointer; margin-top: 10px;
+        }
+        button.action-btn:hover { filter: brightness(1.1); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Code View (Processing Logic) */
+        .code-block {
+            background: var(--code-bg);
+            border: 1px solid #475569;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #c9d1d9;
+            overflow-x: auto;
+            min-height: 120px;
+        }
+        .code-hl { color: var(--input-teal); }
+        .code-bad { color: var(--attack-red); text-decoration: underline; }
+        .code-good { color: var(--safe-green); }
+
+        /* Result Output (Browser/DB View) */
+        .result-box {
+            background: white;
+            color: black;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 150px;
+            position: relative;
+        }
+        .result-label {
+            position: absolute; top: -10px; left: 10px;
+            background: #333; color: white; padding: 2px 8px;
+            border-radius: 4px; font-size: 0.75rem;
+        }
+        
+        /* Alert Popup (XSS Sim) */
+        .alert-popup {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white; border: 2px solid #ccc;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            padding: 20px; text-align: center;
+            border-radius: 8px; display: none; z-index: 100;
+            width: 200px;
+        }
+        .alert-btn { margin-top: 10px; padding: 5px 15px; }
+
+        /* Logs */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-ok { color: var(--safe-green); }
+        .log-err { color: var(--attack-red); }
+        .log-sys { color: var(--input-teal); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Input Validation Defense Lab</h1>
+    <p>XSS Encoding • SQL Parameterization • Path Sanitization</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="setScenario('xss')" id="tab-xss">XSS</button>
+            <button class="tab-btn" onclick="setScenario('sqli')" id="tab-sqli">SQLi</button>
+            <button class="tab-btn" onclick="setScenario('path')" id="tab-path">Path</button>
+        </div>
+
+        <!-- XSS CONTROLS -->
+        <div id="ctrl-xss" class="scenario-ctrl">
+            <div class="form-group">
+                <label>Comment Input:</label>
+                <textarea id="xss-input"><script>alert('HACKED')</script></textarea>
+            </div>
+            <div class="toggle-row">
+                <span>Output Encoding (HTML Entity)</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="cfg-encode">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button class="action-btn" onclick="runXSS()">Post Comment</button>
+        </div>
+
+        <!-- SQLi CONTROLS -->
+        <div id="ctrl-sqli" class="scenario-ctrl" style="display:none;">
+            <div class="form-group">
+                <label>Username Input:</label>
+                <input type="text" id="sqli-input" value="admin' OR '1'='1">
+            </div>
+            <div class="toggle-row">
+                <span>Use Prepared Statements (?)</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="cfg-prepare">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button class="action-btn" onclick="runSQLi()">Login</button>
+        </div>
+
+        <!-- PATH CONTROLS -->
+        <div id="ctrl-path" class="scenario-ctrl" style="display:none;">
+            <div class="form-group">
+                <label>Filename Input:</label>
+                <input type="text" id="path-input" value="../../../etc/passwd">
+            </div>
+            <div class="toggle-row">
+                <span>Sanitize (Basename)</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="cfg-sanitize">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button class="action-btn" onclick="runPath()">Read File</button>
+        </div>
+
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- CODE VIEW -->
+        <div class="code-block" id="code-view">
+            // Backend Logic View
+            Waiting for input...
+        </div>
+
+        <!-- RESULT VIEW -->
+        <div class="result-box" id="output-view">
+            <div class="result-label">BROWSER / DB OUTPUT</div>
+            <div id="render-area" style="font-family:sans-serif; color:#333;"></div>
+            
+            <!-- Fake Alert -->
+            <div class="alert-popup" id="js-alert">
+                <h3>javascript</h3>
+                <p>HACKED</p>
+                <button class="alert-btn" onclick="closeAlert()">OK</button>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Lab Ready. Select a scenario.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let currentScenario = 'xss';
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function setScenario(id) {
+        currentScenario = id;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + id).classList.add('active');
+        
+        document.querySelectorAll('.scenario-ctrl').forEach(c => c.style.display = 'none');
+        document.getElementById('ctrl-' + id).style.display = 'block';
+        
+        document.getElementById('code-view').innerText = "// Backend Logic View\nWaiting for input...";
+        document.getElementById('render-area').innerText = "";
+        log(`SWITCH: Scenario changed to ${id.toUpperCase()}.`, "sys");
+    }
+
+    // --- XSS SCENARIO ---
+    function runXSS() {
+        const input = document.getElementById('xss-input').value;
+        const encode = document.getElementById('cfg-encode').checked;
+        const codeView = document.getElementById('code-view');
+        const render = document.getElementById('render-area');
+
+        if (encode) {
+            // Secure Path
+            const encoded = input.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            codeView.innerHTML = `
+<span class="code-hl">function</span> postComment(input) {
+  <span class="code-good">// ENCODING ENABLED</span>
+  return input.replace(/</g, "&amp;lt;")...; 
+}
+<span class="code-good">Result:</span> "${encoded}"`;
+            
+            render.innerText = input; // Browser renders text safely
+            log("DEFENSE: Input Encoded. Script rendered as text.", "ok");
+        } else {
+            // Insecure Path
+            codeView.innerHTML = `
+<span class="code-hl">function</span> postComment(input) {
+  <span class="code-bad">// NO VALIDATION</span>
+  return input; 
+}
+<span class="code-bad">Executing:</span> ${input}`;
+            
+            // Simulate Execution
+            if (input.includes("<script>")) {
+                document.getElementById('js-alert').style.display = 'block';
+                log("ATTACK: XSS Payload Executed!", "err");
+            }
+            render.innerHTML = "<i>(Script Executing...)</i>";
+        }
+    }
+
+    function closeAlert() {
+        document.getElementById('js-alert').style.display = 'none';
+    }
+
+    // --- SQLi SCENARIO ---
+    function runSQLi() {
+        const input = document.getElementById('sqli-input').value;
+        const prepare = document.getElementById('cfg-prepare').checked;
+        const codeView = document.getElementById('code-view');
+        const render = document.getElementById('render-area');
+
+        if (prepare) {
+            // Secure
+            codeView.innerHTML = `
+<span class="code-hl">SELECT</span> * <span class="code-hl">FROM</span> users 
+<span class="code-hl">WHERE</span> user = <span class="code-good">?</span>;
+<span class="code-good">// Parameter Bound:</span> "${input}"`;
+            
+            render.innerHTML = "<strong>Login Failed:</strong> User not found.";
+            render.style.color = "red";
+            log("DEFENSE: Prepared Statement treated input as literal string.", "ok");
+        } else {
+            // Insecure
+            const query = `SELECT * FROM users WHERE user = '${input}'`;
+            codeView.innerHTML = `
+<span class="code-hl">String</span> query = 
+  "${query}";
+<span class="code-bad">// Dynamic SQL Construction</span>`;
+            
+            render.innerHTML = `<strong>Welcome, Admin!</strong><br>(Bypassed via ' OR '1'='1)`;
+            render.style.color = "green";
+            log("ATTACK: SQL Injection Successful. Auth Bypassed.", "err");
+        }
+    }
+
+    // --- PATH SCENARIO ---
+    function runPath() {
+        const input = document.getElementById('path-input').value;
+        const sanitize = document.getElementById('cfg-sanitize').checked;
+        const codeView = document.getElementById('code-view');
+        const render = document.getElementById('render-area');
+
+        if (sanitize) {
+            // Secure (Basename)
+            // Simulating path.basename()
+            const clean = input.split('/').pop();
+            codeView.innerHTML = `
+<span class="code-hl">File</span> f = new File(baseDir, <span class="code-good">basename(input)</span>);
+<span class="code-good">// Sanitized:</span> "passwd"`;
+            
+            render.innerHTML = "Error: File 'passwd' not found in /var/www/uploads/";
+            render.style.color = "#333";
+            log(`DEFENSE: Path Traversal stripped. Looked for '${clean}' in safe dir.`, "ok");
+        } else {
+            // Insecure
+            codeView.innerHTML = `
+<span class="code-hl">File</span> f = new File(baseDir, input);
+<span class="code-bad">// Opening:</span> ${input}`;
+            
+            render.innerHTML = "root:x:0:0:root:/root:/bin/bash<br>daemon:x:1:1:daemon...";
+            render.style.color = "var(--attack-red)";
+            log("ATTACK: Directory Traversal Successful. System file read.", "err");
+        }
+    }
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: File Integrity Monitoring Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --fim-teal: #14b8a6;
+            --alert-red: #ef4444;
+            --safe-green: #22c55e;
+            --warn-yellow: #f59e0b;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--fim-teal);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--fim-teal); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+            text-align: left;
+            padding-left: 15px;
+        }
+        
+        .btn-baseline { background: var(--safe-green); color: black; }
+        .btn-scan { background: var(--fim-teal); color: black; }
+        .btn-attack { background: var(--alert-red); }
+        .btn-patch { background: var(--warn-yellow); color: black; }
+        
+        button:hover { filter: brightness(1.1); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* File System Grid */
+        .fs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .file-card {
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 10px;
+            position: relative;
+            transition: 0.3s;
+        }
+        .file-card.modified { border-color: var(--alert-red); background: rgba(239, 68, 68, 0.1); }
+        .file-card.secure { border-color: var(--safe-green); }
+        
+        .file-icon { font-size: 1.5rem; margin-bottom: 5px; }
+        .file-name { font-weight: bold; font-size: 0.9rem; }
+        .file-hash { font-family: monospace; font-size: 0.7rem; color: #aaa; word-break: break-all; margin-top: 5px; }
+        
+        .status-badge {
+            position: absolute;
+            top: 10px; right: 10px;
+            font-size: 0.6rem;
+            padding: 2px 5px;
+            border-radius: 3px;
+            background: #333;
+            color: #aaa;
+        }
+        .status-badge.alert { background: var(--alert-red); color: white; animation: blink 1s infinite; }
+
+        /* Database View (The FIM DB) */
+        .fim-db {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 15px;
+            flex-grow: 1;
+        }
+        .db-header { font-size: 0.8rem; color: #aaa; border-bottom: 1px solid #475569; padding-bottom: 5px; margin-bottom: 10px; }
+        .db-row { font-family: monospace; font-size: 0.8rem; margin-bottom: 5px; display: flex; justify-content: space-between; }
+        .hash-match { color: var(--safe-green); }
+        .hash-mismatch { color: var(--alert-red); }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-sys { color: var(--fim-teal); }
+        .log-err { color: var(--alert-red); }
+        .log-ok { color: var(--safe-green); }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>File Integrity Monitoring (FIM) Lab</h1>
+    <p>Detecting Unauthorized Changes via Hash Comparison</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Configuration</div>
+        <button class="btn-baseline" onclick="updateBaseline()">📸 Update Baseline (Trust Current)</button>
+        <button class="btn-scan" onclick="runScan()">🔍 Run Integrity Scan</button>
+
+        <div class="section-title" style="margin-top:20px;">2. Simulations</div>
+        <button class="btn-attack" onclick="modifyFile('login')">💉 Rootkit: Modify /bin/login</button>
+        <button class="btn-attack" onclick="modifyFile('config')">📝 Attack: Change Config</button>
+        <button class="btn-patch" onclick="patchFile()">📦 System Patch (Authorized)</button>
+        
+        <div style="font-size:0.75rem; color:#aaa; margin-top:10px;">
+            *Tip: After a Patch, you must Update Baseline to stop alerts.
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- FILE SYSTEM -->
+        <div class="fs-grid">
+            <div class="file-card" id="file-login">
+                <div class="status-badge" id="badge-login">OK</div>
+                <div class="file-icon">⚙️</div>
+                <div class="file-name">/bin/login</div>
+                <div class="file-hash" id="hash-login">Hash: a1b2c3d4</div>
+            </div>
+
+            <div class="file-card" id="file-config">
+                <div class="status-badge" id="badge-config">OK</div>
+                <div class="file-icon">📄</div>
+                <div class="file-name">/etc/passwd</div>
+                <div class="file-hash" id="hash-config">Hash: 99887766</div>
+            </div>
+
+            <div class="file-card" id="file-web">
+                <div class="status-badge" id="badge-web">OK</div>
+                <div class="file-icon">🌐</div>
+                <div class="file-name">index.html</div>
+                <div class="file-hash" id="hash-web">Hash: ffooeedd</div>
+            </div>
+        </div>
+
+        <!-- FIM DATABASE -->
+        <div class="fim-db">
+            <div class="db-header">FIM BASELINE DATABASE (Stored Hashes)</div>
+            <div id="db-content">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> FIM Agent Started. Waiting for baseline...</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    // Current State of Files
+    const fileSystem = {
+        login: { hash: "a1b2c3d4", content: "original_binary" },
+        config: { hash: "99887766", content: "original_config" },
+        web: { hash: "ffooeedd", content: "original_html" }
+    };
+
+    // Stored Baseline
+    let baseline = {};
+
+    function init() {
+        // Create initial baseline logic
+        baseline = { ...fileSystem }; // Clone
+        renderDB();
+        log("SYSTEM: Initial Baseline created.", "sys");
+    }
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function renderFiles() {
+        for (const [key, data] of Object.entries(fileSystem)) {
+            document.getElementById(`hash-${key}`).innerText = `Hash: ${data.hash}`;
+        }
+    }
+
+    function renderDB() {
+        const container = document.getElementById('db-content');
+        container.innerHTML = "";
+        for (const [key, data] of Object.entries(baseline)) {
+            const row = document.createElement('div');
+            row.className = "db-row";
+            row.innerHTML = `<span>${key}</span> <span>${data.hash}</span>`;
+            container.appendChild(row);
+        }
+    }
+
+    function updateBaseline() {
+        baseline = JSON.parse(JSON.stringify(fileSystem)); // Deep copy
+        renderDB();
+        
+        // Reset visual alerts
+        document.querySelectorAll('.file-card').forEach(el => {
+            el.classList.remove('modified');
+            el.querySelector('.status-badge').innerText = "OK";
+            el.querySelector('.status-badge').className = "status-badge";
+        });
+        
+        log("ACTION: Baseline Updated. Current state is now trusted.", "ok");
+    }
+
+    function modifyFile(id) {
+        // Simulate Attack
+        const newHash = Math.random().toString(16).substring(2, 10);
+        fileSystem[id].hash = newHash;
+        
+        renderFiles();
+        
+        // Visual feedback of modification
+        const card = document.getElementById(`file-${id}`);
+        card.classList.add('modified'); // Shows change occurred on disk
+        log(`EVENT: File /${id} modified on disk. New Hash: ${newHash}`, "sys");
+    }
+
+    function patchFile() {
+        // Simulate authorized patch
+        const newHash = "patch_" + Math.random().toString(16).substring(2, 6);
+        fileSystem.login.hash = newHash;
+        renderFiles();
+        log("EVENT: System Patch applied to /bin/login.", "sys");
+    }
+
+    function runScan() {
+        log("SCAN: Starting Integrity Check...", "sys");
+        let issues = 0;
+
+        for (const [key, data] of Object.entries(fileSystem)) {
+            const stored = baseline[key];
+            const card = document.getElementById(`file-${key}`);
+            const badge = document.getElementById(`badge-${key}`);
+
+            if (data.hash !== stored.hash) {
+                // ALARM
+                issues++;
+                card.classList.add('modified');
+                badge.innerText = "ALERT";
+                badge.className = "status-badge alert";
+                log(`ALERT: Integrity Violation! ${key} hash mismatch. Expected: ${stored.hash}, Found: ${data.hash}`, "err");
+            } else {
+                // OK
+                card.classList.remove('modified');
+                badge.innerText = "OK";
+                badge.className = "status-badge";
+            }
+        }
+
+        if (issues === 0) {
+            log("SCAN: All files match baseline. Integrity Verified.", "ok");
+        }
+    }
+
+    // Start
+    init();
+
+</script>
+
+</body>
+</html>

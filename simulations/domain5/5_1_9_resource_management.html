@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Resource Management Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --res-purple: #a855f7;
+            --cpu-blue: #3b82f6;
+            --mem-yellow: #eab308;
+            --danger: #ef4444;
+            --safe: #22c55e;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--res-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--res-purple); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-leak { background: var(--mem-yellow); color: black; }
+        .btn-spike { background: var(--cpu-blue); }
+        .btn-scale { background: var(--res-purple); }
+        .btn-reset { background: #334155; color: #ccc; border: 1px solid #555; }
+        
+        button:hover { filter: brightness(1.1); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #333;
+            margin-bottom: 15px;
+        }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--safe); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Server Cluster */
+        .cluster-view {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding: 10px;
+            min-height: 250px;
+        }
+
+        .server-node {
+            width: 180px;
+            background: #1e293b;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+            transition: 0.3s;
+        }
+        .server-node.crashed {
+            border-color: var(--danger);
+            background: #3e0a0a;
+            opacity: 0.8;
+            animation: shake 0.5s;
+        }
+        .server-node.new { animation: popIn 0.5s; }
+
+        .node-header { font-weight: bold; text-align: center; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .status-badge { font-size: 0.7rem; background: var(--safe); padding: 2px 6px; border-radius: 4px; color: black; display: inline-block; }
+        .status-badge.dead { background: var(--danger); color: white; }
+
+        /* Resource Bars */
+        .bar-container { font-size: 0.8rem; }
+        .bar-label { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .bar-track { height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
+        .bar-fill { height: 100%; width: 5%; transition: width 0.5s linear, background 0.3s; }
+        
+        .fill-cpu { background: var(--cpu-blue); }
+        .fill-mem { background: var(--mem-yellow); }
+
+        /* Task Queue */
+        .queue-viz {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 100px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow-x: hidden;
+        }
+        .task {
+            min-width: 40px; height: 40px;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            color: black;
+            animation: slideLeft 5s linear infinite;
+        }
+        .task-norm { background: #ccc; }
+        .task-bad { background: var(--danger); border: 2px solid white; animation: none; } /* Bad tasks stick */
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-info { color: var(--res-purple); }
+        .log-warn { color: var(--mem-yellow); }
+        .log-err { color: var(--danger); }
+        .log-ok { color: var(--safe); }
+
+        @keyframes shake {
+            0% { transform: translateX(0); } 25% { transform: translateX(3px); }
+            75% { transform: translateX(-3px); } 100% { transform: translateX(0); }
+        }
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Resource Management Lab</h1>
+    <p>Availability Engineering: CPU/RAM Quotas & Auto-Scaling</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Resource Policy</div>
+        
+        <div class="toggle-row">
+            <div>
+                <div>Resource Limits (Quotas)</div>
+                <div style="font-size:0.7rem; color:#aaa;">Kill process if RAM > 90%</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-quota">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="toggle-row">
+            <div>
+                <div>Auto-Scaling</div>
+                <div style="font-size:0.7rem; color:#aaa;">Add node if Load > 80%</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-scale">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">2. Stress Test</div>
+        <button class="btn-leak" onclick="injectFault('memory')">💧 Inject Memory Leak</button>
+        <button class="btn-spike" onclick="injectFault('cpu')">⚡ Trigger CPU Spike</button>
+        <button class="btn-reset" onclick="resetLab()">🔄 Reset Cluster</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- CLUSTER -->
+        <div class="cluster-view" id="cluster">
+            <!-- Node 1 (Default) -->
+            <div class="server-node" id="node-1">
+                <div class="node-header">
+                    Node-01
+                    <br><span class="status-badge" id="badge-1">RUNNING</span>
+                </div>
+                
+                <div class="bar-container">
+                    <div class="bar-label"><span>CPU Usage</span><span id="txt-cpu-1">5%</span></div>
+                    <div class="bar-track"><div class="bar-fill fill-cpu" id="bar-cpu-1" style="width:5%"></div></div>
+                </div>
+
+                <div class="bar-container">
+                    <div class="bar-label"><span>Memory</span><span id="txt-mem-1">10%</span></div>
+                    <div class="bar-track"><div class="bar-fill fill-mem" id="bar-mem-1" style="width:10%"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QUEUE -->
+        <div style="font-size:0.8rem; color:#aaa; margin-bottom:-15px;">Incoming Request Queue:</div>
+        <div class="queue-viz" id="queue">
+            <div class="task task-norm">REQ</div>
+            <div class="task task-norm">REQ</div>
+            <div class="task task-norm">REQ</div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Cluster Initialized. 1 Node Active. Resources Nominal.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let nodes = [{ id: 1, cpu: 5, mem: 10, status: 'ok' }];
+    let nextId = 2;
+    let faultActive = null; // 'memory' or 'cpu'
+    let intervalId = null;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':(type==='warn'?'log-warn':'log-info'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function injectFault(type) {
+        if(faultActive) return;
+        faultActive = type;
+        
+        if(type === 'memory') log("ALERT: Process initiated with Memory Leak detected.", "warn");
+        if(type === 'cpu') log("ALERT: Complex Algorithm triggered CPU Spike.", "warn");
+
+        // Add visual bad task
+        const q = document.getElementById('queue');
+        q.innerHTML += `<div class="task task-bad">${type==='memory'?'LEAK':'LOOP'}</div>`;
+
+        startSimulation();
+    }
+
+    function startSimulation() {
+        if(intervalId) clearInterval(intervalId);
+
+        intervalId = setInterval(() => {
+            const quotas = document.getElementById('cfg-quota').checked;
+            const scaling = document.getElementById('cfg-scale').checked;
+
+            // Update Logic for Node 1 (The Victim)
+            let victim = nodes.find(n => n.id === 1);
+            if(victim && victim.status === 'ok') {
+                
+                if(faultActive === 'memory') {
+                    victim.mem += 5; // Leak
+                    if(victim.mem > 100) victim.mem = 100;
+                }
+                if(faultActive === 'cpu') {
+                    victim.cpu += 10; // Spike
+                    if(victim.cpu > 100) victim.cpu = 100;
+                }
+
+                // Check Quota Defense
+                if (quotas) {
+                    if (victim.mem > 90) {
+                        log("KUBERNETES: OOMKilled process on Node-01. Memory exceeded Limit.", "ok");
+                        victim.mem = 10; // Restarted
+                        faultActive = null; // Cleared
+                        removeBadTask();
+                    }
+                    if (victim.cpu > 90) {
+                        log("KUBERNETES: CPU Throttling applied. Process restarted.", "ok");
+                        victim.cpu = 5;
+                        faultActive = null;
+                        removeBadTask();
+                    }
+                } else {
+                    // No Quota -> Crash
+                    if (victim.mem >= 100 || victim.cpu >= 100) {
+                        victim.status = 'dead';
+                        log("CRITICAL: Node-01 Unresponsive. Resource Exhaustion.", "err");
+                        document.getElementById('node-1').classList.add('crashed');
+                        document.getElementById('badge-1').innerText = "CRASHED";
+                        document.getElementById('badge-1').classList.add('dead');
+                        
+                        // If Scaling ON, rescue
+                        if (scaling && nodes.length < 2) {
+                            spawnNode();
+                        }
+                    }
+                }
+            }
+
+            // Update Visuals
+            updateVisuals();
+
+        }, 500);
+    }
+
+    function spawnNode() {
+        log("AUTOSCALER: Health Check Failed. Provisioning Node-02...", "info");
+        setTimeout(() => {
+            nodes.push({ id: 2, cpu: 10, mem: 15, status: 'ok' });
+            
+            const cluster = document.getElementById('cluster');
+            const newNode = document.createElement('div');
+            newNode.className = "server-node new";
+            newNode.id = "node-2";
+            newNode.innerHTML = `
+                <div class="node-header">
+                    Node-02
+                    <br><span class="status-badge">RUNNING</span>
+                </div>
+                <div class="bar-container">
+                    <div class="bar-label"><span>CPU Usage</span><span id="txt-cpu-2">10%</span></div>
+                    <div class="bar-track"><div class="bar-fill fill-cpu" id="bar-cpu-2" style="width:10%"></div></div>
+                </div>
+                <div class="bar-container">
+                    <div class="bar-label"><span>Memory</span><span id="txt-mem-2">15%</span></div>
+                    <div class="bar-track"><div class="bar-fill fill-mem" id="bar-mem-2" style="width:15%"></div></div>
+                </div>
+            `;
+            cluster.appendChild(newNode);
+            log("SUCCESS: Workload shifted to Node-02. Availability maintained.", "ok");
+            removeBadTask(); // Assume load balancer routed away
+            faultActive = null;
+        }, 1500);
+    }
+
+    function updateVisuals() {
+        nodes.forEach(n => {
+            if(document.getElementById(`bar-cpu-${n.id}`)) {
+                document.getElementById(`bar-cpu-${n.id}`).style.width = n.cpu + "%";
+                document.getElementById(`txt-cpu-${n.id}`).innerText = n.cpu + "%";
+                document.getElementById(`bar-mem-${n.id}`).style.width = n.mem + "%";
+                document.getElementById(`txt-mem-${n.id}`).innerText = n.mem + "%";
+            }
+        });
+    }
+
+    function removeBadTask() {
+        const bad = document.querySelector('.task-bad');
+        if(bad) bad.remove();
+    }
+
+    function resetLab() {
+        nodes = [{ id: 1, cpu: 5, mem: 10, status: 'ok' }];
+        faultActive = null;
+        if(intervalId) clearInterval(intervalId);
+        
+        // Reset DOM
+        const cluster = document.getElementById('cluster');
+        cluster.innerHTML = `
+            <div class="server-node" id="node-1">
+                <div class="node-header">
+                    Node-01
+                    <br><span class="status-badge" id="badge-1">RUNNING</span>
+                </div>
+                <div class="bar-container">
+                    <div class="bar-label"><span>CPU Usage</span><span id="txt-cpu-1">5%</span></div>
+                    <div class="bar-track"><div class="bar-fill fill-cpu" id="bar-cpu-1" style="width:5%"></div></div>
+                </div>
+                <div class="bar-container">
+                    <div class="bar-label"><span>Memory</span><span id="txt-mem-1">10%</span></div>
+                    <div class="bar-track"><div class="bar-fill fill-mem" id="bar-mem-1" style="width:10%"></div></div>
+                </div>
+            </div>
+        `;
+        removeBadTask();
+        log("SYSTEM: Cluster Reset.", "info");
+    }
+
+</script>
+
+</body>
+</html>

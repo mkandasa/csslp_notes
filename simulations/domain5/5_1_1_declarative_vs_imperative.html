@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 5: Security Implementation Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --code-bg: #0d1117;
+            --decl-purple: #a855f7;
+            --imp-blue: #3b82f6;
+            --success: #22c55e;
+            --fail: #ef4444;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--decl-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--decl-purple); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* EDITOR PANELS */
+        .editor-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .panel-header {
+            padding: 10px 15px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .header-decl { background: rgba(168, 85, 247, 0.1); color: var(--decl-purple); }
+        .header-imp { background: rgba(59, 130, 246, 0.1); color: var(--imp-blue); }
+
+        .code-area {
+            flex-grow: 1;
+            background: var(--code-bg);
+            color: #c9d1d9;
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            border: none;
+            outline: none;
+            resize: none;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* SIMULATION CONTROLS */
+        .sim-panel {
+            grid-column: span 2;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .request-builder {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        label { font-size: 0.8rem; color: #aaa; margin-bottom: 2px; }
+        select, input {
+            padding: 8px;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 4px;
+        }
+
+        button.run-btn {
+            padding: 12px;
+            background: var(--success);
+            color: black;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.2s;
+        }
+        button.run-btn:hover { filter: brightness(1.1); }
+
+        /* LOGS */
+        .log-window {
+            flex-grow: 1;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            height: 180px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 2px; }
+        .log-pass { color: var(--success); }
+        .log-block { color: var(--fail); }
+        .log-sys { color: var(--imp-blue); }
+
+        /* Syntax Highlighting (Fake) */
+        .kw { color: #ff7b72; } /* keyword */
+        .str { color: #a5d6a7; } /* string */
+        .fn { color: #d2a8ff; } /* function */
+        .cmt { color: #8b949e; font-style: italic; } /* comment */
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Declarative vs. Imperative Security Lab</h1>
+    <p>Compare Architecture: Config-Based (Container) vs. Code-Based (Logic)</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- DECLARATIVE EDITOR -->
+    <div class="editor-panel">
+        <div class="panel-header header-decl">
+            <span>📄 security-policy.yaml (Declarative)</span>
+            <span style="font-size:0.7rem; opacity:0.7;">CONTAINER MANAGED</span>
+        </div>
+        <div class="code-area" id="code-decl" contenteditable="false">
+<span class="cmt"># URL Access Control List</span>
+<span class="kw">security:</span>
+  <span class="kw">rules:</span>
+    - <span class="kw">path:</span> <span class="str">"/public/*"</span>
+      <span class="kw">access:</span> <span class="str">"PERMIT_ALL"</span>
+    
+    - <span class="kw">path:</span> <span class="str">"/api/*"</span>
+      <span class="kw">access:</span> <span class="str">"AUTHENTICATED"</span>
+
+    - <span class="kw">path:</span> <span class="str">"/admin/*"</span>
+      <span class="kw">roles:</span> <span class="str">["ADMIN_USER"]</span>
+        </div>
+    </div>
+
+    <!-- IMPERATIVE EDITOR -->
+    <div class="editor-panel">
+        <div class="panel-header header-imp">
+            <span>💻 TransactionService.java (Imperative)</span>
+            <span style="font-size:0.7rem; opacity:0.7;">DEVELOPER MANAGED</span>
+        </div>
+        <div class="code-area" id="code-imp" contenteditable="true">
+<span class="kw">public void</span> <span class="fn">processTransfer</span>(User user, double amount) {
+    
+    <span class="cmt">// IMPERATIVE CHECK: Business Logic</span>
+    <span class="kw">if</span> (amount > 10000) {
+        <span class="kw">if</span> (!user.hasRole(<span class="str">"MANAGER"</span>)) {
+            <span class="kw">throw new</span> SecurityException(<span class="str">"Limit Exceeded"</span>);
+        }
+    }
+
+    <span class="cmt">// Core Logic</span>
+    database.transfer(amount);
+}
+        </div>
+    </div>
+
+    <!-- SIMULATION -->
+    <div class="sim-panel">
+        
+        <div class="request-builder">
+            <h3 style="margin-top:0; color:#ccc;">Simulate Request</h3>
+            
+            <label>1. Request Path</label>
+            <select id="req-path">
+                <option value="/public/home">/public/home</option>
+                <option value="/api/transfer">/api/transfer</option>
+                <option value="/admin/logs">/admin/logs</option>
+            </select>
+
+            <label>2. User Role</label>
+            <select id="req-role">
+                <option value="GUEST">Guest (Unauthenticated)</option>
+                <option value="USER">Standard User</option>
+                <option value="MANAGER">Manager</option>
+                <option value="ADMIN_USER">Admin</option>
+            </select>
+
+            <label>3. Amount (for Transfer)</label>
+            <input type="number" id="req-amt" value="500">
+
+            <button class="run-btn" onclick="runRequest()">Send Request</button>
+        </div>
+
+        <div class="log-window" id="logger">
+            <div class="log-entry">> System Ready. Policies Loaded.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        
+        let colorClass = "";
+        if(type === 'block') colorClass = "log-block";
+        if(type === 'pass') colorClass = "log-pass";
+        if(type === 'sys') colorClass = "log-sys";
+
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${colorClass}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function runRequest() {
+        const path = document.getElementById('req-path').value;
+        const role = document.getElementById('req-role').value;
+        const amt = parseFloat(document.getElementById('req-amt').value);
+
+        log(`INCOMING: ${role} requesting ${path} (Amt: $${amt})`, "sys");
+
+        // STEP 1: DECLARATIVE CHECK (Container Level)
+        // Simulate parsing the YAML
+        let declResult = checkDeclarative(path, role);
+        
+        if (!declResult.allowed) {
+            log(`❌ DECLARATIVE BLOCK: ${declResult.reason}`, "block");
+            return; // Stop processing
+        }
+        log(`✅ DECLARATIVE PASS: URL Access Granted.`, "sys");
+
+        // STEP 2: IMPERATIVE CHECK (Code Level)
+        // Only runs if we hit the business logic endpoint
+        if (path === "/api/transfer") {
+            let impResult = checkImperative(role, amt);
+            
+            if (!impResult.allowed) {
+                log(`❌ IMPERATIVE BLOCK: ${impResult.reason}`, "block");
+                return;
+            }
+            log(`✅ IMPERATIVE PASS: Business Rules Validated.`, "pass");
+            log(`💰 SUCCESS: Transfer of $${amt} processed.`, "pass");
+        } else {
+            log(`ℹ️ SUCCESS: Resource accessed (No imperative logic for this path).`, "pass");
+        }
+    }
+
+    function checkDeclarative(path, role) {
+        // Logic mimicking the YAML
+        if (path.startsWith("/public")) {
+            return { allowed: true };
+        }
+        
+        if (path.startsWith("/api")) {
+            if (role === "GUEST") return { allowed: false, reason: "Authentication Required" };
+            return { allowed: true };
+        }
+
+        if (path.startsWith("/admin")) {
+            if (role === "ADMIN_USER") return { allowed: true };
+            return { allowed: false, reason: "Role ADMIN_USER Required" };
+        }
+
+        return { allowed: false, reason: "No Route Match" };
+    }
+
+    function checkImperative(role, amount) {
+        // Reads the text from the editor to simulate "Code"
+        const codeText = document.getElementById('code-imp').innerText;
+        
+        // This is a simulation, not a real Java compiler. 
+        // We implement the logic described in the default text.
+        
+        // Logic: if amount > 10000 AND role != MANAGER -> Block
+        if (amount > 10000) {
+            if (role !== "MANAGER") {
+                return { allowed: false, reason: "Amount > 10k requires MANAGER role" };
+            }
+        }
+        
+        // Security hole: What if the code was edited to remove the check?
+        // Simple check: does the code still contain "amount > 10000"?
+        if (!codeText.includes("10000")) {
+            return { allowed: true, reason: "Security Check Removed from Code!" }; 
+        }
+
+        return { allowed: true };
+    }
+
+</script>
+
+</body>
+</html>
