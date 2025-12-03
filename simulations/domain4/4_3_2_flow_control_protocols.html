@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Protocol Flow Control Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --proto-cyan: #06b6d4;
+            --server-slate: #334155;
+            --success: #10b981;
+            --danger: #ef4444;
+            --slow-yellow: #f59e0b;
+            --text: #f8fafc;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--proto-cyan);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--proto-cyan); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1200px;
+        }
+
+        /* CONTROL PANEL */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            height: fit-content;
+        }
+
+        .stat-box {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border: 1px solid #475569;
+        }
+        .stat-label { font-size: 0.8rem; color: #94a3b8; }
+        .stat-val { font-size: 1.5rem; font-weight: bold; color: var(--proto-cyan); }
+        .stat-val.crit { color: var(--danger); }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-norm { background: var(--success); }
+        .btn-slow { background: var(--slow-yellow); color: black; }
+        .btn-kill { background: var(--danger); }
+        .btn-mitigate { background: #475569; border: 1px solid #94a3b8; }
+        .btn-mitigate.active { background: var(--proto-cyan); color: black; border-color: var(--proto-cyan); }
+        
+        button:hover { filter: brightness(1.1); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* VISUALIZATION */
+        .viz-container {
+            background: #000;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            height: 500px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .server-rack {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 15px;
+        }
+
+        .connection-slot {
+            background: var(--server-slate);
+            height: 80px;
+            border-radius: 6px;
+            border: 2px solid #475569;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            position: relative;
+            overflow: hidden;
+            transition: 0.3s;
+        }
+        
+        .slot-free { color: #64748b; }
+        .slot-active { border-color: var(--success); background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .slot-slow { border-color: var(--slow-yellow); background: rgba(245, 158, 11, 0.1); color: var(--slow-yellow); }
+
+        .progress-bar {
+            width: 80%;
+            height: 4px;
+            background: #333;
+            margin-top: 5px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill { height: 100%; background: #ccc; width: 0%; }
+        
+        .timer-badge {
+            position: absolute;
+            top: 2px; right: 4px;
+            font-size: 0.6rem;
+            font-family: monospace;
+            color: #94a3b8;
+        }
+
+        .server-status {
+            margin-top: auto;
+            width: 100%;
+            padding: 10px;
+            text-align: center;
+            border-top: 1px solid #333;
+            color: #94a3b8;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Protocol Flow Control Simulator</h1>
+    <p>State Management & Resource Exhaustion (Slowloris)</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="stat-box">
+            <div class="stat-label">Active Connections</div>
+            <div class="stat-val" id="conn-count">0 / 20</div>
+            <div class="stat-label" style="margin-top:5px;">Server Status</div>
+            <div id="srv-status-text" style="color:var(--success); font-weight:bold;">OPERATIONAL</div>
+        </div>
+
+        <h3>Traffic Generator</h3>
+        <button class="btn-norm" onclick="spawnTraffic('normal')">🚀 Send Legit Traffic (Batch)</button>
+        <button class="btn-slow" onclick="spawnTraffic('slowloris')">🐢 Send Slowloris Attack</button>
+        <button class="btn-kill" onclick="resetConnections()">🛑 Reset Server</button>
+
+        <h3>Architecture Config</h3>
+        <button class="btn-mitigate" id="btn-fix" onclick="toggleMitigation()">
+            🛡️ Aggressive Timeouts (OFF)
+        </button>
+        <p style="font-size:0.8rem; color:#94a3b8;">
+            <strong>Mitigation:</strong> Configures the protocol stack to drop connections that send headers too slowly (< 10 bytes/sec).
+        </p>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-container">
+        <h3 style="color:#94a3b8; margin-top:0;">Server Connection Pool (State Table)</h3>
+        <div class="server-rack" id="rack">
+            <!-- Slots generated by JS -->
+        </div>
+        <div class="server-status" id="log-output">
+            > Server initialized. Waiting for connections...
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const MAX_SLOTS = 20;
+    let slots = [];
+    let mitigationActive = false;
+
+    // Initialize Slots
+    const rack = document.getElementById('rack');
+    for(let i=0; i<MAX_SLOTS; i++) {
+        let div = document.createElement('div');
+        div.className = 'connection-slot slot-free';
+        div.id = `slot-${i}`;
+        div.innerHTML = `IDLE`;
+        rack.appendChild(div);
+        slots.push({ id: i, active: false, type: null, timer: 0, el: div });
+    }
+
+    function toggleMitigation() {
+        mitigationActive = !mitigationActive;
+        const btn = document.getElementById('btn-fix');
+        if(mitigationActive) {
+            btn.innerText = "🛡️ Aggressive Timeouts (ON)";
+            btn.classList.add('active');
+            log("Config Update: Keep-Alive Timeout reduced. Min Data Rate enforced.");
+        } else {
+            btn.innerText = "🛡️ Aggressive Timeouts (OFF)";
+            btn.classList.remove('active');
+            log("Config Update: Standard RFC defaults restored.");
+        }
+    }
+
+    function spawnTraffic(type) {
+        // Find free slots
+        let count = 0;
+        const batchSize = type === 'normal' ? 5 : 20; // Attack floods everything
+
+        for(let i=0; i<MAX_SLOTS; i++) {
+            if(!slots[i].active && count < batchSize) {
+                startConnection(i, type);
+                count++;
+            }
+        }
+        
+        if(count === 0) {
+            log("CONNECTION REFUSED: Server Pool Exhausted!", "crit");
+        } else {
+            if(type === 'slowloris') log(`WARN: New Slowloris connections opened.`);
+            else log(`INFO: Processing legitimate requests.`);
+        }
+        updateStats();
+    }
+
+    function startConnection(index, type) {
+        const slot = slots[index];
+        slot.active = true;
+        slot.type = type;
+        slot.timer = 0;
+        
+        // Visuals
+        slot.el.className = type === 'normal' ? 'connection-slot slot-active' : 'connection-slot slot-slow';
+        const label = type === 'normal' ? 'HTTP GET' : 'Partial...';
+        const color = type === 'normal' ? 'var(--success)' : 'var(--slow-yellow)';
+        
+        slot.el.innerHTML = `
+            <div class="timer-badge">0s</div>
+            <div style="font-weight:bold;">${label}</div>
+            <div class="progress-bar"><div class="progress-fill" style="background:${color}"></div></div>
+        `;
+
+        // Logic Loop
+        const interval = setInterval(() => {
+            if(!slot.active) { clearInterval(interval); return; }
+
+            slot.timer++;
+            const timerBadge = slot.el.querySelector('.timer-badge');
+            const fill = slot.el.querySelector('.progress-fill');
+            if(timerBadge) timerBadge.innerText = slot.timer + 's';
+
+            if(type === 'normal') {
+                // Normal traffic finishes quickly (approx 2-3s)
+                if(fill) fill.style.width = (slot.timer * 33) + '%';
+                if(slot.timer >= 3) {
+                    closeConnection(index);
+                    clearInterval(interval);
+                }
+            } 
+            else if (type === 'slowloris') {
+                // Slow traffic hangs forever unless mitigated
+                // It sends tiny bits of data (simulated by slow progress)
+                if(fill) fill.style.width = (slot.timer * 2) + '%';
+                
+                // Mitigation Logic
+                if(mitigationActive && slot.timer >= 5) {
+                    // Timeout the attacker
+                    slot.el.style.opacity = '0.5';
+                    setTimeout(() => closeConnection(index), 200);
+                    clearInterval(interval);
+                }
+                
+                // Without mitigation, it stays until max timeout (simulated as infinite here for effect)
+            }
+        }, 500); // Ticks every half second
+    }
+
+    function closeConnection(index) {
+        const slot = slots[index];
+        slot.active = false;
+        slot.type = null;
+        slot.el.className = 'connection-slot slot-free';
+        slot.el.innerHTML = 'IDLE';
+        slot.el.style.opacity = '1';
+        updateStats();
+    }
+
+    function resetConnections() {
+        for(let i=0; i<MAX_SLOTS; i++) {
+            closeConnection(i);
+        }
+        log("ADMIN: Connection Pool Flushed.");
+    }
+
+    function updateStats() {
+        const activeCount = slots.filter(s => s.active).length;
+        const disp = document.getElementById('conn-count');
+        const status = document.getElementById('srv-status-text');
+
+        disp.innerText = `${activeCount} / ${MAX_SLOTS}`;
+        
+        if(activeCount >= MAX_SLOTS) {
+            disp.classList.add('crit');
+            status.innerText = "DENIAL OF SERVICE";
+            status.style.color = "var(--danger)";
+        } else {
+            disp.classList.remove('crit');
+            status.innerText = "OPERATIONAL";
+            status.style.color = "var(--success)";
+        }
+    }
+
+    function log(msg, level) {
+        const out = document.getElementById('log-output');
+        const color = level === 'crit' ? 'var(--danger)' : '#94a3b8';
+        out.innerHTML = `<span style="color:${color}">> ${msg}</span>`;
+    }
+
+</script>
+
+</body>
+</html>

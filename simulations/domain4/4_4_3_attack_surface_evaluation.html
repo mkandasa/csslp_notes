@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Attack Surface Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --surface-orange: #f97316;
+            --risk-red: #ef4444;
+            --safe-green: #22c55e;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--surface-orange);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--surface-orange); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .metric-box {
+            background: #000;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 2px solid var(--risk-red);
+            margin-bottom: 20px;
+            transition: 0.3s;
+        }
+        .metric-val { font-size: 2rem; font-weight: bold; color: var(--risk-red); }
+        .metric-label { font-size: 0.8rem; color: #aaa; }
+
+        /* Actions List */
+        .action-list { display: flex; flex-direction: column; gap: 10px; }
+        
+        .action-card {
+            background: #334155;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            border-left: 4px solid #aaa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: 0.2s;
+        }
+        .action-card:hover { filter: brightness(1.2); }
+        .action-card.done { opacity: 0.5; border-left-color: var(--safe-green); background: #064e3b; cursor: default; }
+        
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Server Surface Map */
+        .server-viz {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 400px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .core {
+            width: 150px; height: 150px;
+            background: #1e293b;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+            z-index: 10;
+            border: 2px solid #fff;
+            position: relative;
+        }
+
+        /* Vectors (Rays) */
+        .vector {
+            position: absolute;
+            width: 140px; 
+            height: 4px;
+            background: var(--risk-red);
+            transform-origin: left center;
+            left: 50%; top: 50%;
+            z-index: 1;
+            transition: width 0.5s, background 0.5s;
+        }
+        .vector::after {
+            content: attr(data-label);
+            position: absolute;
+            right: -100px; top: -10px;
+            color: var(--risk-red);
+            font-size: 0.8rem;
+            font-weight: bold;
+            width: 90px;
+        }
+        
+        /* Mitigated Vector */
+        .vector.secure {
+            width: 0px !important; /* Retract */
+            background: var(--safe-green);
+        }
+        .vector.secure::after { color: var(--safe-green); content: "SECURED"; right: -70px; }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 120px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: var(--surface-orange); }
+        .log-ok { color: var(--safe-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Attack Surface Evaluation Lab</h1>
+    <p>Enumeration, Reduction & RASQ Metrics</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">Risk Metrics</div>
+        <div class="metric-box" id="score-box">
+            <div class="metric-val" id="risk-score">100</div>
+            <div class="metric-label">Relative Attack Surface (High Risk)</div>
+        </div>
+
+        <div class="section-title">Mitigation Actions</div>
+        <div class="action-list">
+            <div class="action-card" id="act-ftp" onclick="mitigate('ftp')">
+                <span>1. Disable FTP (Port 21)</span>
+                <span>🛑</span>
+            </div>
+            <div class="action-card" id="act-ssh" onclick="mitigate('ssh')">
+                <span>2. Restrict SSH to VPN</span>
+                <span>🔐</span>
+            </div>
+            <div class="action-card" id="act-db" onclick="mitigate('db')">
+                <span>3. Firewall Database (3306)</span>
+                <span>🧱</span>
+            </div>
+            <div class="action-card" id="act-api" onclick="mitigate('api')">
+                <span>4. Auth on /admin API</span>
+                <span>🆔</span>
+            </div>
+        </div>
+        
+        <button style="margin-top:20px; padding:10px; background:#444; color:white; border:none; border-radius:4px; width:100%; cursor:pointer;" onclick="location.reload()">Reset Lab</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- SURFACE MAP -->
+        <div class="server-viz">
+            <div class="core">
+                APP<br>CORE
+            </div>
+
+            <!-- VECTORS -->
+            <!-- 0 deg -->
+            <div class="vector" id="vec-ftp" data-label="FTP (21)" style="transform: rotate(0deg);"></div>
+            <!-- 90 deg -->
+            <div class="vector" id="vec-ssh" data-label="SSH (22)" style="transform: rotate(90deg);"></div>
+            <!-- 180 deg -->
+            <div class="vector" id="vec-db" data-label="MySQL (3306)" style="transform: rotate(180deg);"></div>
+            <!-- 270 deg -->
+            <div class="vector" id="vec-api" data-label="/admin API" style="transform: rotate(270deg);"></div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Scanning Target... 4 Critical Vectors Found.</div>
+            <div>> Attack Surface Score: 100/100 (Critical).</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let score = 100;
+    const actions = {
+        ftp: { points: 25, msg: "Service Disabled. Port 21 Closed." },
+        ssh: { points: 25, msg: "ACL Applied. SSH restricted to VPN IP." },
+        db: { points: 25, msg: "Firewall Rule Added. Port 3306 Blocked from Public." },
+        api: { points: 25, msg: "Auth Middleware Enabled. Anonymous access denied." }
+    };
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':'log-sys'}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function mitigate(id) {
+        const card = document.getElementById('act-' + id);
+        if (card.classList.contains('done')) return;
+
+        // UI Update
+        card.classList.add('done');
+        card.innerHTML = `<span>${card.firstElementChild.innerText}</span><span>✅</span>`;
+        
+        // Viz Update
+        const vec = document.getElementById('vec-' + id);
+        vec.classList.add('secure');
+
+        // Score Update
+        score -= actions[id].points;
+        updateScore();
+        
+        log(actions[id].msg, "ok");
+    }
+
+    function updateScore() {
+        const box = document.getElementById('score-box');
+        const val = document.getElementById('risk-score');
+        
+        val.innerText = score;
+        
+        if (score === 0) {
+            box.style.borderColor = "var(--safe-green)";
+            val.style.color = "var(--safe-green)";
+            box.querySelector('.metric-label').innerText = "Minimized Attack Surface (Secure)";
+            log("SUCCESS: Attack Surface minimized to Architectural Baseline.", "ok");
+        } else if (score <= 50) {
+            box.style.borderColor = "#eab308"; // yellow
+            val.style.color = "#eab308";
+            box.querySelector('.metric-label').innerText = "Moderate Risk";
+        }
+    }
+
+</script>
+
+</body>
+</html>

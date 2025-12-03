@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: OS Controls Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --os-blue: #3b82f6;
+            --mem-green: #22c55e;
+            --exploit-red: #ef4444;
+            --text: #f1f5f9;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--os-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--os-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .toggle-group {
+            margin-bottom: 20px;
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        .toggle-label { font-weight: bold; display: block; margin-bottom: 5px; }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px; height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #555; transition: .4s; border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute; content: "";
+            height: 14px; width: 14px; left: 3px; bottom: 3px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--os-blue); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: var(--exploit-red);
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover { filter: brightness(1.2); }
+
+        /* MEMORY VIZ */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .memory-stack {
+            background: #000;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            height: 300px;
+            display: flex;
+            flex-direction: column-reverse; /* Stack grows down visually */
+            overflow: hidden;
+        }
+        
+        .stack-frame {
+            border: 1px dashed #555;
+            margin: 2px 0;
+            padding: 5px;
+            text-align: center;
+            font-size: 0.8rem;
+            position: relative;
+            transition: all 0.5s;
+        }
+        .frame-addr {
+            position: absolute;
+            left: -60px; top: 5px;
+            font-family: 'Courier New', monospace;
+            color: #94a3b8;
+            font-size: 0.7rem;
+        }
+
+        #stack-buffer { height: 60px; background: #1e3a8a; border-color: var(--os-blue); color: white; }
+        #stack-ret { height: 40px; background: #334155; color: #aaa; font-weight: bold; }
+        
+        /* Attack Payload */
+        .payload {
+            position: absolute;
+            width: 100%;
+            background: rgba(239, 68, 68, 0.8);
+            color: white;
+            font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            transition: height 1s;
+            bottom: 0;
+            height: 0px;
+            z-index: 10;
+        }
+
+        /* CPU Status */
+        .cpu-box {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .eip-reg { font-family: monospace; font-size: 1.2rem; color: var(--mem-green); }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: var(--os-blue); }
+        .log-err { color: var(--exploit-red); }
+        .log-ok { color: var(--mem-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>OS Hardening Simulator</h1>
+    <p>ASLR & DEP (NX) vs. Buffer Overflow</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <h3>OS Controls</h3>
+        
+        <div class="toggle-group">
+            <span class="toggle-label">1. ASLR (Address Randomization)</span>
+            <label class="switch">
+                <input type="checkbox" id="cfg-aslr" onchange="updateMemoryMap()">
+                <span class="slider"></span>
+            </label>
+            <div style="font-size:0.75rem; color:#888; margin-top:5px;">Randomizes stack base address on run.</div>
+        </div>
+
+        <div class="toggle-group">
+            <span class="toggle-label">2. DEP / NX (No-Execute)</span>
+            <label class="switch">
+                <input type="checkbox" id="cfg-dep">
+                <span class="slider"></span>
+            </label>
+            <div style="font-size:0.75rem; color:#888; margin-top:5px;">Marks stack memory as non-executable.</div>
+        </div>
+
+        <button onclick="runExploit()">🚀 Launch Buffer Overflow</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- CPU STATE -->
+        <div class="cpu-box">
+            <div>
+                <strong>CPU Instruction Pointer (EIP)</strong>
+                <div style="font-size:0.8rem; color:#888;">Target Jump Address</div>
+            </div>
+            <div class="eip-reg" id="eip-val">0x00401000</div>
+        </div>
+
+        <!-- MEMORY STACK -->
+        <div class="memory-stack" id="stack-viz">
+            <div class="payload" id="payload-bar">SHELLCODE</div>
+            
+            <!-- Dynamic Stack Frames -->
+            <div class="stack-frame" id="stack-ret">
+                <span class="frame-addr" id="addr-ret">0xBFFFF104</span>
+                RETURN ADDRESS (RET)
+            </div>
+            <div class="stack-frame" id="stack-buffer">
+                <span class="frame-addr" id="addr-buf">0xBFFFF100</span>
+                BUFFER [64 Bytes]
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Memory Static.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let baseAddress = 0xBFFFF100;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function updateMemoryMap() {
+        const aslr = document.getElementById('cfg-aslr').checked;
+        
+        if (aslr) {
+            // Randomize Base
+            const offset = Math.floor(Math.random() * 5000);
+            baseAddress = 0xBFFFF100 - offset;
+            log(`ASLR: Stack Base randomized to 0x${baseAddress.toString(16).toUpperCase()}`, "sys");
+        } else {
+            baseAddress = 0xBFFFF100; // Static
+            log("ASLR: Disabled. Stack Base static at 0xBFFFF100", "err");
+        }
+
+        // Update UI
+        document.getElementById('addr-buf').innerText = "0x" + baseAddress.toString(16).toUpperCase();
+        document.getElementById('addr-ret').innerText = "0x" + (baseAddress + 4).toString(16).toUpperCase();
+    }
+
+    function runExploit() {
+        const aslr = document.getElementById('cfg-aslr').checked;
+        const dep = document.getElementById('cfg-dep').checked;
+        const payload = document.getElementById('payload-bar');
+        const eip = document.getElementById('eip-val');
+        
+        // Attacker's Hardcoded Guess (Assuming Static Memory)
+        const targetAddress = 0xBFFFF100; 
+
+        log("ATTACK: Overflowing buffer with Shellcode...", "err");
+        
+        // 1. Fill Buffer
+        payload.style.height = "60px"; // Fill Buffer
+        setTimeout(() => {
+            // 2. Overwrite RET
+            payload.style.height = "110px"; // Cover RET
+            log(`ATTACK: Overwrote RET with 0x${targetAddress.toString(16).toUpperCase()}`, "err");
+            
+            setTimeout(() => {
+                // 3. CPU Jump Attempt
+                eip.innerText = "JUMPING...";
+                
+                setTimeout(() => {
+                    // Check ASLR (Did we jump to the right place?)
+                    if (baseAddress !== targetAddress) {
+                        // ASLR Saved us -> Crash (Segfault) but no exploit
+                        eip.innerText = "SEGFAULT";
+                        eip.style.color = "orange";
+                        log("FAIL: ASLR caused jump to invalid memory. App crashed, but Shellcode NOT executed.", "ok");
+                        return;
+                    }
+
+                    // Check DEP (Is the stack executable?)
+                    if (dep) {
+                        // DEP Saved us -> Exception
+                        eip.innerText = "ACCESS_VIOLATION";
+                        eip.style.color = "var(--os-blue)";
+                        log("FAIL: DEP prevented execution on Stack. CPU blocked instruction.", "ok");
+                        return;
+                    }
+
+                    // Success
+                    eip.innerText = "SHELLCODE_RUNNING";
+                    eip.style.color = "red";
+                    log("CRITICAL: Exploit Successful! Remote Code Execution.", "err");
+
+                }, 800);
+            }, 800);
+        }, 800);
+
+        // Reset Visuals after run
+        setTimeout(() => {
+            payload.style.height = "0px";
+            eip.innerText = "0x00401000";
+            eip.style.color = "var(--mem-green)";
+            // Re-roll ASLR if enabled
+            if(aslr) updateMemoryMap();
+        }, 4000);
+    }
+
+    // Init
+    updateMemoryMap();
+
+</script>
+
+</body>
+</html>

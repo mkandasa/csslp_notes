@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Insider Threat Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --insider-orange: #f97316;
+            --alert-red: #ef4444;
+            --safe-green: #22c55e;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--insider-orange);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--insider-orange); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-normal { background: #334155; color: #ccc; }
+        .btn-rogue { background: var(--insider-orange); color: black; }
+        .btn-deploy { background: #0ea5e9; }
+        .btn-jit { background: var(--safe-green); color: black; }
+        
+        button:hover { filter: brightness(1.2); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* UEBA Chart */
+        .chart-container {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 150px;
+            position: relative;
+            padding: 20px;
+            display: flex;
+            align-items: flex-end;
+            gap: 5px;
+        }
+        .bar {
+            width: 20px;
+            background: #334155;
+            transition: height 0.3s, background 0.3s;
+        }
+        .bar.alert { background: var(--alert-red); animation: flash 1s infinite; }
+        .chart-label { position: absolute; top: 10px; left: 10px; font-size: 0.8rem; color: #aaa; }
+
+        /* Deployment Pipeline (SoD) */
+        .pipeline {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .stage {
+            background: #000;
+            border: 2px solid #555;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            width: 100px;
+            position: relative;
+        }
+        .stage-icon { font-size: 1.5rem; margin-bottom: 5px; }
+        .arrow { font-size: 1.5rem; color: #555; }
+        
+        /* JIT Timer */
+        .jit-panel {
+            background: #000;
+            border: 1px solid var(--safe-green);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            display: none; /* Hidden by default */
+        }
+        .jit-timer { font-family: monospace; font-size: 1.2rem; color: var(--safe-green); }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: #38bdf8; }
+        .log-warn { color: var(--insider-orange); }
+        .log-err { color: var(--alert-red); }
+        .log-ok { color: var(--safe-green); }
+
+        @keyframes flash {
+            0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; }
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Insider Threat Lab</h1>
+    <p>UEBA, Separation of Duties (SoD) & JIT Access</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. User Behavior (UEBA)</div>
+        <button class="btn-normal" onclick="activity('normal')">👤 Bob: Normal Work</button>
+        <button class="btn-rogue" onclick="activity('exfil')">🕵️ Bob: Mass Download</button>
+
+        <div class="section-title" style="margin-top:20px;">2. Deployment (SoD)</div>
+        <div style="font-size:0.75rem; color:#aaa; margin-bottom:5px;">Current User: <strong>Developer_Alice</strong></div>
+        <button class="btn-deploy" onclick="commitCode()">📝 Commit Code</button>
+        <button class="btn-deploy" style="background:#6366f1;" onclick="deployProd()">🚀 Deploy to Prod</button>
+
+        <div class="section-title" style="margin-top:20px;">3. Privileged Access (JIT)</div>
+        <button class="btn-jit" onclick="requestJit()">🔑 Request Admin Access (10s)</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- UEBA CHART -->
+        <div class="chart-container" id="ueba-chart">
+            <div class="chart-label">FILE ACCESS COUNT (Baseline vs. Actual)</div>
+            <!-- Bars injected via JS -->
+        </div>
+
+        <!-- PIPELINE -->
+        <div class="pipeline">
+            <div class="stage" id="stg-commit">
+                <div class="stage-icon">💻</div>
+                <div>COMMIT</div>
+                <div style="font-size:0.6rem; color:#aaa;" id="auth-commit">--</div>
+            </div>
+            <div class="arrow">➔</div>
+            <div class="stage" id="stg-deploy">
+                <div class="stage-icon">☁️</div>
+                <div>PROD</div>
+                <div style="font-size:0.6rem; color:#aaa;" id="auth-deploy">--</div>
+            </div>
+        </div>
+
+        <!-- JIT PANEL -->
+        <div class="jit-panel" id="jit-box">
+            <div>
+                <strong>JIT Session Active</strong><br>
+                <span style="font-size:0.8rem; color:#ccc;">Role: Temporary Admin</span>
+            </div>
+            <div class="jit-timer" id="jit-timer">00:10</div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Monitoring Active.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    // UEBA Data
+    let baseline = [5, 8, 4, 6, 5, 7, 20]; // Last bar is 'Current'
+    const THRESHOLD = 15;
+
+    function initChart() {
+        const cont = document.getElementById('ueba-chart');
+        cont.innerHTML = '<div class="chart-label">FILE ACCESS COUNT (Hourly)</div>';
+        
+        baseline.forEach((val, idx) => {
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+            bar.style.height = (val * 3) + 'px';
+            if(idx === baseline.length - 1) bar.id = 'current-bar';
+            cont.appendChild(bar);
+        });
+    }
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':(type==='warn'?'log-warn':'log-sys'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function activity(type) {
+        const currentBar = document.getElementById('current-bar');
+        
+        if (type === 'normal') {
+            const val = Math.floor(Math.random() * 5) + 3;
+            currentBar.style.height = (val * 3) + 'px';
+            currentBar.classList.remove('alert');
+            log(`UEBA: User accessed ${val} files. Behavior Normal.`, "sys");
+        } else {
+            // Exfil
+            const val = 50; // Huge spike
+            currentBar.style.height = '120px'; // Cap visual
+            currentBar.classList.add('alert');
+            log(`UEBA ALERT: User accessed ${val} files! Deviation > 300% above baseline. Account Locked.`, "err");
+        }
+    }
+
+    // SoD Logic
+    let hasCommitted = false;
+    const CURRENT_USER = "Developer_Alice";
+
+    function commitCode() {
+        hasCommitted = true;
+        document.getElementById('auth-commit').innerText = "By: " + CURRENT_USER;
+        document.getElementById('stg-commit').style.borderColor = "var(--safe-green)";
+        log(`SCM: Code committed by ${CURRENT_USER}.`, "ok");
+    }
+
+    function deployProd() {
+        if (!hasCommitted) {
+            log("ERROR: No code to deploy.", "warn");
+            return;
+        }
+
+        // Check SoD
+        if (CURRENT_USER === "Developer_Alice") {
+            log(`SoD VIOLATION: ${CURRENT_USER} authored the code. They cannot deploy it. Request rejected.`, "err");
+            document.getElementById('stg-deploy').style.borderColor = "var(--alert-red)";
+        } else {
+            // In a real scenario, we'd switch users. Here we just show the denial.
+        }
+    }
+
+    // JIT Logic
+    let jitActive = false;
+    let timerInt;
+
+    function requestJit() {
+        if(jitActive) return;
+        
+        jitActive = true;
+        const box = document.getElementById('jit-box');
+        box.style.display = 'flex';
+        log("PAM: Just-in-Time Admin Access Granted for 10 seconds.", "ok");
+
+        let timeLeft = 10;
+        const display = document.getElementById('jit-timer');
+        
+        timerInt = setInterval(() => {
+            timeLeft--;
+            display.innerText = `00:0${timeLeft}`;
+            if(timeLeft <= 0) {
+                clearInterval(timerInt);
+                box.style.display = 'none';
+                jitActive = false;
+                log("PAM: Session Expired. Privileges Revoked.", "sys");
+            }
+        }, 1000);
+    }
+
+    // Init
+    initChart();
+
+</script>
+
+</body>
+</html>

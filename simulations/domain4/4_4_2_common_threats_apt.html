@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: APT Defense Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --apt-red: #ef4444;
+            --def-blue: #3b82f6;
+            --safe-green: #22c55e;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--apt-red);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--apt-red); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-infect { background: var(--apt-red); }
+        .btn-segment { background: var(--def-blue); }
+        .btn-sinkhole { background: #f59e0b; color: black; }
+        
+        button:hover { filter: brightness(1.2); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .status-badge {
+            background: #000;
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+            border: 1px solid #333;
+        }
+
+        /* NETWORK MAP */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* NODES */
+        .node {
+            position: absolute;
+            width: 100px; height: 100px;
+            background: #1e293b;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 10;
+            font-size: 0.8rem;
+            text-align: center;
+            transition: 0.5s;
+        }
+        .node-icon { font-size: 2rem; margin-bottom: 5px; }
+        .node.infected { border-color: var(--apt-red); background: #3e0a0a; box-shadow: 0 0 20px var(--apt-red); animation: pulse 2s infinite; }
+        .node.secure { border-color: var(--safe-green); background: #064e3b; }
+
+        #node-user { top: 350px; left: 50px; }
+        #node-server { top: 350px; right: 50px; }
+        #node-fw { top: 200px; left: 50%; transform: translateX(-50%); width: 80px; height: 60px; border-radius: 4px; border-color: var(--def-blue); background: #0f172a; }
+        #node-c2 { top: 20px; left: 50%; transform: translateX(-50%); border-color: var(--apt-red); background: #000; border-style: dashed; }
+
+        /* CONNECTIONS */
+        .link {
+            position: absolute;
+            background: #333;
+            height: 2px;
+            z-index: 0;
+            transform-origin: 0 0;
+        }
+        
+        /* Lateral Link (User -> Server) */
+        #link-lateral { top: 400px; left: 150px; width: calc(100% - 300px); }
+
+        /* PACKETS */
+        .packet {
+            position: absolute;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            z-index: 20;
+            display: none;
+        }
+        .pkt-c2 { background: var(--apt-red); box-shadow: 0 0 5px red; }
+        .pkt-lat { background: #f59e0b; box-shadow: 0 0 5px orange; }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-apt { color: var(--apt-red); }
+        .log-sys { color: var(--def-blue); }
+        .log-ok { color: var(--safe-green); }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Firewall Blocks */
+        .blockade {
+            position: absolute;
+            width: 10px; height: 40px;
+            background: var(--def-blue);
+            top: 380px; left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            box-shadow: 0 0 10px var(--def-blue);
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>APT Defense Lab</h1>
+    <p>Advanced Persistent Threat: C2 Beaconing & Lateral Movement</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Kill Chain Phase</div>
+        <button class="btn-infect" onclick="startInfection()">💉 Initial Compromise (Phishing)</button>
+        
+        <div class="status-badge" id="apt-status">State: Dormant</div>
+
+        <div class="section-title" style="margin-top:20px;">2. Architectural Defense</div>
+        <button class="btn-sinkhole" onclick="toggleSinkhole()" id="btn-sink">🛑 DNS Sinkhole (Block C2)</button>
+        <button class="btn-segment" onclick="toggleSegmentation()" id="btn-seg">🛡️ Micro-Segmentation</button>
+        
+        <div style="font-size:0.75rem; color:#888; margin-top:10px;">
+            *Sinkhole stops outgoing C2.<br>
+            *Segmentation stops lateral moves.
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- NODES -->
+        <div class="node" id="node-c2">
+            <div class="node-icon">📡</div>
+            <div>C2 SERVER</div>
+            <div style="font-size:0.6rem; color:#666;">(Internet)</div>
+        </div>
+
+        <div class="node" id="node-fw">
+            <div>FIREWALL</div>
+            <div style="font-size:0.6rem;">(Edge)</div>
+        </div>
+
+        <div class="node" id="node-user">
+            <div class="node-icon">💻</div>
+            <div>PATIENT 0</div>
+            <div style="font-size:0.6rem;">(User PC)</div>
+        </div>
+
+        <div class="node" id="node-server">
+            <div class="node-icon">🛢️</div>
+            <div>TARGET DB</div>
+            <div style="font-size:0.6rem;">(Critical Asset)</div>
+        </div>
+
+        <!-- Links -->
+        <div class="link" id="link-lateral"></div>
+        
+        <!-- Blockade -->
+        <div class="blockade" id="seg-wall"></div>
+
+        <!-- Packets -->
+        <div class="packet pkt-c2" id="pkt-c2"></div>
+        <div class="packet pkt-lat" id="pkt-lat"></div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Network Normal. No anomalies detected.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let isInfected = false;
+    let sinkholeActive = false;
+    let segmentationActive = false;
+    let c2Interval, latInterval;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='apt'?'log-apt':(type==='ok'?'log-ok':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function startInfection() {
+        if(isInfected) return;
+        isInfected = true;
+        
+        const user = document.getElementById('node-user');
+        user.classList.add('infected');
+        document.getElementById('apt-status').innerText = "State: ACTIVE (Beaconing)";
+        document.getElementById('apt-status').style.color = "var(--apt-red)";
+        document.getElementById('apt-status').style.borderColor = "var(--apt-red)";
+
+        log("ALERT: Malware installed on Patient 0 via Phishing Email.", "apt");
+
+        // Start C2 Loop
+        c2Interval = setInterval(() => {
+            runC2Beacon();
+        }, 2000);
+
+        // Start Lateral Loop
+        setTimeout(() => {
+            latInterval = setInterval(() => {
+                runLateralMove();
+            }, 3000);
+        }, 1000);
+    }
+
+    function toggleSinkhole() {
+        sinkholeActive = !sinkholeActive;
+        const btn = document.getElementById('btn-sink');
+        const fw = document.getElementById('node-fw');
+        
+        if(sinkholeActive) {
+            btn.style.border = "2px solid white";
+            btn.innerText = "DNS Sinkhole ACTIVE";
+            fw.style.borderColor = "var(--safe-green)";
+            log("CONFIG: DNS Sinkhole enabled. Malicious domains will resolve to 127.0.0.1.", "sys");
+        } else {
+            btn.style.border = "none";
+            btn.innerText = "🛑 DNS Sinkhole (Block C2)";
+            fw.style.borderColor = "var(--def-blue)";
+            log("CONFIG: DNS Sinkhole disabled.", "sys");
+        }
+    }
+
+    function toggleSegmentation() {
+        segmentationActive = !segmentationActive;
+        const btn = document.getElementById('btn-seg');
+        const wall = document.getElementById('seg-wall');
+        
+        if(segmentationActive) {
+            btn.style.border = "2px solid white";
+            btn.innerText = "Micro-Segmentation ACTIVE";
+            wall.style.display = 'block';
+            log("CONFIG: Zero Trust Segmentation enabled between Workstations and DB.", "sys");
+        } else {
+            btn.style.border = "none";
+            btn.innerText = "🛡️ Micro-Segmentation";
+            wall.style.display = 'none';
+            log("CONFIG: Segmentation disabled. Flat network.", "sys");
+        }
+    }
+
+    function runC2Beacon() {
+        const pkt = document.getElementById('pkt-c2');
+        const user = document.getElementById('node-user');
+        const fw = document.getElementById('node-fw');
+        const c2 = document.getElementById('node-c2');
+
+        // Reset
+        pkt.style.display = 'block';
+        pkt.style.opacity = 1;
+        
+        // Pos 1: User
+        const userRect = user.getBoundingClientRect();
+        const vizRect = document.querySelector('.viz-area').getBoundingClientRect();
+        
+        const startX = 100; // Relative to viz
+        const startY = 350;
+
+        pkt.style.left = startX + 'px';
+        pkt.style.top = startY + 'px';
+
+        // Animate to FW
+        const fwX = vizRect.width / 2;
+        const fwY = 230;
+
+        let pos = 0;
+        const anim = setInterval(() => {
+            pos += 0.05;
+            const curX = startX + (fwX - startX) * pos;
+            const curY = startY + (fwY - startY) * pos;
+            pkt.style.left = curX + 'px';
+            pkt.style.top = curY + 'px';
+
+            if(pos >= 1) {
+                clearInterval(anim);
+                
+                // Check Sinkhole
+                if(sinkholeActive) {
+                    log("BLOCKED: C2 Beacon dropped by Firewall/Sinkhole.", "ok");
+                    pkt.style.display = 'none';
+                } else {
+                    // Continue to C2
+                    finishC2(fwX, fwY);
+                }
+            }
+        }, 20);
+    }
+
+    function finishC2(startX, startY) {
+        const pkt = document.getElementById('pkt-c2');
+        const vizRect = document.querySelector('.viz-area').getBoundingClientRect();
+        const endX = vizRect.width / 2;
+        const endY = 70; // C2 node
+
+        let pos = 0;
+        const anim = setInterval(() => {
+            pos += 0.05;
+            const curX = startX + (endX - startX) * pos;
+            const curY = startY + (endY - startY) * pos;
+            pkt.style.left = curX + 'px';
+            pkt.style.top = curY + 'px';
+
+            if(pos >= 1) {
+                clearInterval(anim);
+                log("APT: Command received from C2 Server.", "apt");
+                pkt.style.display = 'none';
+            }
+        }, 20);
+    }
+
+    function runLateralMove() {
+        const pkt = document.getElementById('pkt-lat');
+        
+        // Reset
+        pkt.style.display = 'block';
+        pkt.style.opacity = 1;
+        pkt.style.left = '150px';
+        pkt.style.top = '400px';
+
+        const endX = document.querySelector('.viz-area').offsetWidth - 150;
+        const wallX = document.querySelector('.viz-area').offsetWidth / 2;
+
+        let curX = 150;
+        const anim = setInterval(() => {
+            curX += 5;
+            pkt.style.left = curX + 'px';
+
+            // Check Segmentation
+            if (segmentationActive && curX >= wallX - 10) {
+                clearInterval(anim);
+                log("BLOCKED: Lateral Movement stopped by Micro-Segmentation.", "ok");
+                pkt.style.display = 'none';
+                return;
+            }
+
+            if (curX >= endX) {
+                clearInterval(anim);
+                log("CRITICAL: Lateral Movement Successful! DB Compromised.", "apt");
+                document.getElementById('node-server').classList.add('infected');
+                pkt.style.display = 'none';
+            }
+        }, 20);
+    }
+
+</script>
+
+</body>
+</html>

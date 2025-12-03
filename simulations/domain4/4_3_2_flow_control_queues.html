@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Queue Flow Control Lab</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --queue-purple: #9c27b0;
+            --consumer-blue: #2196f3;
+            --poison-green: #76ff03;
+            --error-red: #d32f2f;
+            --text: #e0e0e0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--queue-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--queue-purple); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1200px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            height: fit-content;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-add { background: var(--queue-purple); }
+        .btn-flood { background: #ff9800; color: black; }
+        .btn-poison { background: var(--poison-green); color: black; }
+        .btn-dlq { background: #444; border: 1px solid #777; }
+        .btn-dlq.active { background: var(--consumer-blue); border-color: var(--consumer-blue); }
+        
+        button:hover { filter: brightness(1.2); }
+        
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* The Queue Pipe */
+        .queue-container {
+            background: #000;
+            border: 2px solid #333;
+            height: 120px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            overflow-x: auto;
+            position: relative;
+        }
+        .queue-label {
+            position: absolute;
+            top: 5px; left: 10px;
+            font-size: 0.8rem; color: #777;
+        }
+        .queue-limit-line {
+            position: absolute;
+            right: 0; top: 0; bottom: 0;
+            width: 5px;
+            background: repeating-linear-gradient(45deg, #333, #333 10px, #555 10px, #555 20px);
+            z-index: 1;
+        }
+
+        /* Message Box */
+        .message {
+            min-width: 60px;
+            height: 60px;
+            background: var(--queue-purple);
+            border-radius: 6px;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            animation: slideIn 0.3s ease-out;
+            position: relative;
+        }
+        .msg-poison {
+            background: var(--poison-green);
+            color: black;
+            border: 2px solid var(--error-red);
+        }
+        .retry-badge {
+            position: absolute;
+            top: -5px; right: -5px;
+            background: var(--error-red);
+            color: white;
+            border-radius: 50%;
+            width: 20px; height: 20px;
+            font-size: 0.7rem;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Consumer Box */
+        .consumer-box {
+            background: var(--panel-bg);
+            border: 2px dashed var(--consumer-blue);
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .worker {
+            width: 100px; height: 100px;
+            background: #333;
+            border-radius: 8px;
+            display: flex; flex-direction: column; 
+            align-items: center; justify-content: center;
+            font-size: 2rem;
+            transition: 0.2s;
+        }
+        .worker.working { background: var(--consumer-blue); box-shadow: 0 0 15px var(--consumer-blue); }
+        .worker.crashed { background: var(--error-red); animation: shake 0.5s; }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(5px); }
+            50% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* DLQ Box */
+        .dlq-container {
+            background: #1a0505;
+            border: 2px solid #551111;
+            height: 80px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            opacity: 0.5;
+            transition: 0.3s;
+        }
+        .dlq-container.active { opacity: 1; border-color: var(--error-red); }
+
+        /* LOGS */
+        .log-panel {
+            background: #000;
+            border: 1px solid #333;
+            height: 150px;
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+            color: #aaa;
+            font-size: 0.85rem;
+        }
+        .log-err { color: var(--error-red); }
+        .log-sys { color: var(--consumer-blue); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Queue Flow Control Simulator</h1>
+    <p>Buffering, Poison Pills, and Dead Letter Queues (DLQ)</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <h3>Producer Actions</h3>
+        <button class="btn-add" onclick="produce('normal')">Add Standard Task</button>
+        <button class="btn-poison" onclick="produce('poison')">Inject Poison Pill</button>
+        <button class="btn-flood" onclick="floodQueue()">Flood Attack (20x)</button>
+
+        <h3>Architecture Config</h3>
+        <button class="btn-dlq" id="btn-dlq" onclick="toggleDLQ()">
+            Defense: Dead Letter Queue (OFF)
+        </button>
+        <div style="font-size:0.8rem; color:#888; margin-top:5px;">
+            If ON: Moves failed messages to DLQ after 3 attempts.
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- QUEUE -->
+        <div class="queue-container" id="main-queue">
+            <div class="queue-label">MAIN QUEUE (Capacity: 10)</div>
+            <div class="queue-limit-line"></div>
+            <!-- Messages go here -->
+        </div>
+
+        <!-- CONSUMER -->
+        <div class="consumer-box">
+            <div style="width:200px;">
+                <h3>Consumer Worker</h3>
+                <div id="consumer-status">Status: IDLE</div>
+            </div>
+            <div class="worker" id="worker-viz">⚙️</div>
+        </div>
+
+        <!-- DLQ -->
+        <div class="dlq-container" id="dlq-box">
+            <div class="queue-label" style="color:#d32f2f">DEAD LETTER QUEUE (Quarantine)</div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="log-panel" id="logger">
+            <div>> System initialized. Waiting for messages...</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    const MAX_CAPACITY = 10;
+    const PROCESS_TIME = 1500; // ms
+    let queue = [];
+    let isProcessing = false;
+    let dlqEnabled = false;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type === 'err' ? 'log-err' : (type==='sys'?'log-sys':'')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function toggleDLQ() {
+        dlqEnabled = !dlqEnabled;
+        const btn = document.getElementById('btn-dlq');
+        const box = document.getElementById('dlq-box');
+        if (dlqEnabled) {
+            btn.innerText = "Defense: Dead Letter Queue (ON)";
+            btn.classList.add('active');
+            box.classList.add('active');
+            log("CONFIG: DLQ Enabled. Max Retries set to 3.", 'sys');
+        } else {
+            btn.innerText = "Defense: Dead Letter Queue (OFF)";
+            btn.classList.remove('active');
+            box.classList.remove('active');
+            log("CONFIG: DLQ Disabled. Infinite Retries allowed.", 'sys');
+        }
+    }
+
+    function produce(type) {
+        if (queue.length >= MAX_CAPACITY) {
+            log("QUEUE FULL: Dropping incoming message (Backpressure applied).", 'err');
+            return;
+        }
+
+        const msg = {
+            id: Math.floor(Math.random() * 1000),
+            type: type,
+            retries: 0
+        };
+        queue.push(msg);
+        renderQueue();
+        log(`PRODUCER: Enqueued ${type.toUpperCase()} message #${msg.id}`);
+        
+        if (!isProcessing) processNext();
+    }
+
+    function floodQueue() {
+        let added = 0;
+        const interval = setInterval(() => {
+            if (added >= 20 || queue.length >= MAX_CAPACITY) {
+                clearInterval(interval);
+                return;
+            }
+            produce('normal');
+            added++;
+        }, 100);
+    }
+
+    async function processNext() {
+        if (queue.length === 0) {
+            isProcessing = false;
+            updateWorker('idle');
+            return;
+        }
+
+        isProcessing = true;
+        const msg = queue[0]; // Peek at head
+        updateWorker('working', msg);
+        log(`CONSUMER: Processing #${msg.id}...`);
+
+        await new Promise(r => setTimeout(r, PROCESS_TIME));
+
+        // Logic
+        if (msg.type === 'normal') {
+            // Success
+            queue.shift(); // Remove from queue
+            log(`CONSUMER: Success #${msg.id}.`);
+            renderQueue();
+            processNext();
+        } else {
+            // Poison Pill Failure
+            msg.retries++;
+            log(`ERROR: Message #${msg.id} caused a crash! (Attempt ${msg.retries})`, 'err');
+            updateWorker('crashed');
+
+            await new Promise(r => setTimeout(r, 1000)); // Restart time
+
+            if (dlqEnabled && msg.retries >= 3) {
+                // Move to DLQ
+                queue.shift();
+                moveToDLQ(msg);
+                log(`DLQ: Message #${msg.id} quarantined after 3 failures.`, 'sys');
+                renderQueue();
+                processNext();
+            } else {
+                // Infinite Loop (Poison Pill)
+                log(`REQUEUE: Putting #${msg.id} back in queue for retry.`);
+                // In this sim, it stays at head.
+                renderQueue(); // Update retry badge
+                processNext();
+            }
+        }
+    }
+
+    function updateWorker(state, msg) {
+        const w = document.getElementById('worker-viz');
+        const s = document.getElementById('consumer-status');
+        
+        if (state === 'idle') {
+            w.innerText = "⚙️";
+            w.className = 'worker';
+            s.innerText = "Status: IDLE";
+        } else if (state === 'working') {
+            w.innerText = msg.type === 'poison' ? "🤢" : "📄";
+            w.className = 'worker working';
+            s.innerText = `Status: Processing #${msg.id}`;
+        } else if (state === 'crashed') {
+            w.innerText = "💥";
+            w.className = 'worker crashed';
+            s.innerText = "Status: CRASHED";
+        }
+    }
+
+    function renderQueue() {
+        const cont = document.getElementById('main-queue');
+        // Keep label/line, clear msgs
+        const msgs = cont.querySelectorAll('.message');
+        msgs.forEach(m => m.remove());
+
+        queue.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = `message ${msg.type === 'poison' ? 'msg-poison' : ''}`;
+            div.innerText = msg.type === 'poison' ? "☣️" : "DOC";
+            
+            if (msg.retries > 0) {
+                div.innerHTML += `<div class="retry-badge">${msg.retries}</div>`;
+            }
+            cont.appendChild(div);
+        });
+    }
+
+    function moveToDLQ(msg) {
+        const cont = document.getElementById('dlq-box');
+        const div = document.createElement('div');
+        div.className = "message msg-poison";
+        div.style.opacity = "0.7";
+        div.innerText = "💀";
+        cont.appendChild(div);
+    }
+
+</script>
+
+</body>
+</html>

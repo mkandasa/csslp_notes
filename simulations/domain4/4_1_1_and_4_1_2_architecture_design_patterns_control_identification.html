@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Secure Architecture</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f8fafc;
+            --accent: #22d3ee; /* Cyan */
+            --sabsa: #c084fc;  /* Purple */
+            --chain: #f472b6;  /* Pink */
+            --fed: #fbbf24;    /* Amber */
+            --ctrl: #34d399;   /* Green */
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1000px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); height: fit-content; margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- SABSA Styles --- */
+        .sabsa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .layer-box {
+            background: #111; padding: 10px; border-radius: 6px; border: 1px solid #444; margin-bottom: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .layer-box.mapped { border-color: var(--sabsa); background: rgba(192, 132, 252, 0.1); }
+        .connector-line { border-left: 2px dashed #666; height: 20px; margin-left: 20px; }
+
+        .drop-target {
+            border: 2px dashed #666; padding: 10px; text-align: center; border-radius: 6px; min-height: 40px; color: #777;
+        }
+        .drop-target.filled { border-color: var(--sabsa); color: var(--sabsa); font-weight: bold; }
+
+        .draggable {
+            background: var(--sabsa); color: #000; padding: 5px 10px; border-radius: 4px; cursor: grab; font-size: 0.8rem;
+            display: inline-block; margin: 2px;
+        }
+
+        /* --- Chain Styles --- */
+        .chain-container { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .filter-slot {
+            width: 300px; padding: 15px; background: #111; border: 2px dashed #555; text-align: center;
+            border-radius: 8px; position: relative;
+        }
+        .filter-slot::after { content: '⬇'; position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); color: #555; font-size: 1.2rem; }
+        .filter-slot:last-child::after { content: ''; }
+        
+        .filter-item {
+            background: var(--chain); color: #000; padding: 10px; border-radius: 6px; font-weight: bold; cursor: grab;
+        }
+
+        /* --- Federated Styles --- */
+        .fed-diagram {
+            display: flex; justify-content: space-between; align-items: center; margin-top: 20px;
+            background: #000; padding: 20px; border-radius: 8px; border: 1px solid #444;
+        }
+        .entity {
+            width: 100px; padding: 10px; background: #222; border: 2px solid #555; text-align: center; border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .entity.trusted { border-color: var(--fed); box-shadow: 0 0 10px var(--fed); }
+        .token-anim {
+            width: 20px; height: 20px; background: var(--fed); border-radius: 50%;
+            display: none; position: relative;
+        }
+
+        /* --- Controls Styles --- */
+        .budget-display { font-size: 1.5rem; color: var(--ctrl); text-align: center; margin-bottom: 20px; }
+        .control-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #111; padding: 10px; margin-bottom: 5px; border-radius: 4px; border-left: 4px solid #555;
+        }
+        .control-row.bought { border-left-color: var(--ctrl); opacity: 0.7; }
+        
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; width: 100%; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-sabsa { background: var(--sabsa); color: #000; }
+        .btn-chain { background: var(--chain); color: #000; }
+        .btn-fed { background: var(--fed); color: #000; }
+        .btn-ctrl { background: var(--ctrl); color: #000; }
+        .btn-buy { background: #333; color: white; width: auto; margin: 0; border: 1px solid #555; }
+
+        /* --- Logs --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem; margin-top: 20px; width: 100%; box-sizing: border-box;
+        }
+        .log-err { color: #ef4444; }
+        .log-ok { color: #10b981; }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Secure Architecture Console</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('sabsa')">1. SABSA Mapping</button>
+        <button class="tab-btn" onclick="switchTab('chain')">2. Chain of Responsibility</button>
+        <button class="tab-btn" onclick="switchTab('fed')">3. Federated Identity</button>
+        <button class="tab-btn" onclick="switchTab('ctrl')">4. Control Budgeting</button>
+    </div>
+
+    <!-- TAB 1: SABSA -->
+    <div id="sabsa" class="tab-content active">
+        <div class="card">
+            <h3>SABSA: Business to Tech Mapping</h3>
+            <p>Drag the Technical Control to the correct Business Requirement.</p>
+            
+            <div class="sabsa-grid">
+                <!-- Business Layer -->
+                <div>
+                    <h4>Business View (Contextual)</h4>
+                    <div class="layer-box">
+                        <span>1. "Protect Customer Privacy"</span>
+                    </div>
+                    <div class="layer-box">
+                        <span>2. "Ensure 24/7 Availability"</span>
+                    </div>
+                    <div class="layer-box">
+                        <span>3. "Prevent Fraudulent Orders"</span>
+                    </div>
+                </div>
+
+                <!-- Technical Layer -->
+                <div>
+                    <h4>Physical View (Control)</h4>
+                    <div class="drop-target" id="drop1" ondrop="drop(event, 'enc')" ondragover="allowDrop(event)">
+                        [Drop Encryption Here]
+                    </div>
+                    <div style="height: 10px;"></div>
+                    <div class="drop-target" id="drop2" ondrop="drop(event, 'ha')" ondragover="allowDrop(event)">
+                        [Drop Cluster Here]
+                    </div>
+                    <div style="height: 10px;"></div>
+                    <div class="drop-target" id="drop3" ondrop="drop(event, 'auth')" ondragover="allowDrop(event)">
+                        [Drop MFA Here]
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top:20px; padding:10px; background:#111; border-radius:6px; text-align:center;">
+                <strong>Toolbox:</strong>
+                <div class="draggable" draggable="true" ondragstart="drag(event)" id="tech-ha">Load Balancer Cluster</div>
+                <div class="draggable" draggable="true" ondragstart="drag(event)" id="tech-enc">AES-256 Encryption</div>
+                <div class="draggable" draggable="true" ondragstart="drag(event)" id="tech-auth">Multi-Factor Auth</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: CHAIN OF RESPONSIBILITY -->
+    <div id="chain" class="tab-content">
+        <div class="card" style="max-width:600px; margin:0 auto;">
+            <h3>Security Filter Chain</h3>
+            <p>Order the filters correctly. <strong>Stop bad traffic early.</strong></p>
+            
+            <div class="chain-container">
+                <div style="color:#aaa">INCOMING REQUEST</div>
+                
+                <!-- Slots -->
+                <div class="filter-slot" id="slot1" ondrop="dropChain(event)" ondragover="allowDrop(event)">1. (First Line)</div>
+                <div class="filter-slot" id="slot2" ondrop="dropChain(event)" ondragover="allowDrop(event)">2. (Middle)</div>
+                <div class="filter-slot" id="slot3" ondrop="dropChain(event)" ondragover="allowDrop(event)">3. (Last Line)</div>
+                
+                <div style="color:#aaa">BUSINESS LOGIC (DB Query)</div>
+            </div>
+
+            <div style="margin-top:20px; text-align:center;">
+                <div class="filter-item" draggable="true" ondragstart="dragChain(event)" id="f-auth">Authentication (Who are you?)</div>
+                <div class="filter-item" draggable="true" ondragstart="dragChain(event)" id="f-waf">WAF (Block Bad IPs)</div>
+                <div class="filter-item" draggable="true" ondragstart="dragChain(event)" id="f-val">Input Validation (Check SQLi)</div>
+            </div>
+
+            <button class="btn-chain" onclick="testChain()">Test Chain Efficiency</button>
+        </div>
+    </div>
+
+    <!-- TAB 3: FEDERATED IDENTITY -->
+    <div id="fed" class="tab-content">
+        <div class="card">
+            <h3>Federated Trust Model (OIDC/SAML)</h3>
+            <p>Configure the trust relationship to allow "Login with Google".</p>
+            
+            <div class="fed-diagram">
+                <div class="entity" id="user-node">User<br>(Browser)</div>
+                <div style="font-size:1.5rem">↔</div>
+                <div class="entity" id="sp-node">Service Provider<br>(Your App)</div>
+                <div style="font-size:1.5rem">↔</div>
+                <div class="entity" id="idp-node">Identity Provider<br>(Google)</div>
+            </div>
+
+            <div style="margin-top:20px; display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                <div style="background:#111; padding:10px; border-radius:6px;">
+                    <strong>Step 1: Exchange Keys</strong><br>
+                    <button class="btn-fed" onclick="exchangeMetadata()">Import IdP Metadata (Certs)</button>
+                </div>
+                <div style="background:#111; padding:10px; border-radius:6px;">
+                    <strong>Step 2: Authenticate</strong><br>
+                    <button class="btn-fed" onclick="runFedAuth()" id="btnFedAuth" disabled>Simulate Login Flow</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: CONTROLS & BUDGET -->
+    <div id="ctrl" class="tab-content">
+        <div class="card">
+            <h3>Control Prioritization</h3>
+            <p>You have a budget of <strong>$10,000</strong>. Mitigate the highest risks first.</p>
+            
+            <div class="budget-display" id="budgetVal">$10,000</div>
+
+            <div class="control-row">
+                <div>
+                    <strong>WAF (Web App Firewall)</strong><br>
+                    <small>Prevents: SQLi, XSS (High Risk)</small>
+                </div>
+                <div style="text-align:right">
+                    <span>$4,000</span>
+                    <button class="btn-buy" onclick="buyControl(4000, this, 'waf')">Buy</button>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div>
+                    <strong>Database Encryption</strong><br>
+                    <small>Prevents: Data Theft at Rest (Med Risk)</small>
+                </div>
+                <div style="text-align:right">
+                    <span>$5,000</span>
+                    <button class="btn-buy" onclick="buyControl(5000, this, 'enc')">Buy</button>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div>
+                    <strong>Fancy AI Threat Map</strong><br>
+                    <small>Prevents: Nothing (Visualization Only)</small>
+                </div>
+                <div style="text-align:right">
+                    <span>$8,000</span>
+                    <button class="btn-buy" onclick="buyControl(8000, this, 'ai')">Buy</button>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div>
+                    <strong>MFA for Admins</strong><br>
+                    <small>Prevents: Account Takeover (Critical Risk)</small>
+                </div>
+                <div style="text-align:right">
+                    <span>$1,000</span>
+                    <button class="btn-buy" onclick="buyControl(1000, this, 'mfa')">Buy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> Architecture Studio Ready.</div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'sabsa':0, 'chain':1, 'fed':2, 'ctrl':3};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : '');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- SABSA LOGIC --- */
+        function allowDrop(ev) { ev.preventDefault(); }
+        function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+        
+        function drop(ev, type) {
+            ev.preventDefault();
+            const data = ev.dataTransfer.getData("text");
+            const el = document.getElementById(data);
+            
+            // Validation
+            let correct = false;
+            if (type === 'enc' && data === 'tech-enc') correct = true;
+            if (type === 'ha' && data === 'tech-ha') correct = true;
+            if (type === 'auth' && data === 'tech-auth') correct = true;
+
+            if (correct) {
+                ev.target.appendChild(el);
+                ev.target.classList.add('filled');
+                log("SABSA: Correct Mapping! Business Goal met by Control.", 'ok');
+            } else {
+                log("SABSA: Incorrect Mapping. Control does not address this Business Goal.", 'err');
+            }
+        }
+
+        /* --- CHAIN LOGIC --- */
+        function dragChain(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+        
+        function dropChain(ev) {
+            ev.preventDefault();
+            const data = ev.dataTransfer.getData("text");
+            const el = document.getElementById(data);
+            ev.target.appendChild(el);
+        }
+
+        function testChain() {
+            const s1 = document.getElementById('slot1').firstElementChild;
+            const s2 = document.getElementById('slot2').firstElementChild;
+            const s3 = document.getElementById('slot3').firstElementChild;
+
+            if (!s1 || !s2 || !s3) { log("Chain Incomplete. Fill all slots.", 'err'); return; }
+
+            // Ideal Order: WAF (Cheap/Fast) -> Auth (db hit) -> Validation (Compute)
+            // Or: WAF -> Validation -> Auth
+            // Key is WAF first (IP block is cheapest). Validation vs Auth is debatable, but usually Auth first to attribute attack.
+            
+            if (s1.id === 'f-waf' && s2.id === 'f-auth' && s3.id === 'f-val') {
+                log("Chain Optimized: WAF blocks IPs first (Fastest). Auth identifies user. Validation cleans input.", 'ok');
+            } else if (s1.id === 'f-val') {
+                log("Inefficient: You are validating input from blocked IPs! Put WAF first.", 'err');
+            } else {
+                log("Chain Functional but Sub-optimal. Recommended: WAF -> Auth -> Val.");
+            }
+        }
+
+        /* --- FEDERATED LOGIC --- */
+        function exchangeMetadata() {
+            document.getElementById('sp-node').classList.add('trusted');
+            document.getElementById('idp-node').classList.add('trusted');
+            document.getElementById('btnFedAuth').disabled = false;
+            log("Trust Established. Certificates exchanged.", 'ok');
+        }
+
+        function runFedAuth() {
+            log("1. User attempts login at SP...");
+            setTimeout(() => log("2. SP Redirects User to IdP (Google)..."), 800);
+            setTimeout(() => log("3. User enters creds at IdP..."), 1600);
+            setTimeout(() => {
+                log("4. IdP sends Signed Token to SP.", 'ok');
+                document.getElementById('sp-node').style.backgroundColor = "#064e3b";
+                log("5. Login Success!", 'ok');
+            }, 2400);
+        }
+
+        /* --- BUDGET LOGIC --- */
+        let budget = 10000;
+        
+        function buyControl(cost, btn, type) {
+            if (budget >= cost) {
+                if (type === 'ai') {
+                    log("Bad Investment: AI Map looks cool but stops zero attacks. ROI is low.", 'err');
+                } else {
+                    budget -= cost;
+                    document.getElementById('budgetVal').innerText = "$" + budget.toLocaleString();
+                    btn.disabled = true;
+                    btn.innerText = "Purchased";
+                    btn.closest('.control-row').classList.add('bought');
+                    
+                    if(type === 'mfa' || type === 'waf') log("Excellent Choice: High Risk Mitigation.", 'ok');
+                    else log("Good Choice: Defense in Depth.");
+                }
+            } else {
+                log("Insufficient Budget!", 'err');
+            }
+        }
+
+    </script>
+</body>
+</html>

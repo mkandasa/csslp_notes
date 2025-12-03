@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Data Lifecycle Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --life-pink: #ec4899;
+            --shred-red: #ef4444;
+            --hold-yellow: #f59e0b;
+            --safe-green: #22c55e;
+            --text: #f1f5f9;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--life-pink);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--life-pink); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-create { background: var(--life-pink); }
+        .btn-soft { background: #334155; color: #ccc; border: 1px solid #555; }
+        .btn-shred { background: var(--shred-red); color: white; }
+        .btn-hold { background: var(--hold-yellow); color: black; }
+        .btn-time { background: var(--safe-green); color: black; }
+        
+        button:hover { filter: brightness(1.2); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Database View */
+        .db-container {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 200px;
+        }
+        
+        .record-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+        }
+
+        .record-card {
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 10px;
+            position: relative;
+            transition: 0.3s;
+            overflow: hidden;
+        }
+        .record-card.soft-deleted { opacity: 0.5; border-style: dashed; }
+        .record-card.shredded { background: #3e0a0a; border-color: var(--shred-red); color: #777; }
+        .record-card.hold { border: 2px solid var(--hold-yellow); box-shadow: 0 0 10px rgba(245, 158, 11, 0.3); }
+        
+        /* New Selected State */
+        .record-card.selected { 
+            box-shadow: 0 0 0 2px white, 0 0 15px rgba(255,255,255,0.3); 
+            transform: scale(1.02);
+            z-index: 10;
+        }
+
+        .rec-header { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 5px; color: #aaa; }
+        .rec-data { font-family: monospace; font-size: 0.9rem; word-break: break-all; margin-bottom: 5px; }
+        .rec-key { font-size: 0.7rem; color: var(--safe-green); display: flex; align-items: center; gap: 5px; }
+        
+        .badge { font-size: 0.6rem; padding: 2px 4px; border-radius: 3px; background: #333; color: white; }
+        .badge.active { background: var(--safe-green); }
+        .badge.deleted { background: var(--shred-red); }
+
+        /* KMS View */
+        .kms-rack {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            height: 60px;
+        }
+        .key-slot {
+            width: 40px; height: 40px;
+            background: #000;
+            border: 1px solid #555;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+        .key-slot.filled { border-color: var(--safe-green); color: var(--safe-green); }
+        .key-slot.destroyed { border-color: var(--shred-red); color: #333; }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: var(--life-pink); }
+        .log-err { color: var(--shred-red); }
+        .log-ok { color: var(--safe-green); }
+        .log-warn { color: var(--hold-yellow); }
+
+        /* Shaking Animation */
+        @keyframes shake {
+            0% { transform: translateX(0); } 25% { transform: translateX(3px); }
+            75% { transform: translateX(-3px); } 100% { transform: translateX(0); }
+        }
+        .shake { animation: shake 0.3s; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure Data Lifecycle Lab</h1>
+    <p>Retention, Legal Hold & Crypto-Shredding</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Data Creation</div>
+        <button class="btn-create" onclick="createRecord()">➕ New Customer Record</button>
+
+        <div class="section-title" style="margin-top:20px;">2. Lifecycle Actions</div>
+        <div style="font-size:0.75rem; color:#aaa; margin-bottom:5px;">Select a record to act on:</div>
+        <select id="rec-select" onchange="highlightRecord()">
+            <option value="">(None)</option>
+        </select>
+
+        <button class="btn-soft" onclick="softDelete()">🗑️ Soft Delete (Logical)</button>
+        <button class="btn-shred" onclick="cryptoShred()">🔥 Crypto-Shred (Physical)</button>
+        <button class="btn-hold" onclick="toggleHold()">⚖️ Toggle Legal Hold</button>
+
+        <div class="section-title" style="margin-top:20px;">3. Retention Policy</div>
+        <button class="btn-time" onclick="advanceTime()">⏩ Advance Time (+1 Year)</button>
+        <div style="font-size:0.75rem; color:#aaa; margin-top:5px;">
+            Policy: Delete records older than 3 years.
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- KMS -->
+        <div class="kms-rack" id="kms-rack">
+            <div style="font-weight:bold; font-size:0.8rem; margin-right:10px;">KMS (Master Keys):</div>
+            <!-- Keys injected here -->
+        </div>
+
+        <!-- DATABASE -->
+        <div class="db-container">
+            <h3 style="margin-top:0; color:#aaa; font-size:0.9rem; border-bottom:1px solid #333; padding-bottom:5px;">
+                ENCRYPTED STORAGE
+            </h3>
+            <div class="record-grid" id="grid">
+                <!-- Records go here -->
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Retention Policy: 3 Years.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let records = [];
+    let idCounter = 0;
+    const RETENTION_LIMIT = 3;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':(type==='warn'?'log-warn':'log-sys'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function createRecord() {
+        idCounter++;
+        const rec = {
+            id: idCounter,
+            data: "User_" + idCounter,
+            age: 0,
+            status: 'active', // active, soft, shredded
+            hold: false,
+            keyId: idCounter // 1-to-1 key mapping for crypto-shredding
+        };
+        records.push(rec);
+        
+        updateSelect();
+        render();
+        log(`CREATE: Record #${rec.id} created. Encrypted with Key #${rec.keyId}.`, "sys");
+    }
+
+    function updateSelect() {
+        const sel = document.getElementById('rec-select');
+        sel.innerHTML = '<option value="">(None)</option>';
+        records.forEach(r => {
+            if(r.status !== 'shredded') {
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.innerText = `Record #${r.id} (${r.status})`;
+                sel.appendChild(opt);
+            }
+        });
+    }
+
+    function highlightRecord() {
+        const id = document.getElementById('rec-select').value;
+        document.querySelectorAll('.record-card').forEach(c => c.classList.remove('selected'));
+        if(id) {
+            const card = document.getElementById(`card-${id}`);
+            if(card) card.classList.add('selected');
+        }
+    }
+
+    function getSelected() {
+        const id = parseInt(document.getElementById('rec-select').value);
+        return records.find(r => r.id === id);
+    }
+
+    function softDelete() {
+        const rec = getSelected();
+        if(!rec) return;
+
+        if (rec.hold) {
+            log(`DENIED: Record #${rec.id} is on LEGAL HOLD. Cannot delete.`, "warn");
+            shakeCard(rec.id);
+            return;
+        }
+
+        rec.status = 'soft';
+        render();
+        log(`DELETE: Record #${rec.id} marked as deleted (is_deleted=true). Data persists.`, "sys");
+    }
+
+    function cryptoShred() {
+        const rec = getSelected();
+        if(!rec) return;
+
+        if (rec.hold) {
+            log(`DENIED: Record #${rec.id} is on LEGAL HOLD. Destruction blocked.`, "warn");
+            shakeCard(rec.id);
+            return;
+        }
+
+        rec.status = 'shredded';
+        rec.data = "Gibberish_@#$!"; // Simulated ciphertext without key
+        
+        render();
+        updateSelect();
+        log(`SHRED: Key #${rec.keyId} destroyed in KMS. Record #${rec.id} is now unrecoverable noise.`, "err");
+    }
+
+    function toggleHold() {
+        const rec = getSelected();
+        if(!rec) return;
+        
+        rec.hold = !rec.hold;
+        render();
+        log(`LEGAL: Record #${rec.id} hold status set to: ${rec.hold}`, "warn");
+    }
+
+    function advanceTime() {
+        log("TIME: Fast-forwarding 1 Year...", "sys");
+        let deletedCount = 0;
+
+        records.forEach(r => {
+            if (r.status === 'shredded') return;
+            
+            r.age++;
+            
+            // Retention Policy Check
+            if (r.age > RETENTION_LIMIT) {
+                if (r.hold) {
+                    log(`POLICY: Record #${r.id} expired, but retained due to LEGAL HOLD.`, "warn");
+                } else {
+                    r.status = 'shredded';
+                    r.data = "Expired_#$*";
+                    deletedCount++;
+                }
+            }
+        });
+
+        if(deletedCount > 0) log(`POLICY: Auto-shredded ${deletedCount} expired records.`, "err");
+        render();
+        updateSelect();
+    }
+
+    function render() {
+        const grid = document.getElementById('grid');
+        const kms = document.getElementById('kms-rack');
+        
+        grid.innerHTML = "";
+        // Keep label in KMS
+        kms.innerHTML = '<div style="font-weight:bold; font-size:0.8rem; margin-right:10px;">KMS (Keys):</div>';
+
+        records.forEach(r => {
+            // Render Card
+            const card = document.createElement('div');
+            card.className = `record-card ${r.status === 'soft' ? 'soft-deleted' : ''} ${r.status === 'shredded' ? 'shredded' : ''} ${r.hold ? 'hold' : ''}`;
+            card.id = `card-${r.id}`;
+            
+            let statusBadge = `<span class="badge active">ACTIVE</span>`;
+            if (r.status === 'soft') statusBadge = `<span class="badge">DELETED</span>`;
+            if (r.status === 'shredded') statusBadge = `<span class="badge deleted">SHREDDED</span>`;
+            
+            let holdBadge = r.hold ? `<span class="badge" style="background:var(--hold-yellow); color:black">HOLD</span>` : '';
+
+            card.innerHTML = `
+                <div class="rec-header">
+                    <span>ID: ${r.id}</span>
+                    <span>Age: ${r.age}y</span>
+                </div>
+                <div class="rec-data">${r.data}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="rec-key">🔑 Key_${r.keyId}</div>
+                    <div style="display:flex; gap:5px;">${holdBadge} ${statusBadge}</div>
+                </div>
+            `;
+            grid.appendChild(card);
+
+            // Render Key Slot
+            const key = document.createElement('div');
+            key.className = `key-slot ${r.status === 'shredded' ? 'destroyed' : 'filled'}`;
+            key.innerText = r.status === 'shredded' ? "❌" : "🔑";
+            key.title = `Key for Record #${r.id}`;
+            kms.appendChild(key);
+        });
+    }
+
+    function shakeCard(id) {
+        const c = document.getElementById(`card-${id}`);
+        c.classList.remove('shake');
+        void c.offsetWidth; // trigger reflow
+        c.classList.add('shake');
+    }
+
+</script>
+
+</body>
+</html>

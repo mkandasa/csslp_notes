@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: CI/CD Security Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --pipeline-blue: #3b82f6;
+            --fail-red: #ef4444;
+            --pass-green: #22c55e;
+            --warn-yellow: #f59e0b;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--pipeline-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--pipeline-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 600px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Toggles */
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #0f172a;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .toggle-label { font-weight: bold; font-size: 0.9rem; }
+        
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--pipeline-blue); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: var(--pipeline-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: 0.2s;
+        }
+        button:hover { filter: brightness(1.1); }
+        button:disabled { background: #555; cursor: not-allowed; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        /* PIPELINE STAGES */
+        .pipeline-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            position: relative;
+        }
+        
+        .stage {
+            width: 100px;
+            height: 100px;
+            background: #1e293b;
+            border: 2px solid #555;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+            transition: 0.3s;
+        }
+        .stage-icon { font-size: 2rem; margin-bottom: 5px; }
+        
+        .stage.running { border-color: var(--pipeline-blue); box-shadow: 0 0 15px var(--pipeline-blue); animation: pulse 1s infinite; }
+        .stage.pass { border-color: var(--pass-green); background: rgba(34,197,94,0.1); color: var(--pass-green); }
+        .stage.fail { border-color: var(--fail-red); background: rgba(239,68,68,0.1); color: var(--fail-red); }
+
+        .connector {
+            flex-grow: 1;
+            height: 4px;
+            background: #333;
+            margin: 0 10px;
+            position: relative;
+        }
+        .flow-dot {
+            position: absolute;
+            width: 10px; height: 10px;
+            background: var(--pipeline-blue);
+            border-radius: 50%;
+            top: -3px;
+            display: none;
+        }
+
+        /* LOGS */
+        .console {
+            background: #0f172a;
+            height: 200px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-info { color: var(--pipeline-blue); }
+        .log-err { color: var(--fail-red); }
+        .log-ok { color: var(--pass-green); }
+        .log-warn { color: var(--warn-yellow); }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure CI/CD Lab</h1>
+    <p>DevSecOps: Integrating SAST, Secrets Management & Code Signing</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">Pipeline Configuration</div>
+        
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">1. Secret Scanning</div>
+                <div style="font-size:0.7rem; color:#aaa;">Prevents committing API Keys</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-secrets">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">2. SAST (Code Analysis)</div>
+                <div style="font-size:0.7rem; color:#aaa;">Detects SQLi/XSS in source</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-sast">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">3. Artifact Signing</div>
+                <div style="font-size:0.7rem; color:#aaa;">Prevents tampering after build</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="cfg-sign">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <button onclick="runPipeline()" id="btn-run">🚀 Run Pipeline</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <div class="pipeline-container">
+            <!-- COMMIT -->
+            <div class="stage" id="stg-commit">
+                <div class="stage-icon">💻</div>
+                <div>COMMIT</div>
+            </div>
+            <div class="connector"><div class="flow-dot" id="dot-1"></div></div>
+
+            <!-- BUILD/SCAN -->
+            <div class="stage" id="stg-build">
+                <div class="stage-icon">⚙️</div>
+                <div>BUILD & SCAN</div>
+            </div>
+            <div class="connector"><div class="flow-dot" id="dot-2"></div></div>
+
+            <!-- SIGN -->
+            <div class="stage" id="stg-sign">
+                <div class="stage-icon">✍️</div>
+                <div>SIGNING</div>
+            </div>
+            <div class="connector"><div class="flow-dot" id="dot-3"></div></div>
+
+            <!-- DEPLOY -->
+            <div class="stage" id="stg-deploy">
+                <div class="stage-icon">🚀</div>
+                <div>DEPLOY</div>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Jenkins Agent Ready. Waiting for commit...</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':(type==='warn'?'log-warn':'log-info'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function resetStages() {
+        document.querySelectorAll('.stage').forEach(s => {
+            s.className = 'stage';
+        });
+        document.getElementById('btn-run').disabled = true;
+    }
+
+    async function runPipeline() {
+        resetStages();
+        const useSecrets = document.getElementById('cfg-secrets').checked;
+        const useSast = document.getElementById('cfg-sast').checked;
+        const useSign = document.getElementById('cfg-sign').checked;
+
+        // SCENARIO LOGIC:
+        // We simulate a codebase that HAS vulnerabilities and secrets.
+        // If checks are OFF -> Pipeline succeeds (but deploys insecure code).
+        // If checks are ON -> Pipeline FAILS (protecting prod).
+        
+        log("PIPELINE: Job #101 Started.", "info");
+
+        // STAGE 1: COMMIT
+        await animateStage('stg-commit', 'dot-1');
+        
+        // Check Secrets
+        if (useSecrets) {
+            log("SCAN: Searching for hardcoded secrets...", "info");
+            await wait(500);
+            log("ALERT: Found 'AWS_ACCESS_KEY' in config.py!", "err");
+            log("FAILURE: Secret Scanning blocked the commit.", "err");
+            failStage('stg-commit');
+            document.getElementById('btn-run').disabled = false;
+            return;
+        } else {
+            log("WARN: Secret Scanning Disabled. Committing hardcoded keys...", "warn");
+            passStage('stg-commit');
+        }
+
+        // STAGE 2: BUILD & SAST
+        await animateStage('stg-build', 'dot-2');
+        
+        log("BUILD: Compiling artifacts...", "info");
+        await wait(800);
+
+        if (useSast) {
+            log("SAST: Static Analysis running...", "info");
+            await wait(600);
+            log("ALERT: Found SQL Injection in LoginController.java:42", "err");
+            log("FAILURE: Quality Gate failed (Critical Vulnerability).", "err");
+            failStage('stg-build');
+            document.getElementById('btn-run').disabled = false;
+            return;
+        } else {
+            log("WARN: SAST Disabled. Vulnerabilities compiled into binary.", "warn");
+            passStage('stg-build');
+        }
+
+        // STAGE 3: SIGNING
+        await animateStage('stg-sign', 'dot-3');
+        
+        if (useSign) {
+            log("SIGN: Generating Digital Signature with Private Key...", "info");
+            await wait(500);
+            log("SUCCESS: Artifact signed. Hash: a1b2c3d4", "ok");
+            passStage('stg-sign');
+        } else {
+            log("WARN: Signing Disabled. Artifact is untrusted.", "warn");
+            // We pass the stage, but it's "gray"
+            document.getElementById('stg-sign').style.opacity = "0.5";
+        }
+
+        // STAGE 4: DEPLOY
+        const deployEl = document.getElementById('stg-deploy');
+        deployEl.classList.add('running');
+        await wait(1000);
+        
+        // Deployment Logic
+        // If signed, deploy checks signature.
+        // If not signed, deploy accepts anything (INSECURE).
+        
+        if (useSign) {
+            log("DEPLOY: Verifying Signature...", "info");
+            log("DEPLOY: Signature Valid. Deploying to Production.", "ok");
+            passStage('stg-deploy');
+        } else {
+            log("DEPLOY: No signature found. Deploying blindly...", "warn");
+            passStage('stg-deploy');
+            log("RESULT: Production Updated. (Risk: Unverified Code)", "warn");
+        }
+
+        log("PIPELINE FINISHED.", "info");
+        document.getElementById('btn-run').disabled = false;
+    }
+
+    async function animateStage(stageId, dotId) {
+        const stage = document.getElementById(stageId);
+        stage.classList.add('running');
+        await wait(1000);
+        
+        // Animate Dot
+        if (dotId) {
+            const dot = document.getElementById(dotId);
+            dot.style.display = 'block';
+            dot.style.left = '0%';
+            
+            let pos = 0;
+            return new Promise(resolve => {
+                const interval = setInterval(() => {
+                    pos += 5;
+                    dot.style.left = pos + '%';
+                    if(pos >= 100) {
+                        clearInterval(interval);
+                        dot.style.display = 'none';
+                        resolve();
+                    }
+                }, 20);
+            });
+        }
+    }
+
+    function passStage(id) {
+        const el = document.getElementById(id);
+        el.classList.remove('running');
+        el.classList.add('pass');
+    }
+
+    function failStage(id) {
+        const el = document.getElementById(id);
+        el.classList.remove('running');
+        el.classList.add('fail');
+    }
+
+    function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+</script>
+
+</body>
+</html>

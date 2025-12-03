@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: CVSS Calculator Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --cvss-blue: #3b82f6;
+            --score-green: #22c55e;
+            --score-yellow: #facc15;
+            --score-orange: #f97316;
+            --score-red: #ef4444;
+            --score-crit: #7f1d1d;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--cvss-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--cvss-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CALCULATOR PANEL */
+        .calc-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .metric-group {
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 6px;
+            background: #0f172a;
+        }
+        .metric-title {
+            font-size: 0.9rem;
+            color: #aaa;
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .metric-label { font-size: 0.85rem; width: 150px; }
+        
+        select {
+            background: #334155;
+            color: white;
+            border: 1px solid #475569;
+            padding: 5px;
+            border-radius: 4px;
+            width: 200px;
+            cursor: pointer;
+        }
+
+        /* SCORE PANEL */
+        .score-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: sticky;
+            top: 20px;
+            height: fit-content;
+        }
+
+        .score-circle {
+            width: 150px; height: 150px;
+            border-radius: 50%;
+            border: 10px solid #333;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            transition: 0.3s;
+            background: #000;
+        }
+        .rating-text { font-size: 1.2rem; font-weight: bold; }
+        .vector-string {
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #aaa;
+            word-break: break-all;
+            text-align: center;
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        /* PRESETS */
+        .presets {
+            margin-top: 20px;
+            width: 100%;
+        }
+        button.preset-btn {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 5px;
+            background: #334155;
+            border: 1px solid #475569;
+            color: #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+        button.preset-btn:hover { background: #475569; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>CVSS Calculator Lab</h1>
+    <p>Common Vulnerability Scoring System v3.1</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CALCULATOR -->
+    <div class="calc-panel">
+        
+        <!-- BASE METRICS -->
+        <div class="metric-group">
+            <div class="metric-title">Base Metrics (Exploitability)</div>
+            
+            <div class="metric-row">
+                <span class="metric-label">Attack Vector (AV)</span>
+                <select id="AV" onchange="calc()">
+                    <option value="0.85">Network (N)</option>
+                    <option value="0.62">Adjacent (A)</option>
+                    <option value="0.55">Local (L)</option>
+                    <option value="0.2">Physical (P)</option>
+                </select>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Attack Complexity (AC)</span>
+                <select id="AC" onchange="calc()">
+                    <option value="0.77">Low (L)</option>
+                    <option value="0.44">High (H)</option>
+                </select>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Privileges Required (PR)</span>
+                <select id="PR" onchange="calc()">
+                    <option value="0.85">None (N)</option>
+                    <option value="0.62">Low (L)</option>
+                    <option value="0.27">High (H)</option>
+                </select>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">User Interaction (UI)</span>
+                <select id="UI" onchange="calc()">
+                    <option value="0.85">None (N)</option>
+                    <option value="0.62">Required (R)</option>
+                </select>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Scope (S)</span>
+                <select id="S" onchange="calc()">
+                    <option value="U">Unchanged (U)</option>
+                    <option value="C">Changed (C) - Cloud/VM Escape</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="metric-group">
+            <div class="metric-title">Base Metrics (Impact)</div>
+            
+            <div class="metric-row">
+                <span class="metric-label">Confidentiality (C)</span>
+                <select id="C" onchange="calc()">
+                    <option value="0.56">High (H)</option>
+                    <option value="0.22">Low (L)</option>
+                    <option value="0">None (N)</option>
+                </select>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Integrity (I)</span>
+                <select id="I" onchange="calc()">
+                    <option value="0.56">High (H)</option>
+                    <option value="0.22">Low (L)</option>
+                    <option value="0">None (N)</option>
+                </select>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Availability (A)</span>
+                <select id="A" onchange="calc()">
+                    <option value="0.56">High (H)</option>
+                    <option value="0.22">Low (L)</option>
+                    <option value="0">None (N)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- ENVIRONMENTAL METRICS -->
+        <div class="metric-group">
+            <div class="metric-title">Environmental (Context)</div>
+            <div class="metric-row">
+                <span class="metric-label">Target Distribution (CR/IR/AR)</span>
+                <select id="Env" onchange="calc()">
+                    <option value="1.0">Not Defined (1.0)</option>
+                    <option value="1.5">High Value Asset (1.5)</option>
+                    <option value="0.5">Low Value / Test (0.5)</option>
+                </select>
+            </div>
+            <div style="font-size:0.75rem; color:#888;">*Simplified for Simulation. Real CVSS allows per-metric environmental overrides.</div>
+        </div>
+
+    </div>
+
+    <!-- SCORE OUTPUT -->
+    <div class="score-panel">
+        <div id="score-viz" class="score-circle">0.0</div>
+        <div id="rating-text" class="rating-text">NONE</div>
+        <div id="vector-str" class="vector-string">CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H</div>
+
+        <div class="presets">
+            <h3 style="margin-top:0; border-bottom:1px solid #333; padding-bottom:5px; color:#aaa; font-size:0.9rem;">SCENARIOS</h3>
+            <button class="preset-btn" onclick="setPreset('log4j')">1. Log4Shell (RCE)</button>
+            <button class="preset-btn" onclick="setPreset('xss')">2. Reflected XSS</button>
+            <button class="preset-btn" onclick="setPreset('airgap')">3. Air-Gapped DB Attack</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function calc() {
+        // Simplified CVSS Logic for Viz (Not exact spec math, but representative behavior)
+        
+        // Base Score Logic
+        // 1. Impact Sub Score (ISS) = 1 - (1-C)*(1-I)*(1-A)
+        const c = parseFloat(document.getElementById('C').value);
+        const i = parseFloat(document.getElementById('I').value);
+        const a = parseFloat(document.getElementById('A').value);
+        const iss = 1 - ((1 - c) * (1 - i) * (1 - a));
+
+        // 2. Impact
+        const scope = document.getElementById('S').value;
+        let impact = 0;
+        if (scope === 'U') impact = 6.42 * iss;
+        else impact = 7.52 * (iss - 0.029) - 3.25 * Math.pow((iss - 0.02), 15);
+
+        if (impact <= 0) impact = 0;
+
+        // 3. Exploitability
+        const av = parseFloat(document.getElementById('AV').value);
+        const ac = parseFloat(document.getElementById('AC').value);
+        const pr = parseFloat(document.getElementById('PR').value); // Note: PR changes based on Scope in real spec
+        const ui = parseFloat(document.getElementById('UI').value);
+        
+        const exploitability = 8.22 * av * ac * pr * ui;
+
+        // 4. Base Score
+        let baseScore = 0;
+        if (impact > 0) {
+            if (scope === 'U') baseScore = Math.min(10, impact + exploitability);
+            else baseScore = Math.min(10, 1.08 * (impact + exploitability));
+        }
+        
+        // Round up (CVSS specific rounding)
+        baseScore = Math.ceil(baseScore * 10) / 10;
+
+        // 5. Environmental Modifier
+        const env = parseFloat(document.getElementById('Env').value);
+        let finalScore = baseScore * env;
+        finalScore = Math.min(10, finalScore);
+        finalScore = Math.ceil(finalScore * 10) / 10; // Round
+
+        updateUI(finalScore);
+    }
+
+    function updateUI(score) {
+        const circle = document.getElementById('score-viz');
+        const text = document.getElementById('rating-text');
+        
+        circle.innerText = score.toFixed(1);
+        
+        // Colors
+        let color = "#333";
+        let rating = "NONE";
+        
+        if (score === 0) { color = "#555"; rating = "NONE"; }
+        else if (score < 4.0) { color = "var(--score-green)"; rating = "LOW"; }
+        else if (score < 7.0) { color = "var(--score-yellow)"; rating = "MEDIUM"; }
+        else if (score < 9.0) { color = "var(--score-orange)"; rating = "HIGH"; }
+        else { color = "var(--score-red)"; rating = "CRITICAL"; }
+
+        circle.style.borderColor = color;
+        circle.style.color = color;
+        text.innerText = rating;
+        text.style.color = color;
+
+        // Mock Vector String
+        document.getElementById('vector-str').innerText = `CVSS:3.1/Score:${score.toFixed(1)}/Env:${document.getElementById('Env').value}`;
+    }
+
+    function setPreset(name) {
+        if(name === 'log4j') {
+            setVal('AV', '0.85'); // Net
+            setVal('AC', '0.77'); // Low
+            setVal('PR', '0.85'); // None
+            setVal('UI', '0.85'); // None
+            setVal('S', 'C');     // Changed (Can escape)
+            setVal('C', '0.56');  // High
+            setVal('I', '0.56');  // High
+            setVal('A', '0.56');  // High
+            setVal('Env', '1.0');
+        }
+        else if (name === 'xss') {
+            setVal('AV', '0.85'); // Net
+            setVal('AC', '0.77'); // Low
+            setVal('PR', '0.85'); // None
+            setVal('UI', '0.62'); // Required (User must click)
+            setVal('S', 'C');     // Changed (Browser -> Server context shift)
+            setVal('C', '0.22');  // Low (Steal cookie)
+            setVal('I', '0.22');  // Low
+            setVal('A', '0');     // None
+            setVal('Env', '1.0');
+        }
+        else if (name === 'airgap') {
+            setVal('AV', '0.2');  // Physical access required
+            setVal('AC', '0.44'); // High complexity
+            setVal('PR', '0.27'); // High privs
+            setVal('S', 'U');
+            setVal('C', '0.56');  // High Impact if successful
+            setVal('I', '0.56');
+            setVal('A', '0.56');
+            setVal('Env', '1.5'); // High Value Asset
+        }
+        calc();
+    }
+
+    function setVal(id, val) {
+        document.getElementById(id).value = val;
+    }
+
+    // Init
+    setPreset('log4j'); // Start with a bang
+
+</script>
+
+</body>
+</html>

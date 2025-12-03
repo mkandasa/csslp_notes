@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Architecture Simulator</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --term-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent: #00d8ff;
+            --success: #2ecc71;
+            --fail: #e74c3c;
+            --warn: #f1c40f;
+        }
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        h1, h2, h3 { color: var(--accent); }
+        
+        .lab-container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            border: 1px solid #444;
+            padding: 20px;
+            margin-bottom: 40px;
+            background: #252526;
+            border-radius: 8px;
+        }
+
+        /* Controls Panel */
+        .controls {
+            border-right: 1px solid #444;
+            padding-right: 20px;
+        }
+        .switch-group {
+            margin-bottom: 15px;
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #555; }
+        button.attack-btn { background: var(--fail); border: none; font-weight: bold; }
+        button.attack-btn:hover { background: #c0392b; }
+
+        /* Terminal Panel */
+        .terminal-window {
+            background: var(--term-bg);
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #000;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+        .log-entry { margin: 5px 0; border-bottom: 1px solid #3a3a3a; padding-bottom: 2px; }
+        .log-time { color: #888; font-size: 0.8em; margin-right: 10px; }
+        .log-sys { color: var(--accent); font-weight: bold; }
+        .log-err { color: var(--fail); }
+        .log-success { color: var(--success); }
+        .log-warn { color: var(--warn); }
+        .blinking-cursor::after { content: "█"; animation: blink 1s infinite; color: var(--accent); }
+        
+        @keyframes blink { 0% {opacity: 0;} 50% {opacity: 1;} 100% {opacity: 0;} }
+
+        .status-bar {
+            grid-column: 1 / -1;
+            background: #333;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+        .secure-badge {
+            background: var(--fail);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+        .secure-badge.safe { background: var(--success); }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>CSSLP Domain 4: Architecture Simulation Lab</h1>
+        <p>Architectural Defense Against Pervasive Computing Threats</p>
+    </header>
+
+    <!-- LAB 1: IoT FIRMWARE -->
+    <div class="lab-container">
+        <div class="controls">
+            <h2>Lab 1: IoT Firmware</h2>
+            <p><strong>Scenario:</strong> You are architecting a smart thermostat. Attackers are attempting to flash malicious firmware to enslave the device into a botnet.</p>
+            
+            <div class="switch-group">
+                <label>Boot Loader Logic:</label>
+                <select id="iot-boot-logic">
+                    <option value="insecure">Load Any Binary</option>
+                    <option value="secure">Verify Signature (Root of Trust)</option>
+                </select>
+            </div>
+
+            <div class="switch-group">
+                <label>Update Mechanism:</label>
+                <select id="iot-update-mech">
+                    <option value="http">HTTP (Plaintext)</option>
+                    <option value="https">HTTPS (Encrypted Channel)</option>
+                    <option value="signed">Signed Binary + HTTPS</option>
+                </select>
+            </div>
+
+            <button class="attack-btn" onclick="runIoTAttack()">RUN EXPLOIT: Inject Malware</button>
+        </div>
+        <div class="simulation">
+            <div class="terminal-window" id="iot-terminal">
+                <div class="log-entry"><span class="log-time">SYS</span> System Ready. Waiting for input...</div>
+                <span class="blinking-cursor"></span>
+            </div>
+            <div class="status-bar">
+                <span>Device Status: <span id="iot-status">Online</span></span>
+                <span id="iot-security-rating" class="secure-badge">VULNERABLE</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- LAB 2: NFC PAYMENT -->
+    <div class="lab-container">
+        <div class="controls">
+            <h2>Lab 2: NFC Payment</h2>
+            <p><strong>Scenario:</strong> An attacker is using a relay device to bridge a victim's card to a payment terminal 5 miles away.</p>
+            
+            <div class="switch-group">
+                <label>Authentication Protocol:</label>
+                <select id="nfc-auth">
+                    <option value="static">Static UID (Serial Number)</option>
+                    <option value="challenge">Challenge-Response (Crypto)</option>
+                </select>
+            </div>
+
+            <div class="switch-group">
+                <label>Latency Check (Distance Bounding):</label>
+                <select id="nfc-latency">
+                    <option value="none">None (Accept any response time)</option>
+                    <option value="strict">Strict (Max 20ms Round Trip)</option>
+                </select>
+            </div>
+
+            <button class="attack-btn" onclick="runNFCAttack()">RUN EXPLOIT: Relay Attack</button>
+        </div>
+        <div class="simulation">
+            <div class="terminal-window" id="nfc-terminal">
+                <div class="log-entry"><span class="log-time">POS</span> Terminal Ready.</div>
+                <span class="blinking-cursor"></span>
+            </div>
+            <div class="status-bar">
+                <span>Transaction Status: <span id="nfc-status">Idle</span></span>
+                <span id="nfc-security-rating" class="secure-badge">VULNERABLE</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- LAB 3: MESH NETWORK -->
+    <div class="lab-container">
+        <div class="controls">
+            <h2>Lab 3: Wireless Mesh</h2>
+            <p><strong>Scenario:</strong> Sensitive sensor data hops through Node B (Attacker Controlled) to get to the Cloud.</p>
+            
+            <div class="switch-group">
+                <label>Encryption Layer:</label>
+                <select id="mesh-enc">
+                    <option value="link">Link Layer (Hop-by-Hop)</option>
+                    <option value="app">Application Layer (End-to-End)</option>
+                </select>
+            </div>
+
+            <div class="switch-group">
+                <label>Node Trust Model:</label>
+                <select id="mesh-trust">
+                    <option value="blind">Blind Trust (Accept all neighbors)</option>
+                    <option value="auth">Mutual Auth (Certificates)</option>
+                </select>
+            </div>
+
+            <button class="attack-btn" onclick="runMeshAttack()">RUN EXPLOIT: Sniff Traffic</button>
+        </div>
+        <div class="simulation">
+            <div class="terminal-window" id="mesh-terminal">
+                <div class="log-entry"><span class="log-time">MESH</span> Network formed. 3 Nodes active.</div>
+                <span class="blinking-cursor"></span>
+            </div>
+            <div class="status-bar">
+                <span>Data Confidentiality: <span id="mesh-status">Unknown</span></span>
+                <span id="mesh-security-rating" class="secure-badge">VULNERABLE</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Helper to log to terminal
+        function log(termId, type, msg) {
+            const term = document.getElementById(termId);
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            let colorClass = 'log-sys';
+            if (type === 'ERR') colorClass = 'log-err';
+            if (type === 'OK') colorClass = 'log-success';
+            if (type === 'WARN') colorClass = 'log-warn';
+            if (type === 'ATK') colorClass = 'log-err'; // Attack logs are red
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">${time}</span> <span class="${colorClass}">[${type}]</span> ${msg}`;
+            
+            // Insert before cursor
+            term.insertBefore(entry, term.lastElementChild);
+            term.scrollTop = term.scrollHeight;
+        }
+
+        // --- LAB 1: IoT LOGIC ---
+        function runIoTAttack() {
+            const bootLogic = document.getElementById('iot-boot-logic').value;
+            const updateMech = document.getElementById('iot-update-mech').value;
+            const statusBadge = document.getElementById('iot-security-rating');
+
+            log('iot-terminal', 'ATK', 'Initiating firmware injection via Port 80...');
+            
+            setTimeout(() => {
+                if (bootLogic === 'insecure') {
+                    log('iot-terminal', 'ERR', 'CRITICAL: Unsigned firmware loaded into memory.');
+                    log('iot-terminal', 'ERR', 'SYSTEM COMPROMISED. Botnet agent active.');
+                    statusBadge.textContent = "COMPROMISED";
+                    statusBadge.className = "secure-badge";
+                } else {
+                    log('iot-terminal', 'SYS', 'Bootloader verifying cryptographic signature...');
+                    if (updateMech === 'signed') {
+                        log('iot-terminal', 'OK', 'Signature Mismatch! Update rejected.');
+                        log('iot-terminal', 'OK', 'Secure Boot prevented malware execution.');
+                        statusBadge.textContent = "SECURE";
+                        statusBadge.className = "secure-badge safe";
+                    } else {
+                        log('iot-terminal', 'WARN', 'Signature Check Failed, but transmission was insecure.');
+                        log('iot-terminal', 'OK', 'Device rebooting to safe mode.');
+                        statusBadge.textContent = "PARTIAL";
+                        statusBadge.className = "secure-badge";
+                    }
+                }
+            }, 800);
+        }
+
+        // --- LAB 2: NFC LOGIC ---
+        function runNFCAttack() {
+            const auth = document.getElementById('nfc-auth').value;
+            const latency = document.getElementById('nfc-latency').value;
+            const statusBadge = document.getElementById('nfc-security-rating');
+
+            log('nfc-terminal', 'ATK', 'Relay Attack Started. Bridge established (500ms latency).');
+
+            setTimeout(() => {
+                log('nfc-terminal', 'SYS', 'Card presented. Attempting handshake...');
+                
+                if (latency === 'none') {
+                    if (auth === 'static') {
+                        log('nfc-terminal', 'ERR', 'UID 0x4A1B cloned. Transaction Approved.');
+                        statusBadge.textContent = "COMPROMISED";
+                        statusBadge.className = "secure-badge";
+                    } else {
+                        log('nfc-terminal', 'WARN', 'Crypto Challenge passed (Relayed). Transaction Approved.');
+                        log('nfc-terminal', 'ERR', 'Attack Successful: System ignored physical distance.');
+                        statusBadge.textContent = "COMPROMISED";
+                        statusBadge.className = "secure-badge";
+                    }
+                } else {
+                    // Strict Latency
+                    log('nfc-terminal', 'SYS', 'Measuring Round Trip Time (RTT)...');
+                    log('nfc-terminal', 'WARN', 'RTT: 502ms (Threshold: 20ms).');
+                    log('nfc-terminal', 'OK', 'Distance Bounding Check Failed. Transaction Denied.');
+                    statusBadge.textContent = "SECURE";
+                    statusBadge.className = "secure-badge safe";
+                }
+            }, 800);
+        }
+
+        // --- LAB 3: MESH LOGIC ---
+        function runMeshAttack() {
+            const enc = document.getElementById('mesh-enc').value;
+            const trust = document.getElementById('mesh-trust').value;
+            const statusBadge = document.getElementById('mesh-security-rating');
+
+            log('mesh-terminal', 'ATK', 'Compromised Node B sniffing traffic...');
+
+            setTimeout(() => {
+                log('mesh-terminal', 'SYS', 'Packet routing: A -> B -> Cloud');
+                
+                if (enc === 'link') {
+                    log('mesh-terminal', 'ERR', 'Node B decrypted Link Layer.');
+                    log('mesh-terminal', 'ERR', 'PAYLOAD EXPOSED: {"temp": 98.6, "patient_id": 101}');
+                    statusBadge.textContent = "DATA LEAK";
+                    statusBadge.className = "secure-badge";
+                } else {
+                    log('mesh-terminal', 'SYS', 'Node B decrypting Link Layer...');
+                    log('mesh-terminal', 'OK', 'Inner payload is Application Layer Encrypted.');
+                    log('mesh-terminal', 'OK', 'Attacker sees: 0x89a1b4... (Garbage).');
+                    statusBadge.textContent = "SECURE";
+                    statusBadge.className = "secure-badge safe";
+                }
+            }, 800);
+        }
+
+    </script>
+
+</body>
+</html>

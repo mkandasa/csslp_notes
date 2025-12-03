@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Secure Topology Builder</title>
+    <style>
+        :root {
+            --bg: #f0f2f5;
+            --surface: #ffffff;
+            --primary: #3b82f6; /* Blue */
+            --danger: #ef4444; /* Red */
+            --warning: #f59e0b; /* Yellow/Orange */
+            --success: #10b981; /* Green */
+            --text: #1f2937;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        header {
+            background: var(--surface);
+            padding: 15px 30px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        h1 { margin: 0; font-size: 1.2rem; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+        
+        .score-badge {
+            background: var(--text);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        /* MAIN LAYOUT */
+        .workspace {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR (INVENTORY) */
+        .sidebar {
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        .inventory-box {
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 15px;
+            min-height: 100px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-content: flex-start;
+        }
+
+        .helper-text {
+            font-size: 0.85rem;
+            color: #64748b;
+            line-height: 1.4;
+            background: #e0f2fe;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .btn-test {
+            margin-top: auto;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-test:hover { background: #2563eb; transform: translateY(-2px); }
+        .btn-test:disabled { background: #94a3b8; cursor: not-allowed; transform: none; }
+
+        .btn-reset {
+            background: transparent;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .btn-reset:hover { background: #f1f5f9; }
+
+        /* DROP ZONES AREA */
+        .topology-map {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+            align-items: center;
+        }
+
+        /* NETWORK ZONES */
+        .zone {
+            width: 80%;
+            max-width: 800px;
+            min-height: 120px;
+            background: rgba(255,255,255,0.8);
+            border: 2px solid;
+            border-radius: 12px;
+            position: relative;
+            padding: 40px 20px 20px 20px;
+            transition: 0.3s;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .zone.drag-over { transform: scale(1.02); background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+
+        .zone-label {
+            position: absolute;
+            top: 0; left: 0;
+            padding: 5px 15px;
+            border-radius: 10px 0 10px 0;
+            font-weight: bold;
+            font-size: 0.8rem;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Specific Zone Styles */
+        #zone-public { 
+            border-color: var(--danger); 
+            background: linear-gradient(to bottom, rgba(239,68,68,0.05), transparent);
+        }
+        #zone-public .zone-label { background: var(--danger); }
+
+        #zone-dmz { 
+            border-color: var(--warning); 
+            background: linear-gradient(to bottom, rgba(245,158,11,0.05), transparent);
+        }
+        #zone-dmz .zone-label { background: var(--warning); color: black; }
+
+        #zone-app { 
+            border-color: var(--primary); 
+            background: linear-gradient(to bottom, rgba(59,130,246,0.05), transparent);
+        }
+        #zone-app .zone-label { background: var(--primary); }
+
+        #zone-data { 
+            border-color: var(--success); 
+            background: linear-gradient(to bottom, rgba(16,185,129,0.05), transparent);
+        }
+        #zone-data .zone-label { background: var(--success); }
+
+        /* Connectors (Visual Lines) */
+        .connector {
+            width: 2px;
+            height: 20px;
+            background: #cbd5e1;
+        }
+
+        /* DRAGGABLE SERVERS */
+        .server-card {
+            width: 90px;
+            height: 90px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: 0.2s;
+            position: relative;
+            z-index: 20;
+        }
+        .server-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-color: var(--primary); }
+        .server-card:active { cursor: grabbing; }
+        
+        .icon { font-size: 2rem; margin-bottom: 5px; }
+        .name { font-size: 0.75rem; font-weight: bold; color: #4b5563; text-align: center;}
+
+        /* ATTACK VISUALS */
+        .hacker {
+            position: absolute;
+            font-size: 2.5rem;
+            z-index: 100;
+            top: 20px;
+            right: 20px;
+            transition: top 1s ease-in-out, left 1s ease-in-out, opacity 0.5s;
+            filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2));
+            display: none;
+        }
+
+        .server-card.hacked {
+            background: #fee2e2;
+            border-color: var(--danger);
+            animation: shake 0.5s;
+        }
+        .server-card.hacked .icon { content: "☠️"; } /* Just for effect */
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(5px); }
+            50% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* Overlay Modal for Result */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            backdrop-filter: blur(2px);
+        }
+        .modal {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .modal h2 { margin-top: 0; color: var(--text); }
+        .modal p { color: #4b5563; margin-bottom: 20px; }
+        .modal button {
+            background: var(--primary); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🏗️ Secure Topology Builder</h1>
+    <div class="score-badge" id="arch-score">Architecture Score: 0/100</div>
+</header>
+
+<div class="workspace">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <h3>1. Asset Inventory</h3>
+        <p style="font-size:0.85rem; color:#64748b; margin-top:-10px;">Drag these components into the correct security zones.</p>
+        
+        <div class="inventory-box" id="inventory" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <!-- Draggable Items -->
+            <div class="server-card" draggable="true" ondragstart="drag(event)" id="web-server" data-type="web">
+                <div class="icon">🌐</div>
+                <div class="name">Web Server</div>
+            </div>
+            <div class="server-card" draggable="true" ondragstart="drag(event)" id="app-server" data-type="app">
+                <div class="icon">⚙️</div>
+                <div class="name">App Logic</div>
+            </div>
+            <div class="server-card" draggable="true" ondragstart="drag(event)" id="db-server" data-type="db">
+                <div class="icon">🛢️</div>
+                <div class="name">Database</div>
+            </div>
+        </div>
+
+        <div class="helper-text" id="assistant">
+            <strong>Architect's Assistant:</strong><br>
+            Hi! I'm here to help. Start by dragging the <strong>Web Server</strong>. Since it talks to the Internet, where should it go? (Hint: Not the Data Tier!)
+        </div>
+
+        <button class="btn-test" onclick="runSimulation()" id="btn-run" disabled>
+            🚀 Test Security
+        </button>
+        <button class="btn-reset" onclick="resetLab()">Reset Board</button>
+    </div>
+
+    <!-- MAIN MAP -->
+    <div class="topology-map">
+        
+        <!-- ZONE 1: PUBLIC -->
+        <div class="zone" id="zone-public" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="zone-label">Public Internet (Untrusted)</div>
+        </div>
+
+        <div class="connector"></div>
+
+        <!-- ZONE 2: DMZ -->
+        <div class="zone" id="zone-dmz" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="zone-label">DMZ (Perimeter)</div>
+        </div>
+
+        <div class="connector"></div>
+
+        <!-- ZONE 3: APP TIER -->
+        <div class="zone" id="zone-app" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="zone-label">App Tier (Internal)</div>
+        </div>
+
+        <div class="connector"></div>
+
+        <!-- ZONE 4: DATA TIER -->
+        <div class="zone" id="zone-data" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <div class="zone-label">Data Tier (Restricted)</div>
+        </div>
+
+    </div>
+
+    <!-- ATTACKER SPRITE -->
+    <div class="hacker" id="hacker">👾</div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="result-modal">
+    <div class="modal">
+        <h2 id="modal-title">Title</h2>
+        <div style="font-size:3rem; margin:10px 0;" id="modal-icon">✅</div>
+        <p id="modal-msg">Message</p>
+        <button onclick="closeModal()">Close</button>
+    </div>
+</div>
+
+<script>
+    // State Tracking
+    const locations = {
+        'web-server': 'inventory',
+        'app-server': 'inventory',
+        'db-server': 'inventory'
+    };
+
+    // Drag & Drop Functions
+    function allowDrop(ev) {
+        ev.preventDefault();
+        // Visual cue
+        if (ev.target.classList.contains('zone') || ev.target.id === 'inventory') {
+            ev.target.classList.add('drag-over');
+        }
+    }
+
+    function drag(ev) {
+        ev.dataTransfer.setData("text", ev.target.id);
+        // Clean up drag-over styles on drag start just in case
+        document.querySelectorAll('.zone').forEach(z => z.classList.remove('drag-over'));
+    }
+
+    function drop(ev) {
+        ev.preventDefault();
+        const data = ev.dataTransfer.getData("text");
+        const el = document.getElementById(data);
+        
+        // Find the valid drop target (handle dropping ON another element inside the zone)
+        let target = ev.target;
+        while (!target.classList.contains('zone') && target.id !== 'inventory') {
+            target = target.parentElement;
+            if(!target) return; // Dropped outside valid area
+        }
+
+        target.classList.remove('drag-over');
+        target.appendChild(el);
+        
+        // Update State
+        locations[data] = target.id;
+        
+        // Provide Instant Feedback
+        evaluateMove(data, target.id);
+        
+        // Check if ready to run
+        const ready = Object.values(locations).every(loc => loc !== 'inventory');
+        document.getElementById('btn-run').disabled = !ready;
+    }
+
+    // Interactive Feedback Logic
+    function evaluateMove(item, zone) {
+        const assistant = document.getElementById('assistant');
+        let msg = "";
+        let score = 0;
+
+        // Reset Styles
+        assistant.style.borderLeftColor = "#3b82f6"; // Blue default
+
+        if (item === 'web-server') {
+            if (zone === 'zone-public') {
+                msg = "⚠️ <strong>Risky!</strong> Putting the Web Server directly on the Public Internet exposes it to full attack. A <strong>DMZ</strong> is safer.";
+                assistant.style.borderLeftColor = "#f59e0b";
+            } else if (zone === 'zone-dmz') {
+                msg = "✅ <strong>Perfect.</strong> The Web Server belongs in the DMZ. It's accessible but isolated from data.";
+                assistant.style.borderLeftColor = "#10b981";
+                score += 30;
+            } else if (zone === 'zone-data') {
+                msg = "❌ <strong>Incorrect.</strong> Users can't reach the Web Server if it's buried in the Data Tier!";
+                assistant.style.borderLeftColor = "#ef4444";
+            }
+        }
+
+        if (item === 'db-server') {
+            if (zone !== 'zone-data' && zone !== 'inventory') {
+                msg = "⛔ <strong>Stop!</strong> Databases should NEVER be exposed. Move it deeper.";
+                assistant.style.borderLeftColor = "#ef4444";
+            } else if (zone === 'zone-data') {
+                msg = "✅ <strong>Excellent.</strong> The Database is in the deepest, most restricted zone.";
+                assistant.style.borderLeftColor = "#10b981";
+                score += 40;
+            }
+        }
+
+        if (item === 'app-server') {
+            if (zone === 'zone-app') {
+                msg = "✅ <strong>Good.</strong> Application Logic is hidden behind the Web Server.";
+                assistant.style.borderLeftColor = "#10b981";
+                score += 30;
+            }
+        }
+
+        if (msg === "") msg = "Keep going! Arrange the servers to minimize the attack surface.";
+        
+        assistant.innerHTML = `<strong>Architect's Assistant:</strong><br>${msg}`;
+        calculateScore();
+    }
+
+    function calculateScore() {
+        let score = 0;
+        if (locations['web-server'] === 'zone-dmz') score += 30;
+        if (locations['app-server'] === 'zone-app') score += 30;
+        if (locations['db-server'] === 'zone-data') score += 40;
+        
+        document.getElementById('arch-score').innerText = `Architecture Score: ${score}/100`;
+        return score;
+    }
+
+    // Reset
+    function resetLab() {
+        const inv = document.getElementById('inventory');
+        ['web-server', 'app-server', 'db-server'].forEach(id => {
+            const el = document.getElementById(id);
+            inv.appendChild(el);
+            locations[id] = 'inventory';
+            el.classList.remove('hacked');
+        });
+        document.getElementById('btn-run').disabled = true;
+        document.getElementById('arch-score').innerText = "Architecture Score: 0/100";
+        document.getElementById('assistant').innerHTML = `<strong>Architect's Assistant:</strong><br>Board reset. Try again!`;
+        document.getElementById('hacker').style.display = 'none';
+    }
+
+    // Simulation
+    async function runSimulation() {
+        const hacker = document.getElementById('hacker');
+        const web = document.getElementById('web-server');
+        const app = document.getElementById('app-server');
+        const db = document.getElementById('db-server');
+
+        hacker.style.display = 'block';
+        hacker.style.top = '20px'; // Start at Public Internet
+        hacker.style.right = '20px';
+
+        // Animate Function
+        const moveTo = async (element) => {
+            const rect = element.getBoundingClientRect();
+            // Adjust for scrolling
+            const top = rect.top + window.scrollY;
+            const left = rect.left + window.scrollX;
+            
+            hacker.style.top = top + 'px';
+            hacker.style.left = (left + 50) + 'px'; // Center roughly
+            
+            return new Promise(r => setTimeout(r, 1000));
+        };
+
+        // Step 1: Attack Web Server
+        await moveTo(web);
+        web.classList.add('hacked'); // Web is public facing, always gets hit
+
+        // Step 2: Try to Pivot to DB
+        // Logic: Can we reach DB?
+        // Insecure: Web & DB in same zone OR DB in Public/DMZ
+        const webZone = locations['web-server'];
+        const dbZone = locations['db-server'];
+        const appZone = locations['app-server'];
+
+        let success = false;
+        let failMsg = "";
+
+        if (dbZone === 'zone-public' || dbZone === 'zone-dmz') {
+            // Easy Pivot
+            await moveTo(db);
+            db.classList.add('hacked');
+            success = false;
+            failMsg = "The Database was exposed in an untrusted zone (Public/DMZ). The attacker accessed it directly.";
+        } 
+        else if (dbZone === 'zone-data') {
+            // DB is secure. Can we reach it?
+            // Proper Path: Web(DMZ) -> App(App) -> DB(Data)
+            
+            if (webZone === 'zone-dmz' && appZone === 'zone-app') {
+                // Attempt to pivot to App
+                await moveTo(app);
+                app.classList.add('hacked'); // App logic compromised
+                
+                // Attempt pivot to DB (Blocked by Firewall rules/IDS typically in this sim)
+                // In this simplified view, if topology is perfect, we say Architecture SAVED the data.
+                // Or we can say "contained".
+                
+                // Let's stop at App.
+                success = true;
+            } else {
+                // Misconfiguration (e.g. Web in Public) might lead to issues, but if DB is in Data, it's hard to reach.
+                // If Web is Public and App is Public -> Easy pivot.
+                if (appZone === 'zone-public' || appZone === 'zone-dmz') {
+                     await moveTo(app);
+                     app.classList.add('hacked');
+                     await moveTo(db); // Assuming firewalls are weak if architecture is sloppy
+                     db.classList.add('hacked');
+                     success = false;
+                     failMsg = "The Application Server was exposed, allowing the attacker to easily pivot to the Database.";
+                } else {
+                    success = true; // DB saved by segmentation
+                }
+            }
+        }
+
+        // Show Result
+        const title = document.getElementById('modal-title');
+        const icon = document.getElementById('modal-icon');
+        const msg = document.getElementById('modal-msg');
+        const modal = document.getElementById('result-modal');
+
+        if (success) {
+            title.innerText = "Architecture Secure!";
+            icon.innerText = "🛡️";
+            msg.innerText = "The attack breached the perimeter (Web Server), but Network Segmentation prevented access to the Database. The data is safe.";
+        } else {
+            title.innerText = "Data Breach!";
+            icon.innerText = "☠️";
+            msg.innerText = failMsg;
+        }
+        
+        setTimeout(() => { modal.style.display = 'flex'; }, 500);
+    }
+
+    function closeModal() {
+        document.getElementById('result-modal').style.display = 'none';
+        resetLab();
+    }
+
+</script>
+
+</body>
+</html>

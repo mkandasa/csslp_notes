@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Embedded Security Simulator</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+            --highlight: #00e5ff;
+            --success: #00c853;
+            --danger: #ff1744;
+            --warning: #ffab00;
+            --chip-color: #37474f;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 2px solid var(--highlight);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--highlight); }
+        
+        .main-interface {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1200px;
+        }
+
+        /* Controls Panel */
+        .control-panel {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .control-group {
+            margin-bottom: 25px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+        }
+        .control-group:last-child { border-bottom: none; }
+        label { display: block; margin-bottom: 8px; color: var(--highlight); font-weight: bold; }
+        select, button {
+            width: 100%;
+            padding: 10px;
+            background: #2c2c2c;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            font-family: monospace;
+        }
+        button.exploit {
+            background-color: #b71c1c;
+            border-color: #d32f2f;
+            font-weight: bold;
+        }
+        button.exploit:hover { background-color: #c62828; }
+
+        /* Visualization Panel */
+        .viz-panel {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+        .chip-layout {
+            background: #000;
+            height: 300px;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 15px;
+            border: 2px solid #444;
+        }
+
+        /* Architectural Components */
+        .component {
+            position: absolute;
+            background: var(--chip-color);
+            border: 1px solid #78909c;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        #cpu { width: 120px; height: 120px; top: 90px; left: 50px; border-color: var(--highlight); }
+        #flash { width: 80px; height: 100px; top: 100px; left: 250px; }
+        #ram { width: 80px; height: 100px; top: 100px; left: 350px; }
+        #tpm { width: 60px; height: 60px; top: 20px; left: 80px; background: #263238; border-style: dashed; }
+        #efuse { width: 120px; height: 20px; bottom: 30px; left: 50px; background: #3e2723; color: #aaa; font-size: 0.7rem; }
+
+        /* Data Flow Animation */
+        .packet {
+            width: 10px;
+            height: 10px;
+            background: var(--warning);
+            border-radius: 50%;
+            position: absolute;
+            display: none;
+            z-index: 10;
+        }
+
+        /* Console Output */
+        .console {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            padding: 10px;
+            height: 150px;
+            overflow-y: auto;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        .log-err { color: var(--danger); }
+        .log-warn { color: var(--warning); }
+        .log-info { color: var(--highlight); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>CSSLP Domain 4: Embedded Architecture Simulator</h1>
+</header>
+
+<div class="main-interface">
+    
+    <!-- CONTROLS -->
+    <div class="control-panel">
+        
+        <!-- Scenario 1: Secure Boot -->
+        <div class="control-group">
+            <h3>1. Boot Process</h3>
+            <label>Chain of Trust Logic:</label>
+            <select id="boot-logic">
+                <option value="none">None (Trust All Code)</option>
+                <option value="check">Signature Check (Soft)</option>
+                <option value="hardware">Hardware Root of Trust (eFuse)</option>
+            </select>
+            <button class="exploit" onclick="runBootAttack()">Attack: Inject Evil Bootloader</button>
+        </div>
+
+        <!-- Scenario 2: Secure Storage -->
+        <div class="control-group">
+            <h3>2. Key Storage</h3>
+            <label>Crypto Key Location:</label>
+            <select id="key-loc">
+                <option value="flash">Flash Memory (Plaintext)</option>
+                <option value="obfuscated">Flash (Obfuscated)</option>
+                <option value="se">Secure Element / TPM</option>
+            </select>
+            <button class="exploit" onclick="runStorageAttack()">Attack: Dump Flash Memory</button>
+        </div>
+
+        <!-- Scenario 3: Firmware Update -->
+        <div class="control-group">
+            <h3>3. Firmware Update</h3>
+            <label>Rollback Protection:</label>
+            <select id="update-logic">
+                <option value="none">None (Accept Valid Signature)</option>
+                <option value="arb">Anti-Rollback (Check Version > eFuse)</option>
+            </select>
+            <button class="exploit" onclick="runRollbackAttack()">Attack: Flash Old Vulnerable Firmware</button>
+        </div>
+
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-panel">
+        <div class="chip-layout">
+            <!-- Components -->
+            <div id="tpm" class="component">TPM/SE</div>
+            <div id="cpu" class="component">CPU / SoC<br><br>(Execution)</div>
+            <div id="flash" class="component">FLASH<br>(Code/Keys)</div>
+            <div id="ram" class="component">RAM<br>(Runtime)</div>
+            <div id="efuse" class="component">Hardware eFuses (RoT/Ver)</div>
+
+            <!-- Animation Packet -->
+            <div id="data-packet" class="packet"></div>
+        </div>
+        
+        <div class="console" id="sys-console">
+            <div>System Initialized. Waiting for architectural decisions...</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const consoleDiv = document.getElementById('sys-console');
+    const packet = document.getElementById('data-packet');
+
+    function log(msg, type = 'normal') {
+        const line = document.createElement('div');
+        line.textContent = "> " + msg;
+        if (type === 'error') line.className = 'log-err';
+        if (type === 'warn') line.className = 'log-warn';
+        if (type === 'info') line.className = 'log-info';
+        consoleDiv.appendChild(line);
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+
+    function animatePacket(startEl, endEl, color, callback) {
+        const startRect = startEl.getBoundingClientRect();
+        const endRect = endEl.getBoundingClientRect();
+        const containerRect = document.querySelector('.chip-layout').getBoundingClientRect();
+
+        // Calculate positions relative to container
+        const startX = startRect.left - containerRect.left + (startRect.width/2);
+        const startY = startRect.top - containerRect.top + (startRect.height/2);
+        const endX = endRect.left - containerRect.left + (endRect.width/2);
+        const endY = endRect.top - containerRect.top + (endRect.height/2);
+
+        packet.style.display = 'block';
+        packet.style.backgroundColor = color;
+        packet.style.left = startX + 'px';
+        packet.style.top = startY + 'px';
+
+        let pos = 0;
+        const id = setInterval(frame, 10);
+        function frame() {
+            if (pos >= 100) {
+                clearInterval(id);
+                packet.style.display = 'none';
+                if(callback) callback();
+            } else {
+                pos += 2;
+                const currentX = startX + (endX - startX) * (pos/100);
+                const currentY = startY + (endY - startY) * (pos/100);
+                packet.style.left = currentX + 'px';
+                packet.style.top = currentY + 'px';
+            }
+        }
+    }
+
+    // --- LAB 1: BOOT ATTACK ---
+    function runBootAttack() {
+        const logic = document.getElementById('boot-logic').value;
+        log("Attacker attempting to flash malicious bootloader...", "warn");
+        
+        // Animation: Flash -> CPU
+        animatePacket(document.getElementById('flash'), document.getElementById('cpu'), '#ff1744', () => {
+            if (logic === 'none') {
+                log("FAILURE: CPU accepted malicious code. No verification.", "error");
+                document.getElementById('cpu').style.borderColor = '#ff1744';
+                document.getElementById('cpu').innerHTML = "CPU / SoC<br><br>(OWNED)";
+            } else if (logic === 'check') {
+                log("INFO: Software signature check running...");
+                log("FAILURE: Attacker patched the software check in Flash. Code runs.", "error");
+                document.getElementById('cpu').style.borderColor = '#ff1744';
+            } else if (logic === 'hardware') {
+                // Animation: eFuse -> CPU
+                animatePacket(document.getElementById('efuse'), document.getElementById('cpu'), '#00e5ff', () => {
+                    log("SUCCESS: Hardware RoT verification FAILED. CPU halted execution.", "info");
+                    document.getElementById('cpu').style.borderColor = '#00c853';
+                    document.getElementById('cpu').innerHTML = "CPU / SoC<br><br>(LOCKED)";
+                });
+            }
+        });
+    }
+
+    // --- LAB 2: STORAGE ATTACK ---
+    function runStorageAttack() {
+        const loc = document.getElementById('key-loc').value;
+        log("Attacker engaging JTAG debugger to dump memory...", "warn");
+
+        if (loc === 'flash') {
+            animatePacket(document.getElementById('flash'), document.getElementById('cpu'), '#ff1744', () => {
+                log("FAILURE: Private Key found in plaintext at address 0x004F.", "error");
+            });
+        } else if (loc === 'obfuscated') {
+             animatePacket(document.getElementById('flash'), document.getElementById('cpu'), '#ffab00', () => {
+                log("WARN: Key is obfuscated (XOR). Attacker reverse engineering...", "warn");
+                setTimeout(() => log("FAILURE: Obfuscation broken. Key extracted.", "error"), 1000);
+            });
+        } else if (loc === 'se') {
+             animatePacket(document.getElementById('tpm'), document.getElementById('cpu'), '#00e5ff', () => {
+                log("SUCCESS: Key is non-exportable. JTAG dump contains only API handles, not the key.", "info");
+            });
+        }
+    }
+
+    // --- LAB 3: ROLLBACK ATTACK ---
+    function runRollbackAttack() {
+        const logic = document.getElementById('update-logic').value;
+        log("Attacker flashing Signed Firmware v1.0 (Known Vulnerability)...", "warn");
+
+        // Animation: Flash -> CPU
+        animatePacket(document.getElementById('flash'), document.getElementById('cpu'), '#ffab00', () => {
+            if (logic === 'none') {
+                log("INFO: Signature Valid (Manufacturer Key).");
+                log("FAILURE: Downgrade successful. Vulnerability re-introduced.", "error");
+            } else {
+                log("INFO: Signature Valid.");
+                log("INFO: Checking Version Fuse...");
+                animatePacket(document.getElementById('efuse'), document.getElementById('cpu'), '#00e5ff', () => {
+                    log("SUCCESS: Update Version (1) < Fuse Version (2). Update Rejected.", "info");
+                });
+            }
+        });
+    }
+
+</script>
+
+</body>
+</html>s

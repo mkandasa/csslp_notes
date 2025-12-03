@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Firewall Architecture Lab</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --firewall-red: #e53935;
+            --safe-green: #43a047;
+            --net-blue: #1e88e5;
+            --text: #e0e0e0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--firewall-red);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--firewall-red); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROL PANEL */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .acl-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+        }
+        .acl-table th { text-align: left; border-bottom: 2px solid #555; padding: 5px; color: #aaa; }
+        .acl-table td { border-bottom: 1px solid #333; padding: 8px 5px; }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 34px; height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #555; transition: .4s; border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute; content: "";
+            height: 14px; width: 14px; left: 3px; bottom: 3px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--firewall-red); }
+        input:checked + .slider:before { transform: translateX(14px); }
+
+        .traffic-gen {
+            border-top: 1px solid #444;
+            padding-top: 15px;
+        }
+        button.gen-btn {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-http { background: var(--net-blue); }
+        .btn-ssh { background: #8e24aa; }
+        .btn-xss { background: #fb8c00; color: black; }
+        button:hover { filter: brightness(1.2); }
+
+        /* VISUALIZATION */
+        .viz-window {
+            background: #000;
+            border: 2px solid #333;
+            border-radius: 8px;
+            height: 500px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+
+        .wall {
+            position: absolute;
+            left: 50%; top: 0; bottom: 0;
+            width: 20px;
+            background: repeating-linear-gradient(
+                45deg,
+                #222,
+                #222 10px,
+                #333 10px,
+                #333 20px
+            );
+            border-left: 2px solid var(--firewall-red);
+            border-right: 2px solid var(--firewall-red);
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            color: #555;
+            font-weight: bold;
+            letter-spacing: 5px;
+        }
+        
+        .zone-label {
+            position: absolute;
+            top: 10px;
+            font-weight: bold;
+            color: #555;
+            text-transform: uppercase;
+        }
+        .zone-untrust { left: 20px; }
+        .zone-trust { right: 20px; }
+
+        .server-icon {
+            position: absolute;
+            right: 50px;
+            width: 80px; height: 100px;
+            background: #263238;
+            border: 2px solid var(--safe-green);
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--safe-green);
+            font-weight: bold;
+            z-index: 5;
+        }
+
+        /* PACKET STYLES */
+        .packet {
+            position: absolute;
+            width: 120px; height: 40px;
+            background: #fff;
+            color: #000;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            z-index: 20;
+            box-shadow: 0 0 10px rgba(255,255,255,0.3);
+            left: -150px; /* Start off screen */
+            transition: left 2s linear, opacity 0.3s, transform 0.3s;
+        }
+        .pkt-header { font-weight: bold; border-bottom: 1px solid #ccc; width: 100%; text-align: center; }
+        .pkt-body { font-family: monospace; color: #555; }
+        
+        .pkt-ssh { border: 2px solid #8e24aa; background: #f3e5f5; }
+        .pkt-xss { border: 2px solid #fb8c00; background: #fff3e0; }
+        .pkt-http { border: 2px solid var(--net-blue); background: #e3f2fd; }
+
+        .burn-anim {
+            animation: burn 0.5s forwards;
+        }
+        @keyframes burn {
+            0% { transform: scale(1); background: var(--firewall-red); }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        /* LOGS */
+        .log-panel {
+            grid-column: 1 / -1;
+            background: #111;
+            height: 150px;
+            border: 1px solid #333;
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        .log-deny { color: var(--firewall-red); }
+        .log-allow { color: var(--safe-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Firewall Architecture Simulator</h1>
+    <p>Network (L4) & Application (L7) Filtering</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <h3>Access Control List (ACL)</h3>
+        <table class="acl-table">
+            <thead>
+                <tr>
+                    <th>Rule Type</th>
+                    <th>Detail</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>L4: Network</td>
+                    <td>Port 80/443 (Web)</td>
+                    <td style="color:var(--safe-green)">ALLOW</td>
+                </tr>
+                <tr>
+                    <td>L4: Network</td>
+                    <td>Port 22 (SSH)</td>
+                    <td>
+                        <label class="switch">
+                            <input type="checkbox" id="rule-ssh" checked>
+                            <span class="slider"></span>
+                        </label> <span style="font-size:0.7rem; margin-left:5px;">BLOCK</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>L7: WAF</td>
+                    <td>Inspect Payload (XSS/SQLi)</td>
+                    <td>
+                        <label class="switch">
+                            <input type="checkbox" id="rule-waf">
+                            <span class="slider"></span>
+                        </label> <span style="font-size:0.7rem; margin-left:5px;">ACTIVE</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="traffic-gen">
+            <h3>Generate Traffic</h3>
+            <button class="gen-btn btn-http" onclick="spawnPacket('http')">✅ Legitimate Web User</button>
+            <button class="gen-btn btn-ssh" onclick="spawnPacket('ssh')">💀 SSH Brute Force</button>
+            <button class="gen-btn btn-xss" onclick="spawnPacket('xss')">💉 Web Attack (XSS Payload)</button>
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-window" id="viz-area">
+        <div class="zone-label zone-untrust">Untrusted Zone (Internet)</div>
+        <div class="zone-label zone-trust">Trusted Zone (DMZ)</div>
+
+        <div class="wall">FIREWALL</div>
+
+        <div class="server-icon">
+            APP<br>SERVER
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-panel" id="logger">
+        <div>> Firewall initialized. Default Policy: DENY ALL unless specified.</div>
+    </div>
+
+</div>
+
+<script>
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const entry = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        entry.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type === 'deny' ? 'log-deny' : 'log-allow'}">${msg}</span>`;
+        box.prepend(entry);
+    }
+
+    function spawnPacket(type) {
+        const viz = document.getElementById('viz-area');
+        const pkt = document.createElement('div');
+        pkt.className = `packet pkt-${type}`;
+        
+        let headerText = "";
+        let bodyText = "";
+
+        if (type === 'http') {
+            headerText = "TCP:80";
+            bodyText = "GET /index.html";
+        } else if (type === 'ssh') {
+            headerText = "TCP:22";
+            bodyText = "root@login";
+        } else if (type === 'xss') {
+            headerText = "TCP:80";
+            bodyText = "<script>alert(1)";
+        }
+
+        pkt.innerHTML = `<div class="pkt-header">${headerText}</div><div class="pkt-body">${bodyText}</div>`;
+        viz.appendChild(pkt);
+
+        // Start Animation
+        // Start Position
+        pkt.style.left = '20px';
+
+        // Check Logic at the Wall (center is approx 50% of container width)
+        // Container width varies, let's assume 100% logic
+        
+        setTimeout(() => {
+            // Move to Wall
+            const wallPos = viz.offsetWidth / 2 - 60; // 60 is half packet width
+            pkt.style.left = wallPos + 'px';
+
+            setTimeout(() => {
+                checkFirewall(pkt, type);
+            }, 2000); // Time to reach wall
+        }, 100);
+    }
+
+    function checkFirewall(pkt, type) {
+        const blockSSH = document.getElementById('rule-ssh').checked;
+        const activeWAF = document.getElementById('rule-waf').checked;
+
+        let action = 'allow';
+        let reason = '';
+
+        // 1. L4 CHECKS (Port)
+        if (type === 'ssh') {
+            if (blockSSH) {
+                action = 'deny';
+                reason = 'L4 Rule: Port 22 Blocked';
+            } else {
+                reason = 'L4 Rule: Port 22 Open (Risky!)';
+            }
+        }
+
+        // 2. L7 CHECKS (Payload)
+        // Only run if L4 passed
+        if (action === 'allow' && type === 'xss') {
+            if (activeWAF) {
+                action = 'deny';
+                reason = 'WAF Rule: Malicious Payload Detect';
+            } else {
+                reason = 'WAF Disabled: Payload Ignored';
+            }
+        }
+
+        if (type === 'http') {
+            reason = 'Rule: Web Traffic Allowed';
+        }
+
+        // Execute Action
+        if (action === 'deny') {
+            pkt.classList.add('burn-anim');
+            log(`BLOCKED: ${type.toUpperCase()} Packet. Reason: ${reason}`, 'deny');
+            setTimeout(() => pkt.remove(), 500);
+        } else {
+            // Move to Server
+            const serverPos = document.getElementById('viz-area').offsetWidth - 150;
+            pkt.style.left = serverPos + 'px';
+            log(`ALLOWED: ${type.toUpperCase()} Packet. Reason: ${reason}`, 'allow');
+            
+            setTimeout(() => {
+                pkt.style.opacity = 0;
+                setTimeout(() => pkt.remove(), 500);
+            }, 2000);
+        }
+    }
+
+</script>
+
+</body>
+</html>

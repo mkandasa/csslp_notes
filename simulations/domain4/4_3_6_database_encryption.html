@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Database Encryption Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --db-orange: #f97316;
+            --app-blue: #3b82f6;
+            --hacker-red: #ef4444;
+            --text: #f1f5f9;
+            --cipher-green: #10b981;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--db-orange);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--db-orange); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .mode-btn {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 2px solid #475569;
+            background: #0f172a;
+            color: #94a3b8;
+            cursor: pointer;
+            border-radius: 6px;
+            text-align: left;
+            transition: 0.2s;
+        }
+        .mode-btn:hover { border-color: var(--db-orange); }
+        .mode-btn.active { 
+            border-color: var(--db-orange); 
+            background: rgba(249, 115, 22, 0.1); 
+            color: white; 
+            font-weight: bold;
+        }
+        .mode-btn small { display: block; font-size: 0.75rem; margin-top: 5px; font-weight: normal; }
+
+        .attack-panel {
+            margin-top: 20px;
+            border-top: 1px solid #475569;
+            padding-top: 15px;
+        }
+        .btn-attack {
+            width: 100%;
+            padding: 10px;
+            background: var(--hacker-red);
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+        .btn-attack:hover { filter: brightness(1.1); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Architecture Diagram */
+        .arch-diagram {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #000;
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            position: relative;
+        }
+        
+        .node {
+            width: 100px; height: 100px;
+            border-radius: 8px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 0.8rem;
+            text-align: center;
+            z-index: 10;
+            border: 2px solid #555;
+            background: #222;
+            transition: 0.3s;
+        }
+        #node-app { border-color: var(--app-blue); }
+        #node-db { border-color: var(--db-orange); }
+        #node-disk { border-color: #64748b; }
+
+        .data-flow {
+            position: absolute;
+            height: 4px;
+            background: #334155;
+            top: 50%; left: 100px; right: 100px;
+            z-index: 0;
+        }
+        .packet {
+            position: absolute;
+            width: 60px; height: 30px;
+            background: white;
+            color: black;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            top: 50%; transform: translateY(-50%);
+            left: 120px;
+            opacity: 0;
+        }
+        .pkt-enc { background: var(--cipher-green); color: white; border: 1px solid white; }
+
+        /* DB TABLE VIEW */
+        .db-view {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        table { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 0.9rem; }
+        th { text-align: left; color: #94a3b8; border-bottom: 1px solid #475569; padding: 5px; }
+        td { padding: 8px 5px; border-bottom: 1px solid #334155; }
+        .sensitive { color: var(--hacker-red); }
+        .encrypted { color: var(--cipher-green); word-break: break-all; font-size: 0.75rem; }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 120px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #ccc;
+        }
+        .log-steal { color: var(--hacker-red); }
+        .log-fail { color: var(--cipher-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Database Encryption Simulator</h1>
+    <p>Architecture: TDE (Rest) vs. Application Level (ALE)</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <h3>Architecture Strategy</h3>
+        
+        <button class="mode-btn active" onclick="setMode('none')" id="btn-none">
+            1. No Encryption (Plaintext)
+            <small>Fastest. Highest Risk. "000-11-2222"</small>
+        </button>
+
+        <button class="mode-btn" onclick="setMode('tde')" id="btn-tde">
+            2. Transparent Data Enc (TDE)
+            <small>Disk is encrypted. DB Engine decrypts on read.</small>
+        </button>
+
+        <button class="mode-btn" onclick="setMode('ale')" id="btn-ale">
+            3. App-Level Encryption (ALE)
+            <small>App encrypts. DB sees only ciphertext.</small>
+        </button>
+
+        <div class="attack-panel">
+            <h3>Simulate Breach</h3>
+            <button class="btn-attack" onclick="attackSQLi()">💉 Attack: SQL Injection</button>
+            <button class="btn-attack" onclick="attackDisk()">💾 Attack: Stolen Hard Drive</button>
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- ARCH DIAGRAM -->
+        <div class="arch-diagram">
+            <div class="node" id="node-app">
+                APP SERVER<br>
+                <span id="app-status" style="font-size:0.7rem; color:#aaa;">(No Key)</span>
+            </div>
+            
+            <div class="node" id="node-db">
+                DB ENGINE<br>
+                <span id="db-status" style="font-size:0.7rem; color:#aaa;">(No Key)</span>
+            </div>
+            
+            <div class="node" id="node-disk">
+                HARD DISK<br>(Storage)
+            </div>
+
+            <div class="data-flow"></div>
+            <div class="packet" id="packet">DATA</div>
+        </div>
+
+        <!-- DATABASE STATE -->
+        <div class="db-view">
+            <h3>Database Storage View (What is on Disk?)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>SSN (Sensitive)</th>
+                    </tr>
+                </thead>
+                <tbody id="db-rows">
+                    <!-- Rows injected by JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Default: Plaintext.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let mode = 'none'; // none, tde, ale
+
+    const plainData = "123-45-6789";
+    const cipherData = "U2FsdGVkX1+..."; 
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        div.innerHTML = `> <span class="${type==='steal'?'log-steal':(type==='fail'?'log-fail':'')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function setMode(newMode) {
+        mode = newMode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + newMode).classList.add('active');
+
+        // Update Visuals
+        const appStatus = document.getElementById('app-status');
+        const dbStatus = document.getElementById('db-status');
+        const diskNode = document.getElementById('node-disk');
+
+        // Reset
+        appStatus.innerText = "(No Key)";
+        dbStatus.innerText = "(No Key)";
+        diskNode.style.borderColor = "#64748b";
+
+        if(mode === 'none') {
+            updateTable(plainData, false);
+            log("Config: Encryption Disabled. Data stored in plaintext.");
+        } 
+        else if (mode === 'tde') {
+            dbStatus.innerText = "🔑 Has Key";
+            dbStatus.style.color = "var(--db-orange)";
+            diskNode.style.borderColor = "var(--cipher-green)";
+            updateTable(cipherData, true); // On disk it is encrypted
+            log("Config: TDE Enabled. DB decrypts transparently for users.");
+        }
+        else if (mode === 'ale') {
+            appStatus.innerText = "🔑 Has Key";
+            appStatus.style.color = "var(--app-blue)";
+            updateTable(cipherData, true);
+            log("Config: ALE Enabled. DB stores opaque ciphertext.");
+        }
+    }
+
+    function updateTable(data, isEncrypted) {
+        const tbody = document.getElementById('db-rows');
+        const cls = isEncrypted ? "encrypted" : "sensitive";
+        tbody.innerHTML = `
+            <tr>
+                <td>1</td>
+                <td>Alice</td>
+                <td class="${cls}">${data}</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>Bob</td>
+                <td class="${cls}">${data}</td>
+            </tr>
+        `;
+    }
+
+    function attackSQLi() {
+        log("ATTACK: Injecting `SELECT * FROM users` via Web App...", "normal");
+        
+        // Animation
+        const pkt = document.getElementById('packet');
+        pkt.style.left = "120px"; // App
+        pkt.style.opacity = "1";
+        pkt.innerText = "QUERY";
+        pkt.className = "packet";
+
+        setTimeout(() => {
+            pkt.style.left = "50%"; // DB
+            
+            setTimeout(() => {
+                // Return Data
+                pkt.style.left = "120px";
+                
+                if (mode === 'ale') {
+                    pkt.innerText = "U2Fsd..";
+                    pkt.className = "packet pkt-enc";
+                    log("FAIL: Attacker stole Ciphertext. Cannot decrypt without App Key.", "fail");
+                } else {
+                    // Plaintext OR TDE (DB decrypts automatically for authorized connections)
+                    pkt.innerText = "123-45..";
+                    pkt.className = "packet";
+                    log("SUCCESS: Attacker stole Plaintext SSNs! (TDE decrypts for SQL queries).", "steal");
+                }
+                
+                setTimeout(() => pkt.style.opacity = 0, 1000);
+            }, 800);
+        }, 800);
+    }
+
+    function attackDisk() {
+        log("ATTACK: Thief stole the physical hard drive server...", "normal");
+        
+        const disk = document.getElementById('node-disk');
+        disk.style.boxShadow = "0 0 20px red";
+        
+        setTimeout(() => {
+            disk.style.boxShadow = "none";
+            
+            if (mode === 'none') {
+                log("SUCCESS: Thief mounted drive and read plaintext files.", "steal");
+            } else {
+                // Both TDE and ALE encrypt data at rest on disk
+                log("FAIL: Thief sees garbage data. Drive is encrypted.", "fail");
+            }
+        }, 1000);
+    }
+
+    // Init
+    setMode('none');
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: DB Privilege Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --db-orange: #f97316;
+            --role-purple: #a855f7;
+            --user-green: #22c55e;
+            --danger: #ef4444;
+            --text: #f1f5f9;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--role-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--role-purple); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .user-select {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .user-btn {
+            flex: 1;
+            padding: 10px;
+            background: #334155;
+            border: 2px solid transparent;
+            color: #ccc;
+            cursor: pointer;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .user-btn.active { border-color: var(--user-green); color: white; background: #064e3b; }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        button.action-btn {
+            padding: 12px;
+            background: #475569;
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button.action-btn:hover { filter: brightness(1.2); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-admin { background: var(--db-orange); color: black; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Access Matrix */
+        .matrix-view {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { text-align: left; color: #94a3b8; border-bottom: 1px solid #475569; padding: 8px; }
+        td { padding: 8px; border-bottom: 1px solid #333; }
+        
+        .perm-check { color: var(--user-green); }
+        .perm-cross { color: var(--danger); opacity: 0.5; }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: var(--role-purple); }
+        .log-ok { color: var(--user-green); }
+        .log-err { color: var(--danger); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Database Privilege Management Lab</h1>
+    <p>RBAC, Least Privilege & Escalation Prevention</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Switch Active User</div>
+        <div class="user-select">
+            <div class="user-btn active" onclick="switchUser('app_read')" id="btn-read">
+                👤 Reader<br><span style="font-size:0.7rem">Role: Report</span>
+            </div>
+            <div class="user-btn" onclick="switchUser('app_write')" id="btn-write">
+                👷 Writer<br><span style="font-size:0.7rem">Role: AppUser</span>
+            </div>
+            <div class="user-btn" onclick="switchUser('dba_admin')" id="btn-admin">
+                👑 DBA<br><span style="font-size:0.7rem">Role: Super</span>
+            </div>
+        </div>
+
+        <div class="section-title">2. Execute SQL Command</div>
+        <div class="action-grid">
+            <button class="action-btn" onclick="execSQL('SELECT')">SELECT * FROM orders</button>
+            <button class="action-btn" onclick="execSQL('INSERT')">INSERT INTO orders...</button>
+            <button class="action-btn btn-danger" onclick="execSQL('DROP')">DROP TABLE orders</button>
+            <button class="action-btn btn-admin" onclick="execSQL('GRANT')">GRANT ALL TO public</button>
+        </div>
+        <div style="font-size:0.75rem; color:#888; margin-top:10px;">
+            *Observe logs to see Authorization (AuthZ) decisions.
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- PRIVILEGE MATRIX -->
+        <div class="matrix-view">
+            <h3 style="margin-top:0; color:var(--role-purple)">Effective Permissions Matrix (RBAC)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Assigned Role</th>
+                        <th>SELECT</th>
+                        <th>INSERT/UPDATE</th>
+                        <th>DROP/ALTER</th>
+                        <th>GRANT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>app_read</td>
+                        <td>role_reporting</td>
+                        <td class="perm-check">✔</td>
+                        <td class="perm-cross">✘</td>
+                        <td class="perm-cross">✘</td>
+                        <td class="perm-cross">✘</td>
+                    </tr>
+                    <tr>
+                        <td>app_write</td>
+                        <td>role_application</td>
+                        <td class="perm-check">✔</td>
+                        <td class="perm-check">✔</td>
+                        <td class="perm-cross">✘</td>
+                        <td class="perm-cross">✘</td>
+                    </tr>
+                    <tr>
+                        <td>dba_admin</td>
+                        <td>role_sysadmin</td>
+                        <td class="perm-check">✔</td>
+                        <td class="perm-check">✔</td>
+                        <td class="perm-check">✔</td>
+                        <td class="perm-check">✔</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> DB Security Engine Ready. RBAC Loaded.</div>
+            <div>> Current Context: app_read@localhost</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let currentUser = 'app_read';
+    
+    // Permission Config
+    const perms = {
+        'app_read': ['SELECT'],
+        'app_write': ['SELECT', 'INSERT'],
+        'dba_admin': ['SELECT', 'INSERT', 'DROP', 'GRANT']
+    };
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function switchUser(user) {
+        currentUser = user;
+        
+        // UI Toggle
+        document.querySelectorAll('.user-btn').forEach(b => b.classList.remove('active'));
+        if(user === 'app_read') document.getElementById('btn-read').classList.add('active');
+        if(user === 'app_write') document.getElementById('btn-write').classList.add('active');
+        if(user === 'dba_admin') document.getElementById('btn-admin').classList.add('active');
+
+        log(`CONTEXT SWITCH: Logged in as ${currentUser}`, "sys");
+    }
+
+    function execSQL(action) {
+        log(`REQUEST: User '${currentUser}' attempting ${action}...`, "sys");
+        
+        // Authorization Check
+        if (perms[currentUser].includes(action)) {
+            setTimeout(() => {
+                if(action === 'DROP') log("SUCCESS: Table Dropped. (Disaster!)", "err");
+                else if(action === 'GRANT') log("SUCCESS: Permissions modified.", "ok");
+                else log(`SUCCESS: ${action} executed. 10 rows affected.`, "ok");
+            }, 300);
+        } else {
+            setTimeout(() => {
+                log(`DENIED: Authorization Failure. User '${currentUser}' lacks ${action} privilege.`, "err");
+                log("AUDIT: Failed access attempt logged.", "sys");
+            }, 300);
+        }
+    }
+
+</script>
+
+</body>
+</html>

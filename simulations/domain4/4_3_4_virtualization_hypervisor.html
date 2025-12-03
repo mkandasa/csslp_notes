@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Hypervisor Lab</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --hyp-blue: #0288d1;
+            --vm-green: #2e7d32;
+            --host-orange: #f57c00;
+            --danger: #d32f2f;
+            --text: #e0e0e0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--hyp-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--hyp-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            color: #aaa;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+            text-align: left;
+            padding-left: 15px;
+        }
+        .btn-arch { background: #333; border-left: 4px solid var(--hyp-blue); }
+        .btn-arch:hover { background: #444; }
+        .btn-arch.active { background: #263238; border-color: #00e5ff; }
+
+        .btn-attack { background: #333; border-left: 4px solid var(--danger); }
+        .btn-attack:hover { background: #3e2723; }
+        
+        .btn-mitigate { background: #333; border-left: 4px solid var(--vm-green); }
+        .btn-mitigate.active { background: #1b5e20; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #333;
+            border-radius: 8px;
+            height: 500px;
+            position: relative;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            overflow: hidden;
+        }
+
+        /* Layers */
+        .layer {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-weight: bold;
+            transition: all 0.5s;
+            position: relative;
+        }
+
+        #layer-hw { height: 60px; background: #424242; color: #9e9e9e; border-bottom: 4px solid #000; }
+        #layer-os { height: 80px; background: var(--host-orange); color: black; display: none; }
+        #layer-hyp { height: 60px; background: var(--hyp-blue); color: white; z-index: 10; }
+        
+        /* VMs Container */
+        .vm-container {
+            display: flex;
+            justify-content: space-around;
+            flex-grow: 1;
+            align-items: flex-end;
+            padding-bottom: 10px;
+        }
+        
+        .vm {
+            width: 30%;
+            height: 150px;
+            background: var(--vm-green);
+            border: 2px solid #66bb6a;
+            border-radius: 6px 6px 0 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            transition: 0.3s;
+            position: relative;
+        }
+        
+        .vm-resource-bar {
+            width: 80%;
+            height: 10px;
+            background: rgba(0,0,0,0.3);
+            margin-top: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .vm-fill {
+            height: 100%;
+            width: 20%;
+            background: #fff;
+            transition: width 0.2s;
+        }
+
+        /* ATTACK VISUALS */
+        .exploit-code {
+            position: absolute;
+            width: 10px; height: 10px;
+            background: var(--danger);
+            border-radius: 50%;
+            display: none;
+            box-shadow: 0 0 10px red;
+        }
+        
+        .cpu-spike { animation: pulse 0.1s infinite; background: var(--danger); border-color: red; }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        /* LOGS */
+        .console {
+            background: #111;
+            height: 120px;
+            border-top: 1px solid #333;
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+            color: #aaa;
+            font-size: 0.85rem;
+        }
+        .log-sys { color: var(--hyp-blue); }
+        .log-err { color: var(--danger); }
+        .log-ok { color: var(--vm-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Hypervisor Architecture Simulator</h1>
+    <p>Type 1 vs Type 2 • Isolation • Resource Control</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">Architecture</div>
+        <button id="btn-type1" class="btn-arch active" onclick="setArch('type1')">Type 1 (Bare Metal)</button>
+        <button id="btn-type2" class="btn-arch" onclick="setArch('type2')">Type 2 (Hosted)</button>
+
+        <div class="section-title" style="margin-top:20px;">Threat Simulation</div>
+        <button class="btn-attack" onclick="runNoisyNeighbor()">🔥 Noisy Neighbor Attack</button>
+        <button class="btn-attack" onclick="runVMEscape()">🔓 VM Escape Attempt</button>
+
+        <div class="section-title" style="margin-top:20px;">Mitigations</div>
+        <button class="btn-mitigate" id="btn-limits" onclick="toggleLimits()">
+            🛡️ Resource Limits (OFF)
+        </button>
+        <button class="btn-mitigate" id="btn-harden" onclick="toggleHardening()">
+            🛡️ Hypervisor Hardening (OFF)
+        </button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <div class="vm-container">
+            <div class="vm" id="vm-1">
+                <div style="font-size:1.5rem;">VM A</div>
+                <div style="font-size:0.8rem;">(Web Server)</div>
+                <div class="vm-resource-bar"><div class="vm-fill" id="fill-1"></div></div>
+                <div class="exploit-code" id="exploit"></div>
+            </div>
+            
+            <div class="vm" id="vm-2">
+                <div style="font-size:1.5rem;">VM B</div>
+                <div style="font-size:0.8rem;">(Database)</div>
+                <div class="vm-resource-bar"><div class="vm-fill" id="fill-2"></div></div>
+            </div>
+        </div>
+
+        <!-- LAYERS -->
+        <div class="layer" id="layer-hyp">HYPERVISOR (VMM)</div>
+        <div class="layer" id="layer-os">HOST OS (Windows/Linux)</div>
+        <div class="layer" id="layer-hw">PHYSICAL HARDWARE (CPU/RAM)</div>
+
+    </div>
+
+    <!-- LOGS -->
+    <div class="console" id="logger">
+        <div>> System Initialized. Default: Type 1 Architecture.</div>
+    </div>
+
+</div>
+
+<script>
+    let arch = 'type1';
+    let limitsEnabled = false;
+    let hardeningEnabled = false;
+    let spikeInterval = null;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='err'?'log-err':(type==='ok'?'log-ok':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function setArch(type) {
+        arch = type;
+        const osLayer = document.getElementById('layer-os');
+        const hypLayer = document.getElementById('layer-hyp');
+        
+        // Reset buttons by ID instead of event target to support programmatic calls
+        document.querySelectorAll('.btn-arch').forEach(b => b.classList.remove('active'));
+        
+        if(type === 'type1') {
+            document.getElementById('btn-type1').classList.add('active');
+            osLayer.style.display = 'none';
+            hypLayer.innerText = "HYPERVISOR (ESXi / Xen)";
+            hypLayer.style.background = "var(--hyp-blue)";
+            log("Architecture Switched: Type 1 (Bare Metal). High Security.", 'sys');
+        } else {
+            document.getElementById('btn-type2').classList.add('active');
+            osLayer.style.display = 'flex';
+            hypLayer.innerText = "HYPERVISOR APP (Workstation)";
+            hypLayer.style.background = "#5c6bc0";
+            log("Architecture Switched: Type 2 (Hosted). Increased Attack Surface.", 'sys');
+        }
+    }
+
+    function toggleLimits() {
+        limitsEnabled = !limitsEnabled;
+        const btn = document.getElementById('btn-limits');
+        if(limitsEnabled) {
+            btn.innerText = "🛡️ Resource Limits (ON)";
+            btn.classList.add('active');
+            log("CONFIG: CPU/RAM Limits applied. Reservations set.", 'ok');
+        } else {
+            btn.innerText = "🛡️ Resource Limits (OFF)";
+            btn.classList.remove('active');
+            log("CONFIG: Limits removed. Resources are shared freely.", 'sys');
+        }
+    }
+
+    function toggleHardening() {
+        hardeningEnabled = !hardeningEnabled;
+        const btn = document.getElementById('btn-harden');
+        if(hardeningEnabled) {
+            btn.innerText = "🛡️ Hypervisor Hardening (ON)";
+            btn.classList.add('active');
+            log("CONFIG: Unused devices disabled. Patch levels verified.", 'ok');
+        } else {
+            btn.innerText = "🛡️ Hypervisor Hardening (OFF)";
+            btn.classList.remove('active');
+            log("CONFIG: Default settings restored.", 'sys');
+        }
+    }
+
+    function runNoisyNeighbor() {
+        if(spikeInterval) clearInterval(spikeInterval);
+
+        const vmA = document.getElementById('vm-1');
+        const vmB = document.getElementById('vm-2');
+        const fillA = document.getElementById('fill-1');
+        const fillB = document.getElementById('fill-2');
+
+        log("ATTACK: VM A is running a crypto miner (100% CPU)...", 'err');
+        vmA.classList.add('cpu-spike');
+        fillA.style.width = "100%";
+        fillA.style.background = "var(--danger)";
+
+        let counter = 0;
+        spikeInterval = setInterval(() => {
+            counter++;
+            if (counter > 30) { clearInterval(spikeInterval); resetVMs(); return; }
+
+            if (limitsEnabled) {
+                // With Limits
+                fillA.style.width = "80%"; // Capped
+                fillB.style.width = "20%"; // Guaranteed
+                vmB.style.opacity = "1";
+                if(counter === 1) log("MITIGATION: Hypervisor throttled VM A. VM B unaffected.", 'ok');
+            } else {
+                // Without Limits
+                fillB.style.width = "1%"; // Starved
+                vmB.style.opacity = "0.3";
+                if(counter === 1) log("IMPACT: VM B is starved of resources (DoS).", 'err');
+            }
+        }, 100);
+    }
+
+    function runVMEscape() {
+        const exploit = document.getElementById('exploit');
+        const hypLayer = document.getElementById('layer-hyp');
+        
+        log("ATTACK: Attempting Heap Overflow in Virtual Floppy Driver...", 'err');
+        
+        exploit.style.display = 'block';
+        exploit.style.top = '100px'; 
+        exploit.style.left = '50%';
+
+        // Animate Drop
+        let top = 100;
+        const anim = setInterval(() => {
+            top += 5;
+            exploit.style.top = top + 'px';
+
+            // Hit Hypervisor Layer (approx 280px)
+            if (top >= 350) {
+                clearInterval(anim);
+                
+                if (hardeningEnabled) {
+                    log("BLOCKED: Virtual Driver disabled by Hardening Policy.", 'ok');
+                    exploit.style.display = 'none';
+                    hypLayer.style.borderColor = "var(--vm-green)";
+                    setTimeout(() => hypLayer.style.borderColor = "transparent", 500);
+                } else {
+                    if (arch === 'type2') {
+                        log("CRITICAL: Escape Successful! Attacker owns Host OS.", 'err');
+                        document.getElementById('layer-os').style.background = "var(--danger)";
+                    } else {
+                        log("CRITICAL: Escape Successful! Hypervisor Ring -1 compromised.", 'err');
+                        hypLayer.style.background = "var(--danger)";
+                    }
+                    setTimeout(() => {
+                         resetVMs();
+                         setArch(arch); // restore colors
+                    }, 2000);
+                }
+            }
+        }, 20);
+    }
+
+    function resetVMs() {
+        document.getElementById('vm-1').classList.remove('cpu-spike');
+        document.getElementById('fill-1').style.width = "20%";
+        document.getElementById('fill-1').style.background = "white";
+        document.getElementById('fill-2').style.width = "20%";
+        document.getElementById('vm-2').style.opacity = "1";
+        document.getElementById('exploit').style.display = "none";
+        
+        // Reset layer colors
+        document.getElementById('layer-os').style.background = "var(--host-orange)";
+        document.getElementById('layer-hyp').style.background = arch === 'type1' ? "var(--hyp-blue)" : "#5c6bc0";
+    }
+
+</script>
+
+</body>
+</html>

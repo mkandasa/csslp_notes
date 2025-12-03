@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Proxy Architecture Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --proxy-purple: #8b5cf6;
+            --client-blue: #3b82f6;
+            --server-green: #10b981;
+            --danger: #ef4444;
+            --text: #f1f5f9;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--proxy-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--proxy-purple); }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROL PANEL */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            height: fit-content;
+        }
+        .mode-toggle {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            background: #0f172a;
+            padding: 5px;
+            border-radius: 6px;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+            transition: 0.3s;
+        }
+        .mode-btn.active { background: var(--proxy-purple); color: white; }
+
+        .scenario-controls { margin-top: 15px; border-top: 1px solid #334155; padding-top: 15px; }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            background: #334155;
+            border: 1px solid #475569;
+            color: white;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        
+        button.action-btn {
+            width: 100%;
+            padding: 12px;
+            background: #475569;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button.action-btn:hover { background: #64748b; }
+        button.action-btn.send { background: var(--client-blue); }
+
+        /* VISUALIZATION AREA */
+        .viz-stage {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 500px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 50px;
+        }
+
+        .node {
+            width: 120px;
+            height: 140px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 10;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            transition: 0.3s;
+        }
+        .node-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .node-label { font-weight: bold; margin-bottom: 5px; }
+        .node-ip { font-family: 'Courier New', monospace; font-size: 0.75rem; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; }
+
+        #client-node { background: #1e3a8a; border: 2px solid var(--client-blue); }
+        #proxy-node { background: #4c1d95; border: 2px solid var(--proxy-purple); }
+        #server-node { background: #064e3b; border: 2px solid var(--server-green); }
+
+        /* PACKET ANIMATION */
+        .packet {
+            width: 60px; height: 30px;
+            background: white;
+            color: black;
+            border-radius: 4px;
+            position: absolute;
+            font-size: 0.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            z-index: 20;
+            box-shadow: 0 0 10px white;
+            opacity: 0;
+        }
+        .packet.encrypted { background: #facc15; box-shadow: 0 0 10px #facc15; }
+        .packet.blocked { background: var(--danger); box-shadow: 0 0 10px var(--danger); color: white; }
+
+        /* INSPECTION PANEL (Logs) */
+        .log-panel {
+            grid-column: span 2;
+            background: #111;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            height: 150px;
+            overflow-y: auto;
+            border: 1px solid #334155;
+            font-size: 0.85rem;
+        }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #222; padding-bottom: 2px; }
+        .log-time { color: #64748b; margin-right: 10px; }
+        .log-src { color: var(--client-blue); }
+        .log-dst { color: var(--server-green); }
+        .log-proxy { color: var(--proxy-purple); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Proxy Architecture Simulator</h1>
+    <p>Flow Control: Forward vs. Reverse Proxies</p>
+</header>
+
+<div class="workspace">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="setMode('forward')" id="btn-fwd">Forward Proxy</button>
+            <button class="mode-btn" onclick="setMode('reverse')" id="btn-rev">Reverse Proxy</button>
+        </div>
+
+        <!-- FORWARD CONTROLS -->
+        <div id="ctrl-forward" class="scenario-controls">
+            <h3>🛡️ Egress Filtering</h3>
+            <p style="font-size:0.8rem; color:#94a3b8;">Prevent internal clients from visiting bad sites.</p>
+            <label>Destination URL:</label>
+            <select id="fwd-dest">
+                <option value="google.com">google.com (Safe)</option>
+                <option value="malware-c2.xyz">malware-c2.xyz (Malicious)</option>
+            </select>
+            <label>Proxy Block List:</label>
+            <input type="text" value="malware-c2.xyz" readonly style="color:var(--danger)">
+            <button class="action-btn send" onclick="sendPacket()">Send Request</button>
+        </div>
+
+        <!-- REVERSE CONTROLS -->
+        <div id="ctrl-reverse" class="scenario-controls" style="display:none;">
+            <h3>🎭 Attack Surface Hiding</h3>
+            <p style="font-size:0.8rem; color:#94a3b8;">Client connects to Proxy VIP. Server IP is hidden.</p>
+            <label>Protocol:</label>
+            <select id="rev-proto">
+                <option value="https">HTTPS (Encrypted)</option>
+                <option value="http">HTTP (Plain)</option>
+            </select>
+            <label>SSL Offloading:</label>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <label style="font-weight:normal;"><input type="radio" name="ssl" checked> Enabled</label>
+            </div>
+            <button class="action-btn send" onclick="sendPacket()">Connect to App</button>
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-stage">
+        <!-- Lines -->
+        <div style="position:absolute; top:50%; left:0; width:100%; height:2px; background:#334155; z-index:0;"></div>
+
+        <!-- NODES -->
+        <div class="node" id="client-node">
+            <div class="node-icon">💻</div>
+            <div class="node-label">Client</div>
+            <div class="node-ip" id="client-ip">IP: 10.0.0.5</div>
+        </div>
+
+        <div class="node" id="proxy-node">
+            <div class="node-icon">🛡️</div>
+            <div class="node-label">Proxy</div>
+            <div class="node-ip" id="proxy-ip">IP: 192.168.1.1</div>
+        </div>
+
+        <div class="node" id="server-node">
+            <div class="node-icon">☁️</div>
+            <div class="node-label">Internet</div>
+            <div class="node-ip" id="server-ip">IP: 8.8.8.8</div>
+        </div>
+
+        <!-- Moving Packet -->
+        <div id="packet" class="packet">DATA</div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-panel" id="logger">
+        <div class="log-entry">System initialized. Select a mode to begin.</div>
+    </div>
+
+</div>
+
+<script>
+    let mode = 'forward';
+
+    function setMode(newMode) {
+        mode = newMode;
+        document.getElementById('btn-fwd').className = `mode-btn ${mode === 'forward' ? 'active' : ''}`;
+        document.getElementById('btn-rev').className = `mode-btn ${mode === 'reverse' ? 'active' : ''}`;
+        
+        document.getElementById('ctrl-forward').style.display = mode === 'forward' ? 'block' : 'none';
+        document.getElementById('ctrl-reverse').style.display = mode === 'reverse' ? 'block' : 'none';
+
+        // Update Node Visuals
+        if (mode === 'forward') {
+            document.getElementById('client-node').querySelector('.node-label').innerText = "Internal Client";
+            document.getElementById('client-ip').innerText = "IP: 10.0.0.5";
+            
+            document.getElementById('proxy-node').querySelector('.node-label').innerText = "Fwd Proxy";
+            document.getElementById('proxy-ip').innerText = "IP: 10.0.0.1"; // Gateway
+            
+            document.getElementById('server-node').querySelector('.node-label').innerText = "Internet";
+            document.getElementById('server-ip').innerText = "Public Web";
+        } else {
+            document.getElementById('client-node').querySelector('.node-label').innerText = "Public User";
+            document.getElementById('client-ip').innerText = "IP: 203.0.113.5";
+            
+            document.getElementById('proxy-node').querySelector('.node-label').innerText = "Rev Proxy (VIP)";
+            document.getElementById('proxy-ip').innerText = "VIP: 1.2.3.4";
+            
+            document.getElementById('server-node').querySelector('.node-label').innerText = "App Server";
+            document.getElementById('server-ip').innerText = "IP: 172.16.0.5"; // Private
+        }
+        
+        log("System switched to " + mode.toUpperCase() + " Proxy Mode.");
+    }
+
+    function sendPacket() {
+        const packet = document.getElementById('packet');
+        const logger = document.getElementById('logger');
+        const clientRect = document.getElementById('client-node').getBoundingClientRect();
+        const proxyRect = document.getElementById('proxy-node').getBoundingClientRect();
+        const serverRect = document.getElementById('server-node').getBoundingClientRect();
+        const containerRect = document.querySelector('.viz-stage').getBoundingClientRect();
+
+        // Start Pos
+        const startX = clientRect.left - containerRect.left + 30;
+        const proxyX = proxyRect.left - containerRect.left + 30;
+        const serverX = serverRect.left - containerRect.left + 30;
+
+        packet.style.left = startX + 'px';
+        packet.style.top = '50%';
+        packet.style.transform = 'translateY(-50%)';
+        packet.style.opacity = 1;
+        packet.className = 'packet';
+        packet.innerText = "REQ";
+
+        // Logic
+        let blocked = false;
+        let encrypted = false;
+
+        if (mode === 'forward') {
+            const dest = document.getElementById('fwd-dest').value;
+            if (dest.includes('malware')) blocked = true;
+            log(`CLIENT (10.0.0.5) requesting: ${dest}`);
+        } else {
+            const proto = document.getElementById('rev-proto').value;
+            if (proto === 'https') {
+                encrypted = true;
+                packet.classList.add('encrypted');
+                packet.innerHTML = "🔒 TLS";
+            }
+            log(`USER (203.0.113.5) connecting to VIP: 1.2.3.4`);
+        }
+
+        // ANIMATION STEP 1: Client -> Proxy
+        packet.style.transition = "left 1s linear";
+        setTimeout(() => {
+            packet.style.left = proxyX + 'px';
+        }, 10);
+
+        setTimeout(() => {
+            // ARRIVED AT PROXY
+            if (mode === 'forward') {
+                if (blocked) {
+                    packet.classList.add('blocked');
+                    packet.innerText = "DENY";
+                    log("<span class='log-proxy'>PROXY:</span> Destination in Block List. Dropping packet.");
+                    setTimeout(() => packet.style.opacity = 0, 500);
+                    return;
+                } else {
+                    log("<span class='log-proxy'>PROXY:</span> Destination Allowed. Masking Client IP.");
+                    packet.innerText = "NAT";
+                }
+            } else {
+                // Reverse
+                if (encrypted) {
+                    log("<span class='log-proxy'>PROXY:</span> SSL Offloading. Decrypting packet.");
+                    packet.classList.remove('encrypted');
+                    packet.innerText = "HTTP";
+                }
+                log("<span class='log-proxy'>PROXY:</span> Forwarding to Backend (172.16.0.5). Adding 'X-Forwarded-For'.");
+            }
+
+            // ANIMATION STEP 2: Proxy -> Server
+            packet.style.transition = "left 1s linear";
+            packet.style.left = serverX + 'px';
+
+            setTimeout(() => {
+                packet.style.opacity = 0;
+                if (mode === 'forward') {
+                    log("<span class='log-dst'>INTERNET:</span> Received request from Proxy IP (10.0.0.1). Client IP hidden.");
+                } else {
+                    log("<span class='log-dst'>SERVER:</span> Received Internal HTTP Req. Source appears as Proxy.");
+                }
+            }, 1000);
+
+        }, 1000);
+    }
+
+    function log(msg) {
+        const logger = document.getElementById('logger');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        entry.innerHTML = `<span class="log-time">[${time}]</span> ${msg}`;
+        logger.prepend(entry);
+    }
+
+    // Init
+    setMode('forward');
+
+</script>
+
+</body>
+</html>

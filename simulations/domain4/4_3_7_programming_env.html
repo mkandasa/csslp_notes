@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Programming Environment Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --java-red: #f44336;
+            --cpp-blue: #2196f3;
+            --py-yellow: #ffeb3b;
+            --text: #f1f5f9;
+            --success: #4caf50;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--cpp-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--cpp-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Language Tabs */
+        .lang-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+            opacity: 0.7;
+        }
+        .tab-btn.active { opacity: 1; transform: scale(1.05); }
+        .tab-cpp { background: var(--cpp-blue); color: white; }
+        .tab-java { background: var(--java-red); color: white; }
+        .tab-py { background: var(--py-yellow); color: black; }
+
+        /* Scenario Controls */
+        .scenario-box { display: none; }
+        .scenario-box.active { display: block; animation: fadeIn 0.3s; }
+
+        button.action-btn {
+            width: 100%;
+            padding: 12px;
+            background: #475569;
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        button.action-btn:hover { filter: brightness(1.2); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-secure { background: var(--success); }
+
+        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Memory Map */
+        .memory-block {
+            background: #000;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            height: 150px;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .mem-cell {
+            width: 40px; height: 60px;
+            border: 1px solid #333;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem;
+            color: #777;
+            position: relative;
+        }
+        .mem-cell.allocated { background: #1e3a8a; color: white; border-color: var(--cpp-blue); }
+        .mem-cell.sensitive { background: #3e2723; color: var(--danger); border-color: var(--danger); }
+        .mem-cell.overflow { background: var(--danger); color: white; animation: shake 0.2s; }
+
+        .write-head {
+            position: absolute;
+            top: 20px; left: 0;
+            color: var(--success);
+            font-weight: bold;
+            transition: left 0.2s;
+        }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 200px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: #94a3b8; }
+        .log-err { color: var(--danger); }
+        .log-ok { color: var(--success); }
+        .log-code { color: #a5d6a7; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(2px); }
+            75% { transform: translateX(-2px); }
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Runtime Environment Simulator</h1>
+    <p>Memory Safety (C++) vs. Managed Runtime (Java/Python)</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="lang-tabs">
+            <button class="tab-btn tab-cpp active" onclick="setLang('cpp')">C++ (Unmanaged)</button>
+            <button class="tab-btn tab-java" onclick="setLang('java')">Java (JVM)</button>
+            <button class="tab-btn tab-py" onclick="setLang('py')">Python (Dynamic)</button>
+        </div>
+
+        <!-- C++ SCENARIO -->
+        <div id="ctrl-cpp" class="scenario-box active">
+            <div class="section-title">Buffer Overflow Test</div>
+            <p style="font-size:0.8rem; color:#ccc">
+                Allocate a 5-byte buffer. Attempt to write 8 bytes.
+            </p>
+            <button class="action-btn btn-danger" onclick="runOverflow('cpp')">Write 8 Bytes (Unsafe)</button>
+            <div style="font-size:0.7rem; color:#888; margin-top:5px;">
+                *Result depends on Compiler/OS.
+            </div>
+        </div>
+
+        <!-- JAVA SCENARIO -->
+        <div id="ctrl-java" class="scenario-box">
+            <div class="section-title">Sandbox Policy Test</div>
+            <p style="font-size:0.8rem; color:#ccc">
+                Attempt to read `/etc/passwd`.
+            </p>
+            <button class="action-btn btn-danger" onclick="runJavaFileRead(false)">Read File (Default)</button>
+            <button class="action-btn btn-secure" onclick="runJavaFileRead(true)">Read File (With SecurityManager)</button>
+        </div>
+
+        <!-- PYTHON SCENARIO -->
+        <div id="ctrl-py" class="scenario-box">
+            <div class="section-title">Deserialization Test</div>
+            <p style="font-size:0.8rem; color:#ccc">
+                Receive data stream.
+            </p>
+            <button class="action-btn btn-danger" onclick="runPickle()">Unpickle (Insecure)</button>
+            <button class="action-btn btn-secure" onclick="runJson()">JSON Load (Secure)</button>
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- MEMORY MAP -->
+        <div class="memory-block" id="mem-viz">
+            <div class="write-head" id="head-ptr">Write Ptr ▼</div>
+            <!-- Cells generated by JS -->
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Environment Ready. Select a language to begin.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let currentLang = 'cpp';
+
+    // Init Memory
+    const memContainer = document.getElementById('mem-viz');
+    for(let i=0; i<15; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'mem-cell';
+        cell.id = `cell-${i}`;
+        
+        if (i >= 5 && i < 10) {
+            // Buffer
+            cell.classList.add('allocated');
+            cell.innerText = "BUF";
+        } else if (i >= 10) {
+            // Sensitive Data
+            cell.classList.add('sensitive');
+            cell.innerText = "RET"; // Return Address
+        } else {
+            cell.innerText = "00";
+        }
+        
+        memContainer.appendChild(cell);
+    }
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='err'?'log-err':(type==='ok'?'log-ok':(type==='code'?'log-code':'log-sys'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function setLang(lang) {
+        currentLang = lang;
+        document.querySelectorAll('.scenario-box').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        
+        document.getElementById('ctrl-' + lang).classList.add('active');
+        document.querySelector('.tab-' + lang).classList.add('active');
+        
+        // Reset Visuals
+        resetMemory();
+        log(`SWITCH: Environment changed to ${lang.toUpperCase()}.`, 'sys');
+    }
+
+    function resetMemory() {
+        for(let i=0; i<15; i++) {
+            const cell = document.getElementById(`cell-${i}`);
+            cell.className = 'mem-cell';
+            cell.innerText = "00";
+            if (i >= 5 && i < 10) { cell.classList.add('allocated'); cell.innerText = "BUF"; }
+            else if (i >= 10) { cell.classList.add('sensitive'); cell.innerText = "RET"; }
+        }
+        document.getElementById('head-ptr').style.left = "0px";
+    }
+
+    // --- C++ LOGIC ---
+    function runOverflow(lang) {
+        if(lang !== 'cpp') return;
+        
+        log("C++: Allocating char buf[5];", "code");
+        log("C++: memcpy(buf, input, 8); // Unsafe copy", "code");
+
+        let index = 5; // Start of buffer
+        const interval = setInterval(() => {
+            if (index >= 13) { clearInterval(interval); return; } // Write 8 bytes (5 to 12)
+
+            const cell = document.getElementById(`cell-${index}`);
+            
+            // Visual Head Movement
+            const ptr = document.getElementById('head-ptr');
+            ptr.style.left = (cell.offsetLeft + 10) + "px";
+
+            // Write Logic
+            if (index < 10) {
+                // Inside Bounds
+                cell.innerText = "41"; // 'A'
+                cell.style.backgroundColor = "#2196f3";
+            } else {
+                // Overflow!
+                cell.innerText = "41";
+                cell.className = "mem-cell overflow"; // Overwrites RET
+                log(`ERROR: Segmentation Fault! Wrote to restricted memory at address 0x${index}.`, "err");
+                log("SYSTEM: Application Crashed. Return Address Corrupted.", "err");
+                clearInterval(interval);
+            }
+            index++;
+        }, 300);
+    }
+
+    // --- JAVA LOGIC ---
+    function runJavaFileRead(secure) {
+        resetMemory();
+        log("JAVA: File f = new File('/etc/passwd');", "code");
+        log("JAVA: FileReader fr = new FileReader(f);", "code");
+
+        setTimeout(() => {
+            if (secure) {
+                log("JVM: SecurityManager.checkRead('/etc/passwd') invoked...", "sys");
+                setTimeout(() => {
+                    log("JVM EXCEPTION: java.security.AccessControlException: access denied.", "err");
+                    log("RESULT: File Read Blocked by Policy.", "ok");
+                }, 500);
+            } else {
+                log("JVM: No SecurityManager installed.", "sys");
+                log("RESULT: File Read Successful. Content exposed.", "err");
+            }
+        }, 500);
+    }
+
+    // --- PYTHON LOGIC ---
+    function runPickle() {
+        resetMemory();
+        log("PYTHON: import pickle", "code");
+        log("PYTHON: pickle.loads(user_input) # Dangerous!", "code");
+        
+        setTimeout(() => {
+            log("RCE: Pickle stream contained `os.system('rm -rf /')`", "err");
+            
+            // Visual Chaos
+            for(let i=0; i<15; i++) {
+                setTimeout(() => {
+                    const c = document.getElementById(`cell-${i}`);
+                    c.innerText = "??";
+                    c.style.background = "#333";
+                    c.style.borderColor = "red";
+                }, i * 50);
+            }
+            log("SYSTEM: Arbitrary Code Execution Successful. Memory Corrupted.", "err");
+        }, 800);
+    }
+
+    function runJson() {
+        resetMemory();
+        log("PYTHON: import json", "code");
+        log("PYTHON: json.loads(user_input)", "code");
+
+        setTimeout(() => {
+            log("PARSER: Input is valid JSON.", "sys");
+            log("RESULT: Data Object created. No code execution possible.", "ok");
+        }, 800);
+    }
+
+</script>
+
+</body>
+</html>

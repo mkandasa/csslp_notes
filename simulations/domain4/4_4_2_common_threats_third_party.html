@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Supply Chain Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --supply-purple: #8b5cf6;
+            --vuln-red: #ef4444;
+            --safe-green: #22c55e;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--supply-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--supply-purple); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-scan { background: var(--supply-purple); }
+        .btn-update { background: #f59e0b; color: black; }
+        .btn-lock { background: #0ea5e9; }
+        .btn-sbom { background: var(--safe-green); color: black; }
+        
+        button:hover { filter: brightness(1.2); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Dependency Tree */
+        .dep-tree {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 200px;
+            position: relative;
+        }
+        
+        .pkg-node {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #1e293b;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #555;
+            font-family: 'Courier New', monospace;
+            transition: 0.3s;
+        }
+        .pkg-node.safe { border-left-color: var(--safe-green); }
+        .pkg-node.vuln { border-left-color: var(--vuln-red); background: #3e0a0a; }
+        .pkg-node.locked { border-left-color: #0ea5e9; }
+
+        .pkg-ver { font-size: 0.8rem; color: #aaa; background: #0f172a; padding: 2px 6px; border-radius: 4px; }
+        .pkg-status { font-size: 0.7rem; font-weight: bold; }
+
+        /* CI/CD Pipeline */
+        .pipeline-status {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .stage {
+            text-align: center;
+            opacity: 0.3;
+            transition: 0.3s;
+        }
+        .stage.active { opacity: 1; color: var(--supply-purple); font-weight: bold; }
+        .stage.fail { color: var(--vuln-red); }
+        .stage.pass { color: var(--safe-green); }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: var(--supply-purple); }
+        .log-err { color: var(--vuln-red); }
+        .log-ok { color: var(--safe-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Supply Chain Security Lab</h1>
+    <p>SCA, SBOMs & Malicious Dependency Detection</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Build Pipeline</div>
+        <button class="btn-scan" onclick="runBuild()">🏗️ Run CI/CD Build</button>
+        <button class="btn-update" onclick="injectMalware()">💉 Simulate Malicious Update</button>
+
+        <div class="section-title" style="margin-top:20px;">2. Architectural Controls</div>
+        <button class="btn-lock" id="btn-lock" onclick="toggleLocking()">🔒 Enable Version Pinning (Lockfile)</button>
+        <button class="btn-sbom" id="btn-sbom" onclick="toggleSbom()">📜 Enable SBOM Enforcement</button>
+        
+        <div style="font-size:0.75rem; color:#888; margin-top:10px;">
+            *Pinning stops auto-updates.<br>
+            *SBOM checks signatures/hashes.
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- PIPELINE -->
+        <div class="pipeline-status">
+            <div class="stage" id="stg-pull">PULL CODE</div>
+            <div>➔</div>
+            <div class="stage" id="stg-dep">RESOLVE DEPS</div>
+            <div>➔</div>
+            <div class="stage" id="stg-scan">SECURITY SCAN</div>
+            <div>➔</div>
+            <div class="stage" id="stg-build">BUILD</div>
+        </div>
+
+        <!-- DEPENDENCY TREE -->
+        <div class="dep-tree" id="dep-list">
+            <div class="pkg-node safe" id="pkg-react">
+                <span>react-core</span>
+                <span class="pkg-ver">v18.2.0</span>
+                <span class="pkg-status" style="color:var(--safe-green)">OK</span>
+            </div>
+            
+            <div class="pkg-node safe" id="pkg-lodash">
+                <span>lodash-utils</span>
+                <span class="pkg-ver">v4.17.21</span>
+                <span class="pkg-status" style="color:var(--safe-green)">OK</span>
+            </div>
+
+            <div class="pkg-node safe" id="pkg-axios">
+                <span>http-client</span>
+                <span class="pkg-ver">v1.5.0</span>
+                <span class="pkg-status" style="color:var(--safe-green)">OK</span>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> DevSecOps Console Ready.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let isLocked = false;
+    let isSbomActive = false;
+    let isMalicious = false;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function toggleLocking() {
+        isLocked = !isLocked;
+        const btn = document.getElementById('btn-lock');
+        if(isLocked) {
+            btn.innerText = "🔒 Version Pinning ENABLED";
+            btn.style.border = "2px solid white";
+            log("CONFIG: package-lock.json enforced. Auto-updates disabled.", "ok");
+        } else {
+            btn.innerText = "🔒 Enable Version Pinning (Lockfile)";
+            btn.style.border = "none";
+            log("CONFIG: Floating versions allowed (^1.0.0). Risk: High.", "err");
+        }
+    }
+
+    function toggleSbom() {
+        isSbomActive = !isSbomActive;
+        const btn = document.getElementById('btn-sbom');
+        if(isSbomActive) {
+            btn.innerText = "📜 SBOM Enforcement ENABLED";
+            btn.style.border = "2px solid white";
+            log("CONFIG: Build will fail if hash mismatch detected.", "ok");
+        } else {
+            btn.innerText = "📜 Enable SBOM Enforcement";
+            btn.style.border = "none";
+            log("CONFIG: SBOM checks disabled.", "err");
+        }
+    }
+
+    function injectMalware() {
+        isMalicious = true;
+        log("ATTACK: Upstream maintainer of 'http-client' compromised! v1.6.66 (Malware) released.", "err");
+    }
+
+    async function runBuild() {
+        resetStages();
+        log("PIPELINE: Job Started.", "sys");
+
+        // Stage 1: Pull
+        await setStage('stg-pull', 'active');
+        await wait(500);
+        await setStage('stg-pull', 'pass');
+
+        // Stage 2: Resolve Deps
+        await setStage('stg-dep', 'active');
+        await wait(800);
+        
+        const axiosNode = document.getElementById('pkg-axios');
+        const axiosVer = axiosNode.querySelector('.pkg-ver');
+        const axiosStatus = axiosNode.querySelector('.pkg-status');
+
+        if (isMalicious) {
+            if (isLocked) {
+                // Pinning saves us
+                log("RESOLVE: New version v1.6.66 available, but Lockfile forces v1.5.0.", "ok");
+                axiosNode.className = "pkg-node locked";
+                axiosStatus.innerText = "PINNED (Safe)";
+                axiosStatus.style.color = "#0ea5e9";
+                await setStage('stg-dep', 'pass');
+            } else {
+                // Auto-update to malware
+                log("RESOLVE: Auto-updating 'http-client' to latest: v1.6.66", "err");
+                axiosNode.className = "pkg-node vuln";
+                axiosVer.innerText = "v1.6.66";
+                axiosStatus.innerText = "MALICIOUS";
+                axiosStatus.style.color = "var(--vuln-red)";
+                await setStage('stg-dep', 'pass'); // Dep resolution technically succeeded
+            }
+        } else {
+            log("RESOLVE: Dependencies resolved. No updates found.", "sys");
+            await setStage('stg-dep', 'pass');
+        }
+
+        // Stage 3: Scan (SCA/SBOM)
+        await setStage('stg-scan', 'active');
+        await wait(800);
+
+        if (isMalicious && !isLocked) {
+            // We have the malware. Does SBOM catch it?
+            if (isSbomActive) {
+                log("SCAN ALERT: File Hash Mismatch for 'http-client'. Expected: [a1b2...], Found: [DEAD...]", "err");
+                log("SCAN: SBOM Policy Violation. Build Aborted.", "err");
+                await setStage('stg-scan', 'fail');
+                return; // Stop build
+            } else {
+                log("SCAN: No SCA tool configured. Vulnerabilities undetected.", "err");
+                await setStage('stg-scan', 'pass'); // Pass (False Negative)
+            }
+        } else {
+            log("SCAN: Integrity Checks Passed.", "ok");
+            await setStage('stg-scan', 'pass');
+        }
+
+        // Stage 4: Build
+        await setStage('stg-build', 'active');
+        await wait(500);
+        
+        if (isMalicious && !isLocked && !isSbomActive) {
+            log("BUILD SUCCESS: Application built with INFECTED dependency.", "err");
+            await setStage('stg-build', 'fail'); // Logical fail
+        } else {
+            log("BUILD SUCCESS: Clean Artifact generated.", "ok");
+            await setStage('stg-build', 'pass');
+        }
+    }
+
+    function resetStages() {
+        document.querySelectorAll('.stage').forEach(s => {
+            s.className = 'stage';
+        });
+        
+        // Reset Visuals if cleaned
+        if (!isMalicious) {
+            const n = document.getElementById('pkg-axios');
+            n.className = "pkg-node safe";
+            n.querySelector('.pkg-ver').innerText = "v1.5.0";
+            n.querySelector('.pkg-status').innerText = "OK";
+            n.querySelector('.pkg-status').style.color = "var(--safe-green)";
+        }
+    }
+
+    function setStage(id, status) {
+        document.getElementById(id).className = `stage ${status}`;
+        return; // simple return for await
+    }
+
+    function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+</script>
+
+</body>
+</html>

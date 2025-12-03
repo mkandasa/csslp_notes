@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Risk Assessment Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --risk-orange: #f97316;
+            --high-red: #ef4444;
+            --med-yellow: #eab308;
+            --low-green: #22c55e;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--risk-orange);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--risk-orange); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 700px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            overflow-y: auto;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Risk Calculator */
+        .calc-row {
+            margin-bottom: 15px;
+        }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
+        select {
+            width: 100%;
+            padding: 10px;
+            background: #0f172a;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Mitigation Options */
+        .mitigation-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .mit-btn {
+            padding: 12px;
+            background: #334155;
+            border: 1px solid #555;
+            color: #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            transition: 0.2s;
+        }
+        .mit-btn:hover { background: #475569; }
+        .mit-btn.selected { border-color: var(--risk-orange); color: white; background: rgba(249,115,22,0.1); }
+
+        button.action-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--risk-orange);
+            color: black;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+        button.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Architecture Diagram */
+        .arch-diagram {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-top: 20px;
+            position: relative;
+        }
+        
+        .component {
+            width: 120px; height: 120px;
+            border-radius: 8px;
+            background: #1e293b;
+            border: 2px solid #555;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center;
+            position: relative;
+            transition: 0.3s;
+        }
+        .comp-icon { font-size: 2rem; margin-bottom: 5px; }
+        .comp-status { font-size: 0.7rem; color: #aaa; margin-top: 5px; }
+
+        .component.flawed { border-color: var(--high-red); box-shadow: 0 0 15px rgba(239,68,68,0.3); }
+        .component.secure { border-color: var(--low-green); box-shadow: 0 0 15px rgba(34,197,94,0.3); }
+
+        /* Risk Matrix Overlay */
+        .matrix-box {
+            margin-top: 40px;
+            padding: 15px;
+            border: 1px dashed #555;
+            border-radius: 8px;
+            width: 80%;
+            text-align: center;
+        }
+        .score-val { font-size: 2rem; font-weight: bold; }
+        .score-label { font-size: 0.9rem; }
+
+        /* LOGS */
+        .console {
+            margin-top: auto;
+            width: 100%;
+            height: 120px;
+            background: #0f172a;
+            border-top: 1px solid #333;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-sys { color: var(--risk-orange); }
+        .log-err { color: var(--high-red); }
+        .log-ok { color: var(--low-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Architectural Risk Assessment Lab</h1>
+    <p>Design Review, Risk Scoring & Mitigation Selection</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Threat Analysis</div>
+        <div style="background:#0f172a; padding:10px; border-radius:4px; margin-bottom:20px; font-size:0.9rem;">
+            <strong>Scenario:</strong> Proposed Architecture stores customer PII in a Public S3 Bucket for easy access by 3rd party vendors.
+        </div>
+
+        <div class="section-title">2. Risk Scoring (OWASP Model)</div>
+        <div class="calc-row">
+            <label>Likelihood (Probability):</label>
+            <select id="sel-like" onchange="calcRisk()">
+                <option value="1">Low (1) - Requires physical access</option>
+                <option value="5">Medium (5) - Authenticated User</option>
+                <option value="9">High (9) - Public Internet (Anonymous)</option>
+            </select>
+        </div>
+        <div class="calc-row">
+            <label>Impact (Damage):</label>
+            <select id="sel-imp" onchange="calcRisk()">
+                <option value="1">Low (1) - Non-sensitive data</option>
+                <option value="5">Medium (5) - Service downtime</option>
+                <option value="9">High (9) - Massive PII Breach (GDPR Fine)</option>
+            </select>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">3. Mitigation Strategy</div>
+        <div class="mitigation-group">
+            <div class="mit-btn" onclick="selectMitigation('accept', this)">
+                <strong>A. Risk Acceptance</strong><br>
+                <span style="font-size:0.8rem; color:#aaa">"We need speed. Sign off on the risk."</span>
+            </div>
+            <div class="mit-btn" onclick="selectMitigation('mitigate', this)">
+                <strong>B. Risk Mitigation</strong><br>
+                <span style="font-size:0.8rem; color:#aaa">"Make Bucket Private. Use Presigned URLs."</span>
+            </div>
+            <div class="mit-btn" onclick="selectMitigation('avoid', this)">
+                <strong>C. Risk Avoidance</strong><br>
+                <span style="font-size:0.8rem; color:#aaa">"Do not store PII at all."</span>
+            </div>
+        </div>
+
+        <button class="action-btn" id="btn-apply" onclick="applyDecision()" disabled>Apply Decision</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <h3 style="margin:0; color:#aaa;">Current Architecture State</h3>
+
+        <!-- ARCHITECTURE -->
+        <div class="arch-diagram">
+            <div class="component" id="comp-web">
+                <div class="comp-icon">🌐</div>
+                <div>Web App</div>
+            </div>
+            
+            <div style="font-size:2rem; align-self:center; color:#555;">➔</div>
+
+            <div class="component flawed" id="comp-s3">
+                <div class="comp-icon">🪣</div>
+                <div>S3 Bucket</div>
+                <div class="comp-status" id="s3-status">PUBLIC ACCESS</div>
+            </div>
+        </div>
+
+        <!-- MATRIX -->
+        <div class="matrix-box" id="matrix">
+            <div class="score-label">RISK SCORE (Likelihood × Impact)</div>
+            <div class="score-val" id="score-val">--</div>
+            <div class="score-label" id="risk-rating">Rating: --</div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Assessing Design Proposal v1.0...</div>
+            <div>> Flaw Detected: Unrestricted storage access.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let currentScore = 0;
+    let selectedStrategy = null;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function calcRisk() {
+        const like = parseInt(document.getElementById('sel-like').value);
+        const imp = parseInt(document.getElementById('sel-imp').value);
+        
+        const score = (like * imp) / 9; // Normalize roughly 0-10 scale for simplicity representation or keep raw? 
+        // Standard OWASP Risk Rating:
+        // High = 6 to 9, Medium = 3 to 6, Low = 0 to 3
+        
+        // Let's use simple multiplication 1-81 scale mapped to Low/Med/High
+        currentScore = like * imp;
+        
+        const display = document.getElementById('score-val');
+        const rating = document.getElementById('risk-rating');
+        const box = document.getElementById('matrix');
+
+        display.innerText = currentScore;
+        
+        let rateTxt = "LOW";
+        let color = "var(--low-green)";
+
+        if (currentScore >= 50) {
+            rateTxt = "CRITICAL";
+            color = "var(--high-red)";
+        } else if (currentScore >= 20) {
+            rateTxt = "HIGH";
+            color = "var(--risk-orange)";
+        } else if (currentScore >= 10) {
+            rateTxt = "MEDIUM";
+            color = "var(--med-yellow)";
+        }
+
+        rating.innerText = `Rating: ${rateTxt}`;
+        rating.style.color = color;
+        display.style.color = color;
+        box.style.borderColor = color;
+
+        log(`CALC: Likelihood(${like}) * Impact(${imp}) = ${currentScore} (${rateTxt})`, "sys");
+    }
+
+    function selectMitigation(strat, btn) {
+        selectedStrategy = strat;
+        
+        // UI
+        document.querySelectorAll('.mit-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        
+        document.getElementById('btn-apply').disabled = false;
+        log(`STRATEGY: Selected '${strat.toUpperCase()}'. Click Apply to finalize.`, "sys");
+    }
+
+    function applyDecision() {
+        const comp = document.getElementById('comp-s3');
+        const status = document.getElementById('s3-status');
+
+        if (selectedStrategy === 'accept') {
+            log("DECISION: Risk Accepted. Management Sign-off required.", "err");
+            status.innerText = "PUBLIC (Risk Accepted)";
+            comp.className = "component flawed"; // Still red
+        } 
+        else if (selectedStrategy === 'mitigate') {
+            log("DECISION: Mitigation Applied. Bucket set to Private. KMS Enabled.", "ok");
+            status.innerText = "PRIVATE + ENCRYPTED";
+            comp.className = "component secure";
+            comp.querySelector('.comp-icon').innerText = "🔒";
+        }
+        else if (selectedStrategy === 'avoid') {
+            log("DECISION: Risk Avoided. PII Requirement removed from feature.", "ok");
+            status.innerText = "NO DATA STORED";
+            comp.className = "component secure";
+            comp.querySelector('.comp-icon').innerText = "🚫";
+        }
+    }
+
+    // Init
+    calcRisk();
+
+</script>
+
+</body>
+</html>

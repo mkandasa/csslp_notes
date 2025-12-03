@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Threat Analysis Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --threat-red: #ef4444;
+            --agent-purple: #a855f7;
+            --safe-green: #22c55e;
+            --tree-blue: #3b82f6;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--threat-red);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--threat-red); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 600px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .toggle-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+            text-align: left;
+            padding-left: 15px;
+        }
+        .btn-mode { background: #334155; border-left: 4px solid #aaa; color: #ccc; }
+        .btn-mode:hover { background: #475569; }
+        .btn-mode.active { background: #1e293b; border-color: var(--threat-red); color: white; }
+
+        .btn-action { background: var(--tree-blue); text-align: center; margin-top: 10px; }
+        .btn-mitigate { background: var(--safe-green); text-align: center; margin-top: 5px; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            overflow-y: auto;
+        }
+
+        /* SCENARIO 1: AGENTS */
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .agent-card {
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .agent-icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .agent-name { font-weight: bold; color: var(--agent-purple); margin-bottom: 5px; }
+        .agent-stats { font-size: 0.8rem; color: #aaa; text-align: left; width: 100%; }
+
+        /* SCENARIO 2: ATTACK TREE */
+        .tree-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .tree-node {
+            background: #1e293b;
+            border: 2px solid #475569;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-weight: bold;
+            position: relative;
+            min-width: 150px;
+            text-align: center;
+            transition: 0.3s;
+        }
+        .tree-node.root { border-color: var(--threat-red); color: var(--threat-red); }
+        .tree-node.leaf { border-color: var(--tree-blue); font-size: 0.9rem; cursor: pointer; }
+        .tree-node.leaf:hover { background: #334155; }
+        .tree-node.blocked { border-color: var(--safe-green); background: rgba(34, 197, 94, 0.1); opacity: 0.6; text-decoration: line-through; }
+
+        .branch-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        
+        .connector {
+            width: 2px;
+            background: #555;
+            height: 20px;
+            margin: 0 auto;
+        }
+
+        /* SCENARIO 3: ABUSE CASE */
+        .abuse-box {
+            background: #1e293b;
+            border: 1px solid var(--threat-red);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .use-case { color: var(--safe-green); margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .abuse-case { color: var(--threat-red); margin-bottom: 10px; }
+        
+        .flow-step { margin-left: 20px; font-family: monospace; font-size: 0.9rem; color: #aaa; margin-bottom: 5px; }
+        .flow-step.bad { color: #f87171; }
+
+        /* LOGS */
+        .console {
+            margin-top: 20px;
+            background: #000;
+            border-top: 1px solid #333;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            height: 100px;
+            overflow-y: auto;
+        }
+        .log-info { color: var(--tree-blue); }
+        .log-warn { color: var(--threat-red); }
+        .log-ok { color: var(--safe-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Threat Analysis Lab</h1>
+    <p>Profiling Agents, Attack Trees & Abuse Cases</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">Select Analysis Mode</div>
+        <div class="toggle-group">
+            <button class="btn-mode active" onclick="setMode('agent')" id="btn-agent">1. Threat Agent Profiling</button>
+            <button class="btn-mode" onclick="setMode('tree')" id="btn-tree">2. Attack Tree Modeling</button>
+            <button class="btn-mode" onclick="setMode('abuse')" id="btn-abuse">3. Abuse Case Definition</button>
+        </div>
+
+        <div id="ctrl-tree" style="display:none;">
+            <div class="section-title">Mitigation Strategy</div>
+            <p style="font-size:0.8rem; color:#aaa">Click leaf nodes to see details. Apply architectural fix to prune the tree.</p>
+            <button class="btn-mitigate" onclick="mitigateTree()">🛡️ Implement MFA & Lockout</button>
+        </div>
+
+        <div id="ctrl-abuse" style="display:none;">
+            <div class="section-title">Scenario: Password Reset</div>
+            <p style="font-size:0.8rem; color:#aaa">Attacker enumerates valid emails via error messages.</p>
+            <button class="btn-mitigate" onclick="mitigateAbuse()">🛡️ Use Generic Responses</button>
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area" id="viz-container">
+        <!-- Content injected via JS -->
+    </div>
+
+</div>
+
+<!-- LOGS -->
+<div class="console" id="logger">
+    <div>> Lab Ready. Select a module.</div>
+</div>
+
+<script>
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='warn'?'log-warn':'log-info')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function setMode(mode) {
+        // UI Reset
+        document.querySelectorAll('.btn-mode').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + mode).classList.add('active');
+        
+        document.getElementById('ctrl-tree').style.display = 'none';
+        document.getElementById('ctrl-abuse').style.display = 'none';
+        
+        const viz = document.getElementById('viz-container');
+        viz.innerHTML = '';
+
+        if(mode === 'agent') renderAgents(viz);
+        if(mode === 'tree') {
+            renderTree(viz);
+            document.getElementById('ctrl-tree').style.display = 'block';
+        }
+        if(mode === 'abuse') {
+            renderAbuse(viz);
+            document.getElementById('ctrl-abuse').style.display = 'block';
+        }
+        log(`SWITCH: Mode changed to ${mode.toUpperCase()}.`, "info");
+    }
+
+    // --- AGENT PROFILING ---
+    function renderAgents(container) {
+        const agents = [
+            { name: "Script Kiddie", icon: "👾", cap: "Low", motivation: "Curiosity/Fame", risk: "Low" },
+            { name: "Organized Crime", icon: "💰", cap: "High", motivation: "Financial Gain", risk: "Critical" },
+            { name: "Insider (Admin)", icon: "👔", cap: "High (Access)", motivation: "Revenge/Coercion", risk: "High" },
+            { name: "Nation State", icon: "🌐", cap: "Advanced (APT)", motivation: "Espionage", risk: "Critical" }
+        ];
+
+        const grid = document.createElement('div');
+        grid.className = "agent-grid";
+
+        agents.forEach(a => {
+            grid.innerHTML += `
+                <div class="agent-card">
+                    <div class="agent-icon">${a.icon}</div>
+                    <div class="agent-name">${a.name}</div>
+                    <div class="agent-stats">
+                        <div><strong>Capability:</strong> ${a.cap}</div>
+                        <div><strong>Motivation:</strong> ${a.motivation}</div>
+                        <div style="margin-top:5px; color:${a.risk==='Critical'?'var(--threat-red)':'#aaa'}"><strong>Risk:</strong> ${a.risk}</div>
+                    </div>
+                </div>
+            `;
+        });
+        container.appendChild(grid);
+    }
+
+    // --- ATTACK TREE ---
+    function renderTree(container) {
+        container.innerHTML = `
+            <div class="tree-container">
+                <div class="tree-node root">GOAL: Account Takeover</div>
+                <div class="connector"></div>
+                <div class="branch-group">
+                    <div style="display:flex; flex-direction:column; align-items:center;">
+                        <div class="tree-node">1. Credential Theft</div>
+                        <div class="connector"></div>
+                        <div class="branch-group">
+                            <div class="tree-node leaf" id="leaf-phish" onclick="log('Phishing: Sending fake emails.', 'warn')">Phishing</div>
+                            <div class="tree-node leaf" id="leaf-stuff" onclick="log('Credential Stuffing: Trying reused passwords.', 'warn')">Stuffing</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; align-items:center;">
+                        <div class="tree-node">2. Brute Force</div>
+                        <div class="connector"></div>
+                        <div class="tree-node leaf" id="leaf-brute" onclick="log('Brute Force: Guessing passwords online.', 'warn')">Online Guessing</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function mitigateTree() {
+        // Visual Update
+        document.getElementById('leaf-stuff').classList.add('blocked');
+        document.getElementById('leaf-brute').classList.add('blocked');
+        
+        log("MITIGATION: MFA implemented. 'Stuffing' and 'Brute Force' paths blocked.", "ok");
+        log("NOTE: Phishing (Social Engineering) remains a risk (User Education required).", "warn");
+    }
+
+    // --- ABUSE CASE ---
+    function renderAbuse(container) {
+        container.innerHTML = `
+            <div class="abuse-box">
+                <div class="use-case">
+                    <strong>Use Case:</strong> User resets password.<br>
+                    <span style="font-size:0.8rem; color:#aaa;">Goal: Recovery.</span>
+                </div>
+                <div class="abuse-case">
+                    <strong>Abuse Case:</strong> Attacker enumerates valid emails.<br>
+                    <span style="font-size:0.8rem; color:#aaa;">Goal: Reconnaissance.</span>
+                </div>
+                <div id="flow-log">
+                    <div class="flow-step bad">1. Attacker enters "admin@company.com"</div>
+                    <div class="flow-step bad" id="step-2">2. System: "Email sent to admin..." (VALID)</div>
+                    <div class="flow-step bad">3. Attacker enters "fake@company.com"</div>
+                    <div class="flow-step bad" id="step-4">4. System: "Email not found." (INVALID)</div>
+                    <div class="flow-step bad" style="margin-top:10px;">RESULT: Attacker knows "admin" exists.</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function mitigateAbuse() {
+        const s2 = document.getElementById('step-2');
+        const s4 = document.getElementById('step-4');
+        
+        s2.innerText = '2. System: "If account exists, email sent."';
+        s2.className = "flow-step";
+        s2.style.color = "var(--safe-green)";
+
+        s4.innerText = '4. System: "If account exists, email sent."';
+        s4.className = "flow-step";
+        s4.style.color = "var(--safe-green)";
+
+        log("MITIGATION: Generic Error Messages applied. Enumeration vector closed.", "ok");
+    }
+
+    // Init
+    setMode('agent');
+
+</script>
+
+</body>
+</html>

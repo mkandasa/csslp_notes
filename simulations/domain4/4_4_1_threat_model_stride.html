@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: STRIDE Threat Modeling Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --stride-red: #ef4444;
+            --mitigate-green: #22c55e;
+            --info-blue: #3b82f6;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--stride-red);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--stride-red); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 600px;
+        }
+
+        /* DFD VISUALIZATION */
+        .dfd-panel {
+            background: #000;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .trust-boundary {
+            position: absolute;
+            left: 50%; top: 0; bottom: 0;
+            border-left: 2px dashed #666;
+            z-index: 0;
+        }
+        .boundary-label {
+            position: absolute;
+            left: 50%; top: 10px;
+            transform: translateX(-50%);
+            background: #000; padding: 5px;
+            font-size: 0.7rem; color: #888;
+        }
+
+        .node {
+            position: absolute;
+            width: 120px; height: 80px;
+            border-radius: 8px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: 0.3s;
+            z-index: 10;
+            background: #1e293b;
+            border: 2px solid #64748b;
+            text-align: center;
+        }
+        .node:hover { transform: scale(1.05); border-color: var(--info-blue); }
+        .node.selected { border-color: var(--stride-red); box-shadow: 0 0 15px rgba(239,68,68,0.3); }
+        .node.secure { border-color: var(--mitigate-green); box-shadow: 0 0 15px rgba(34,197,94,0.3); }
+
+        #ent-user { top: 40%; left: 50px; border-radius: 4px; } /* External Entity */
+        #proc-web { top: 40%; left: 40%; border-radius: 50%; width: 100px; height: 100px; } /* Process */
+        #store-db { top: 40%; right: 50px; border-radius: 0; border-top: none; border-bottom: none; border-left: 2px solid #aaa; border-right: 2px solid #aaa; } /* Data Store */
+        #ent-log { top: 10%; right: 50px; width: 80px; height: 60px; border-style: dashed; } /* Log Store */
+
+        .data-flow {
+            position: absolute;
+            height: 4px; background: #334155;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .data-flow:hover { background: var(--info-blue); }
+        
+        #flow-1 { top: 48%; left: 170px; width: 180px; } /* User -> Web */
+        #flow-2 { top: 48%; right: 170px; width: 180px; } /* Web -> DB */
+        #flow-3 { top: 30%; right: 90px; width: 4px; height: 60px; } /* DB -> Log */
+
+        /* ANALYSIS PANEL */
+        .analysis-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .threat-card {
+            background: #0f172a;
+            border: 1px solid var(--border);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            display: none; /* Hidden until selected */
+        }
+        .threat-header { font-weight: bold; color: var(--stride-red); margin-bottom: 5px; display: flex; justify-content: space-between; }
+        .threat-desc { font-size: 0.85rem; color: #ccc; margin-bottom: 10px; }
+        
+        .mitigation-options {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        button.mit-btn {
+            padding: 8px;
+            background: #334155;
+            border: 1px solid #475569;
+            color: #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 0.8rem;
+        }
+        button.mit-btn:hover { background: #475569; }
+        button.mit-btn.correct { background: var(--mitigate-green); color: black; border-color: var(--mitigate-green); }
+        button.mit-btn.wrong { background: #3e0a0a; border-color: var(--stride-red); color: #aaa; }
+
+        /* LOGS */
+        .status-bar {
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px solid #333;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>STRIDE Threat Modeling Lab</h1>
+    <p>Complete Coverage: S.T.R.I.D.E Analysis</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- DFD -->
+    <div class="dfd-panel" id="dfd">
+        <div class="trust-boundary"></div>
+        <div class="boundary-label">INTERNET || TRUSTED NETWORK</div>
+
+        <!-- NODES -->
+        <div class="node" id="ent-user" onclick="selectNode('user')">
+            👤 USER<br>(External Entity)
+        </div>
+
+        <div class="data-flow" id="flow-1" onclick="selectNode('flow1')"></div>
+
+        <div class="node" id="proc-web" onclick="selectNode('web')">
+            ⚙️ WEB APP<br>(Process)
+        </div>
+
+        <div class="data-flow" id="flow-2" onclick="selectNode('flow2')"></div>
+
+        <div class="node" id="store-db" onclick="selectNode('db')">
+            🛢️ DATABASE<br>(Data Store)
+        </div>
+
+        <div class="node" id="ent-log" onclick="selectNode('log')">
+            📝 LOGS<br>(Store)
+        </div>
+        
+        <div style="position:absolute; bottom:10px; left:10px; font-size:0.7rem; color:#666;">
+            *Click elements to start STRIDE analysis.
+        </div>
+    </div>
+
+    <!-- ANALYSIS -->
+    <div class="analysis-panel">
+        <h3 style="margin-top:0; border-bottom:1px solid #333; padding-bottom:10px;">Threat Analysis</h3>
+        
+        <div id="placeholder-text" style="color:#666; font-style:italic;">Select a component on the left...</div>
+
+        <!-- S: SPOOFING -->
+        <div class="threat-card" id="card-user">
+            <div class="threat-header">S: Spoofing Identity</div>
+            <div class="threat-desc">Attacker impersonates a legitimate user.</div>
+            <div class="mitigation-options">
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Use HTTP Basic Auth</button>
+                <button class="mit-btn" onclick="checkAnswer(this, true, 'user')">Implement MFA / Strong Auth</button>
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Encrypt Database</button>
+            </div>
+        </div>
+
+        <!-- T: TAMPERING -->
+        <div class="threat-card" id="card-flow">
+            <div class="threat-header">T: Tampering with Data</div>
+            <div class="threat-desc">Attacker modifies data packets in transit.</div>
+            <div class="mitigation-options">
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Strong Password Policy</button>
+                <button class="mit-btn" onclick="checkAnswer(this, true, 'flow1')">TLS 1.3 + HMAC Integrity</button>
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Input Validation</button>
+            </div>
+        </div>
+
+        <!-- R: REPUDIATION -->
+        <div class="threat-card" id="card-log">
+            <div class="threat-header">R: Repudiation</div>
+            <div class="threat-desc">User denies performing an action (e.g., "I didn't delete that file").</div>
+            <div class="mitigation-options">
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Data Encryption</button>
+                <button class="mit-btn" onclick="checkAnswer(this, true, 'log')">Digital Signatures & Secure Audit Logs</button>
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Firewall Rules</button>
+            </div>
+        </div>
+
+        <!-- I: INFORMATION DISCLOSURE -->
+        <div class="threat-card" id="card-db">
+            <div class="threat-header">I: Information Disclosure</div>
+            <div class="threat-desc">Attacker reads sensitive data at rest.</div>
+            <div class="mitigation-options">
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Use a Firewall</button>
+                <button class="mit-btn" onclick="checkAnswer(this, true, 'db')">Encryption At Rest (AES-256)</button>
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Input Validation</button>
+            </div>
+        </div>
+
+        <!-- D: DENIAL OF SERVICE -->
+        <div class="threat-card" id="card-dos">
+            <div class="threat-header">D: Denial of Service</div>
+            <div class="threat-desc">Attacker floods the Web App to crash it.</div>
+            <div class="mitigation-options">
+                <button class="mit-btn" onclick="checkAnswer(this, true, 'web')">Rate Limiting & CDNs</button>
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Strong Authentication</button>
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Data Backup</button>
+            </div>
+        </div>
+
+        <!-- E: ELEVATION OF PRIVILEGE -->
+        <div class="threat-card" id="card-elev">
+            <div class="threat-header">E: Elevation of Privilege</div>
+            <div class="threat-desc">User manipulates input to act as Admin.</div>
+            <div class="mitigation-options">
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Encrypt Hard Drive</button>
+                <button class="mit-btn" onclick="checkAnswer(this, false)">Use HTTP/2</button>
+                <button class="mit-btn" onclick="checkAnswer(this, true, 'web')">Input Validation & RBAC</button>
+            </div>
+        </div>
+
+        <div class="status-bar" id="status-text">Ready.</div>
+    </div>
+
+</div>
+
+<script>
+    function selectNode(id) {
+        // Reset Visuals
+        document.querySelectorAll('.node, .data-flow').forEach(n => n.classList.remove('selected'));
+        document.querySelectorAll('.threat-card').forEach(c => c.style.display = 'none');
+        document.getElementById('placeholder-text').style.display = 'none';
+
+        // Select Logic
+        if(id === 'user') {
+            document.getElementById('ent-user').classList.add('selected');
+            document.getElementById('card-user').style.display = 'block';
+            setStatus("Analyzing User: Vulnerable to SPOOFING.");
+        }
+        else if(id === 'flow1') {
+            document.getElementById('flow-1').classList.add('selected');
+            document.getElementById('card-flow').style.display = 'block';
+            setStatus("Analyzing Network: Vulnerable to TAMPERING.");
+        }
+        else if(id === 'web') {
+            document.getElementById('proc-web').classList.add('selected');
+            // Web Process has multiple threats. Showing DOS and ELEVATION.
+            document.getElementById('card-dos').style.display = 'block';
+            document.getElementById('card-elev').style.display = 'block';
+            setStatus("Analyzing Process: Vulnerable to DOS and ELEVATION.");
+        }
+        else if(id === 'db') {
+            document.getElementById('store-db').classList.add('selected');
+            document.getElementById('card-db').style.display = 'block';
+            setStatus("Analyzing DB: Vulnerable to INFO DISCLOSURE.");
+        }
+        else if(id === 'log') {
+            document.getElementById('ent-log').classList.add('selected');
+            document.getElementById('card-log').style.display = 'block';
+            setStatus("Analyzing Logs: Critical for non-REPUDIATION.");
+        }
+    }
+
+    function checkAnswer(btn, isCorrect, nodeId) {
+        const parent = btn.parentElement;
+        Array.from(parent.children).forEach(b => {
+            b.classList.remove('correct', 'wrong');
+        });
+
+        if(isCorrect) {
+            btn.classList.add('correct');
+            setStatus("✅ Correct Mitigation Applied! Architecture Updated.");
+            
+            if(nodeId === 'user') document.getElementById('ent-user').classList.add('secure');
+            if(nodeId === 'flow1') {
+                document.getElementById('flow-1').classList.add('secure');
+                document.getElementById('flow-1').style.backgroundColor = "var(--mitigate-green)";
+            }
+            if(nodeId === 'web') document.getElementById('proc-web').classList.add('secure');
+            if(nodeId === 'db') document.getElementById('store-db').classList.add('secure');
+            if(nodeId === 'log') document.getElementById('ent-log').classList.add('secure');
+
+        } else {
+            btn.classList.add('wrong');
+            setStatus("❌ Incorrect. That control does not address this specific threat.");
+        }
+    }
+
+    function setStatus(msg) {
+        document.getElementById('status-text').innerText = msg;
+    }
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Flow Control Lab</title>
+    <style>
+        :root {
+            --bg-dark: #1e1e1e;
+            --panel-bg: #2d2d2d;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-yellow: #eab308;
+            --text-main: #e2e8f0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #111;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--accent-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--accent-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 250px 1fr 250px;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS (LEFT) */
+        .controls-panel {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        .switch-group {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #444;
+        }
+        label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 0.9rem; }
+        
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn-toggle { background: #444; color: #aaa; }
+        .btn-toggle.active { background: var(--accent-green); color: #000; }
+        .btn-attack { background: var(--accent-red); color: white; }
+        .btn-traffic { background: var(--accent-yellow); color: black; }
+
+        /* VISUALIZATION (CENTER) */
+        .viz-container {
+            background: #000;
+            border-radius: 8px;
+            height: 500px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #444;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Architecture Components */
+        .component {
+            height: 100px;
+            width: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-align: center;
+            z-index: 10;
+            position: absolute;
+            transition: all 0.3s;
+        }
+        
+        #comp-client { left: 20px; background: #555; border: 2px solid #777; }
+        #comp-waf { left: 150px; border: 2px dashed #555; color: #555; }
+        #comp-waf.active { background: var(--accent-red); border: 2px solid #f87171; color: white; box-shadow: 0 0 15px var(--accent-red); }
+        
+        #comp-queue { left: 350px; border: 2px dashed #555; color: #555; }
+        #comp-queue.active { background: var(--accent-yellow); border: 2px solid #facc15; color: black; box-shadow: 0 0 15px var(--accent-yellow); }
+        
+        #comp-server { right: 20px; background: var(--accent-blue); border: 2px solid #60a5fa; height: 120px; }
+        #comp-server.crashed { background: #333; border-color: #555; color: #555; }
+
+        /* Flow Path */
+        .path-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: #333;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+        /* Packets */
+        .packet {
+            width: 15px; height: 15px;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            transition: left 2s linear, opacity 0.2s;
+        }
+        .pkt-normal { background: var(--accent-blue); box-shadow: 0 0 5px var(--accent-blue); }
+        .pkt-malicious { background: var(--accent-red); box-shadow: 0 0 5px var(--accent-red); }
+        .pkt-highload { background: var(--accent-yellow); box-shadow: 0 0 5px var(--accent-yellow); }
+
+        /* LOGS (RIGHT) */
+        .log-panel {
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            max-height: 500px;
+        }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 2px; }
+        .log-err { color: var(--accent-red); }
+        .log-warn { color: var(--accent-yellow); }
+        .log-ok { color: var(--accent-green); }
+
+        .server-health-bar {
+            position: absolute;
+            bottom: 10px;
+            right: 20px;
+            width: 80px;
+            height: 10px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .health-fill {
+            height: 100%;
+            width: 100%;
+            background: var(--accent-green);
+            transition: width 0.2s, background 0.2s;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Flow Control Simulator</h1>
+    <p>Proxies, Firewalls (WAF), and Queues</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls-panel">
+        <h3>Architecture</h3>
+        
+        <div class="switch-group">
+            <label>1. Web App Firewall (WAF)</label>
+            <p style="font-size:0.8rem; color:#aaa;">Inspects payload. Blocks SQLi/XSS.</p>
+            <button id="btn-waf" class="btn-toggle" onclick="toggleComponent('waf')">Enable WAF</button>
+        </div>
+
+        <div class="switch-group">
+            <label>2. Message Queue</label>
+            <p style="font-size:0.8rem; color:#aaa;">Buffers traffic spikes. Asynchronous.</p>
+            <button id="btn-queue" class="btn-toggle" onclick="toggleComponent('queue')">Enable Queue</button>
+        </div>
+
+        <h3>Attack Simulation</h3>
+        <button class="btn-attack" onclick="startScenario('injection')">🔥 SQL Injection Attack</button>
+        <button class="btn-traffic" onclick="startScenario('ddos')">⚡ Traffic Spike (DoS)</button>
+        <button style="background:#555; color:white;" onclick="startScenario('normal')">Reset / Normal Flow</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-container" id="viz-area">
+        <div class="path-line"></div>
+
+        <div id="comp-client" class="component">Client<br>(Internet)</div>
+        <div id="comp-waf" class="component">WAF<br>(Filter)</div>
+        <div id="comp-queue" class="component">Queue<br>(Buffer)</div>
+        
+        <div id="comp-server" class="component">
+            App Server
+            <div style="font-size:0.7rem; margin-top:5px;" id="server-status">ONLINE</div>
+            <div class="server-health-bar"><div id="health-fill" class="health-fill"></div></div>
+        </div>
+
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-panel" id="log-box">
+        <div class="log-entry">> System Ready.</div>
+        <div class="log-entry">> WAF: Disabled.</div>
+        <div class="log-entry">> Queue: Disabled.</div>
+    </div>
+
+</div>
+
+<script>
+    let components = { waf: false, queue: false };
+    let serverHealth = 100;
+    let scenario = 'normal';
+    let packetInterval;
+    
+    // Components Logic
+    function toggleComponent(comp) {
+        components[comp] = !components[comp];
+        const btn = document.getElementById('btn-' + comp);
+        const viz = document.getElementById('comp-' + comp);
+        
+        if (components[comp]) {
+            btn.classList.add('active');
+            btn.innerText = "Disable " + comp.toUpperCase();
+            viz.classList.add('active');
+            log(`ARCHITECTURE: ${comp.toUpperCase()} Layer Enabled.`, 'ok');
+        } else {
+            btn.classList.remove('active');
+            btn.innerText = "Enable " + comp.toUpperCase();
+            viz.classList.remove('active');
+            log(`ARCHITECTURE: ${comp.toUpperCase()} Layer Disabled.`, 'warn');
+        }
+    }
+
+    // Scenario Logic
+    function startScenario(type) {
+        clearInterval(packetInterval);
+        scenario = type;
+        
+        // Reset Server
+        serverHealth = 100;
+        updateHealth();
+        document.getElementById('comp-server').classList.remove('crashed');
+        document.getElementById('server-status').innerText = "ONLINE";
+
+        if (type === 'normal') {
+            log("SCENARIO: Normal Traffic Flow.", 'ok');
+            packetInterval = setInterval(() => spawnPacket('normal'), 1000);
+        } else if (type === 'injection') {
+            log("SCENARIO: Injection Attack Started!", 'err');
+            packetInterval = setInterval(() => {
+                spawnPacket(Math.random() > 0.5 ? 'malicious' : 'normal');
+            }, 800);
+        } else if (type === 'ddos') {
+            log("SCENARIO: Traffic Spike Detected!", 'warn');
+            packetInterval = setInterval(() => spawnPacket('highload'), 150); // Fast spawn
+        }
+    }
+
+    // Packet Animation Logic
+    function spawnPacket(type) {
+        if (serverHealth <= 0) return;
+
+        const viz = document.getElementById('viz-area');
+        const pkt = document.createElement('div');
+        pkt.className = `packet pkt-${type}`;
+        pkt.style.left = '60px'; // Start at Client
+        viz.appendChild(pkt);
+
+        let pos = 60;
+        let speed = 2; 
+
+        // Animation Loop for this packet
+        const anim = setInterval(() => {
+            if (serverHealth <= 0) { clearInterval(anim); pkt.remove(); return; }
+
+            // 1. Check WAF Intersection (at approx 190px)
+            if (pos >= 180 && pos <= 200 && components.waf && type === 'malicious') {
+                clearInterval(anim);
+                pkt.style.transform = "scale(2)";
+                pkt.style.opacity = "0";
+                setTimeout(() => pkt.remove(), 200);
+                log("WAF: Malicious payload blocked.", 'ok');
+                return;
+            }
+
+            // 2. Check Queue Intersection (at approx 390px)
+            if (pos >= 380 && pos <= 400 && components.queue && type === 'highload') {
+                // Slow down packet significantly to simulate buffering
+                speed = 0.5; 
+            }
+
+            // 3. Reached Server (approx 600px width container, server at right)
+            // Container width varies, calculating based on element
+            const serverLeft = document.getElementById('comp-server').offsetLeft;
+            
+            if (pos >= serverLeft + 10) {
+                clearInterval(anim);
+                pkt.remove();
+                hitServer(type);
+            } else {
+                pos += speed;
+                pkt.style.left = pos + 'px';
+            }
+        }, 10);
+    }
+
+    function hitServer(type) {
+        if (type === 'normal') return;
+
+        if (type === 'malicious') {
+            serverHealth -= 50;
+            log("SERVER: Critical Database Error (SQLi)!", 'err');
+        } 
+        
+        if (type === 'highload') {
+            // If queue is enabled, impact is low. If disabled, impact is high.
+            const damage = components.queue ? 1 : 10;
+            serverHealth -= damage;
+        }
+
+        updateHealth();
+    }
+
+    function updateHealth() {
+        if (serverHealth < 0) serverHealth = 0;
+        const fill = document.getElementById('health-fill');
+        const srv = document.getElementById('comp-server');
+        const lbl = document.getElementById('server-status');
+
+        fill.style.width = serverHealth + '%';
+        
+        if (serverHealth > 50) fill.style.background = 'var(--accent-green)';
+        else if (serverHealth > 20) fill.style.background = 'var(--accent-yellow)';
+        else fill.style.background = 'var(--accent-red)';
+
+        if (serverHealth === 0) {
+            srv.classList.add('crashed');
+            lbl.innerText = "CRASHED";
+            log("SYSTEM FAILURE: Server Overload/Compromise.", 'err');
+        }
+    }
+
+    function log(msg, type) {
+        const box = document.getElementById('log-box');
+        const line = document.createElement('div');
+        line.className = `log-entry log-${type}`;
+        line.innerText = `> ${msg}`;
+        box.prepend(line);
+        // keep only 20 logs
+        if (box.children.length > 20) box.lastChild.remove();
+    }
+
+    // Start
+    startScenario('normal');
+
+</script>
+
+</body>
+</html>

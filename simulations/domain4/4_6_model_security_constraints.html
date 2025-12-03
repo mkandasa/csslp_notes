@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Security NFR Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --sec-blue: #3b82f6;
+            --perf-green: #22c55e;
+            --cost-red: #ef4444;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--sec-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--sec-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 600px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .slider-group { margin-bottom: 20px; }
+        .slider-label { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; }
+        
+        input[type=range] {
+            width: 100%;
+            -webkit-appearance: none;
+            background: #333;
+            height: 8px;
+            border-radius: 4px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+        }
+
+        #rng-sec::-webkit-slider-thumb { background: var(--sec-blue); }
+        #rng-perf::-webkit-slider-thumb { background: var(--perf-green); }
+        #rng-cost::-webkit-slider-thumb { background: var(--cost-red); }
+
+        .scenario-list { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        button {
+            padding: 12px;
+            background: #334155;
+            border: 1px solid #555;
+            color: #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            transition: 0.2s;
+        }
+        button:hover { background: #475569; }
+        button.active { border-color: var(--sec-blue); background: rgba(59, 130, 246, 0.1); color: white; font-weight: bold; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Triangle Chart */
+        .triangle-chart {
+            width: 300px; height: 300px;
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .point {
+            width: 15px; height: 15px;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px currentColor;
+        }
+        
+        /* Triangle Background */
+        .bg-tri {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px; height: 250px;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            background: rgba(255,255,255,0.05);
+            border-bottom: 2px solid #333;
+        }
+
+        /* Dynamic Blob */
+        .blob {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 100px; height: 100px;
+            background: rgba(59, 130, 246, 0.5);
+            border-radius: 50%;
+            filter: blur(20px);
+            transition: all 0.5s ease;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Report Card */
+        .report-card {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            width: 80%;
+            text-align: center;
+        }
+        .report-title { font-weight: bold; color: #aaa; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .report-status { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
+        .report-desc { font-size: 0.85rem; color: #ccc; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Architectural Trade-off Lab</h1>
+    <p>Modeling Non-Functional Requirements: Security vs. Performance vs. Cost</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">NFR Sliders (Constraints)</div>
+        
+        <div class="slider-group">
+            <div class="slider-label">
+                <span>Security</span>
+                <span id="val-sec" style="color:var(--sec-blue)">50%</span>
+            </div>
+            <input type="range" id="rng-sec" min="0" max="100" value="50" oninput="updateModel('sec')">
+        </div>
+
+        <div class="slider-group">
+            <div class="slider-label">
+                <span>Performance</span>
+                <span id="val-perf" style="color:var(--perf-green)">50%</span>
+            </div>
+            <input type="range" id="rng-perf" min="0" max="100" value="50" oninput="updateModel('perf')">
+        </div>
+
+        <div class="slider-group">
+            <div class="slider-label">
+                <span>Cost Efficiency</span>
+                <span id="val-cost" style="color:var(--cost-red)">50%</span>
+            </div>
+            <input type="range" id="rng-cost" min="0" max="100" value="50" oninput="updateModel('cost')">
+        </div>
+
+        <div class="section-title" style="margin-top:30px;">Business Scenarios</div>
+        <div class="scenario-list">
+            <button onclick="setScenario('bank', this)">🏦 Banking Core (High Sec)</button>
+            <button onclick="setScenario('hft', this)">⚡ High Freq Trading (High Perf)</button>
+            <button onclick="setScenario('mvp', this)">🚀 Startup MVP (Low Cost)</button>
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <div class="triangle-chart">
+            <div class="bg-tri"></div>
+            
+            <!-- Blob representing current state -->
+            <div class="blob" id="state-blob"></div>
+
+            <!-- Labels -->
+            <div class="point" style="top:0%; left:50%; background:var(--sec-blue); color:var(--sec-blue);"></div>
+            <div style="position:absolute; top:-25px; left:50%; transform:translateX(-50%); color:var(--sec-blue); font-weight:bold;">SECURITY</div>
+
+            <div class="point" style="bottom:0%; left:0%; background:var(--cost-red); color:var(--cost-red);"></div>
+            <div style="position:absolute; bottom:-25px; left:0%; transform:translateX(-50%); color:var(--cost-red); font-weight:bold;">COST</div>
+
+            <div class="point" style="bottom:0%; right:0%; background:var(--perf-green); color:var(--perf-green);"></div>
+            <div style="position:absolute; bottom:-25px; right:0%; transform:translateX(50%); color:var(--perf-green); font-weight:bold;">PERFORMANCE</div>
+        </div>
+
+        <div class="report-card" id="report">
+            <div class="report-title">ARCHITECTURAL ANALYSIS</div>
+            <div class="report-status" id="status-text">Balanced System</div>
+            <div class="report-desc" id="desc-text">
+                The architecture balances all three constraints moderately. Suitable for general purpose internal apps.
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    function updateModel(source) {
+        const sec = parseInt(document.getElementById('rng-sec').value);
+        const perf = parseInt(document.getElementById('rng-perf').value);
+        const cost = parseInt(document.getElementById('rng-cost').value);
+
+        // Update Labels
+        document.getElementById('val-sec').innerText = sec + "%";
+        document.getElementById('val-perf').innerText = perf + "%";
+        document.getElementById('val-cost').innerText = cost + "%";
+
+        // Logic: You can't have everything.
+        // If user drags one slider up, force others down slightly to simulate trade-off?
+        // For simplicity, we calculate the 'Center of Gravity' of the Blob.
+        
+        // Triangle Coords: Sec(50, 0), Cost(0, 100), Perf(100, 100) (Percent based)
+        
+        // Calculate weighted position
+        const total = sec + perf + cost;
+        if(total === 0) return; // avoid div by zero
+
+        // X Coordinate (Left to Right)
+        // Cost pulls Left (0), Perf pulls Right (100), Sec is Center (50)
+        const x = ((cost * 0) + (sec * 50) + (perf * 100)) / total;
+
+        // Y Coordinate (Top to Bottom)
+        // Sec pulls Top (0), Cost/Perf pull Bottom (100)
+        const y = ((sec * 0) + (cost * 100) + (perf * 100)) / total;
+
+        // Update Blob
+        const blob = document.getElementById('state-blob');
+        blob.style.left = x + "%";
+        blob.style.top = y + "%";
+        
+        // Dynamic Color Mixing
+        // Simplified: Pick dominant color
+        if (sec > perf && sec > cost) blob.style.backgroundColor = "rgba(59, 130, 246, 0.7)"; // Blue
+        else if (perf > sec && perf > cost) blob.style.backgroundColor = "rgba(34, 197, 94, 0.7)"; // Green
+        else if (cost > sec && cost > perf) blob.style.backgroundColor = "rgba(239, 68, 68, 0.7)"; // Red
+        else blob.style.backgroundColor = "rgba(255, 255, 255, 0.5)"; // Balanced
+
+        updateReport(sec, perf, cost);
+    }
+
+    function updateReport(sec, perf, cost) {
+        const status = document.getElementById('status-text');
+        const desc = document.getElementById('desc-text');
+        const card = document.getElementById('report');
+
+        if (sec > 80) {
+            status.innerText = "Fort Knox Architecture";
+            status.style.color = "var(--sec-blue)";
+            desc.innerText = "Heavily Encrypted (Data at Rest/Transit). Strict MFA. Full Audit Logging. Performance suffers due to crypto overhead. High Cost due to security appliances (HSM, WAF).";
+            card.style.borderColor = "var(--sec-blue)";
+        } 
+        else if (perf > 80) {
+            status.innerText = "Speed Demon";
+            status.style.color = "var(--perf-green)";
+            desc.innerText = "In-Memory Caching (Redis). UDP Protocol. Encryption Disabled for speed. Very risky but extremely fast. Low Latency is the priority.";
+            card.style.borderColor = "var(--perf-green)";
+        }
+        else if (cost > 80) {
+            status.innerText = "Budget Build";
+            status.style.color = "var(--cost-red)";
+            desc.innerText = "Serverless / Shared Hosting. No Redundancy. Free Tier Security tools only. High risk of downtime and breach, but extremely cheap.";
+            card.style.borderColor = "var(--cost-red)";
+        }
+        else {
+            status.innerText = "Balanced Trade-off";
+            status.style.color = "#ccc";
+            desc.innerText = "Standard TLS. Reasonable Caching. Cloud-native security controls. A sustainable architecture for most business apps.";
+            card.style.borderColor = "#475569";
+        }
+    }
+
+    function setScenario(type, btn) {
+        // UI
+        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        if (type === 'bank') {
+            setSliders(95, 30, 10); // High Sec, Low Perf, High Cost (Low Efficiency)
+        } else if (type === 'hft') {
+            setSliders(20, 95, 20); // Low Sec, High Perf
+        } else if (type === 'mvp') {
+            setSliders(30, 40, 90); // Low Cost
+        }
+    }
+
+    function setSliders(s, p, c) {
+        document.getElementById('rng-sec').value = s;
+        document.getElementById('rng-perf').value = p;
+        document.getElementById('rng-cost').value = c;
+        updateModel();
+    }
+
+    // Init
+    updateModel();
+
+</script>
+
+</body>
+</html>

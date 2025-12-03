@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Secure Backup Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --backup-cyan: #06b6d4;
+            --ransom-red: #ef4444;
+            --safe-green: #22c55e;
+            --diff-purple: #a855f7;
+            --inc-orange: #f97316;
+            --text: #f1f5f9;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--backup-cyan);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--backup-cyan); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Toggles */
+        .setting-row {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #0f172a;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .setting-label { display: block; font-weight: bold; margin-bottom: 5px; }
+        
+        select, button {
+            width: 100%;
+            padding: 10px;
+            background: #334155;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { filter: brightness(1.2); }
+        
+        .btn-backup { background: var(--backup-cyan); color: black; font-weight: bold; }
+        .btn-attack { background: var(--ransom-red); margin-top: 10px; font-weight: bold; }
+        .btn-restore { background: var(--safe-green); color: black; font-weight: bold; margin-top: 10px; }
+        .btn-drill { background: #eab308; color: black; font-weight: bold; margin-top: 10px; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Backup Type Viz */
+        .type-viz {
+            background: #000;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            height: 100px;
+        }
+        .block {
+            width: 40px;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; color: white; font-weight: bold;
+            transition: 0.3s;
+        }
+        .block-full { height: 80px; background: var(--backup-cyan); }
+        .block-diff { background: var(--diff-purple); opacity: 0.8; }
+        .block-inc { background: var(--inc-orange); opacity: 0.8; }
+
+        /* Timeline */
+        .timeline-box {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 120px;
+            position: relative;
+            padding: 20px;
+            overflow-x: auto;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+        }
+        .timeline-track {
+            position: absolute;
+            top: 50%; left: 0; right: 0;
+            height: 2px;
+            background: #555;
+            z-index: 0;
+        }
+        
+        .backup-point {
+            width: 40px; height: 40px;
+            background: var(--backup-cyan);
+            border-radius: 50%;
+            margin-right: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            z-index: 10;
+            position: relative;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .backup-point.encrypted { background: var(--ransom-red); box-shadow: 0 0 10px var(--ransom-red); }
+        .backup-point.immutable { border: 3px solid var(--safe-green); }
+        .backup-point.diff { background: var(--diff-purple); }
+        .backup-point.inc { background: var(--inc-orange); }
+        
+        /* Server Status */
+        .server-rack {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+        }
+        .server {
+            width: 100px; height: 140px;
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 4px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: #aaa;
+            font-size: 2rem;
+            transition: 0.3s;
+        }
+        .server.online { border-color: var(--safe-green); color: var(--safe-green); box-shadow: 0 0 15px rgba(34,197,94,0.2); }
+        .server.hacked { border-color: var(--ransom-red); background: #3e0a0a; color: var(--ransom-red); animation: shake 0.5s; }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: var(--backup-cyan); }
+        .log-err { color: var(--ransom-red); }
+        .log-ok { color: var(--safe-green); }
+        .log-warn { color: #eab308; }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(5px); }
+            50% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+            100% { transform: translateX(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure Backup & Restoration Lab</h1>
+    <p>Ransomware Defense, RTO/RPO Metrics & Backup Types</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Backup Strategy</div>
+        
+        <div class="setting-row">
+            <span class="setting-label">Immutability (Object Lock)</span>
+            <select id="cfg-worm">
+                <option value="off">OFF (Mutable / Standard)</option>
+                <option value="on">ON (WORM / Governance)</option>
+            </select>
+        </div>
+
+        <div class="setting-row">
+            <span class="setting-label">Backup Type</span>
+            <select id="cfg-type" onchange="updateTypeViz()">
+                <option value="full">Full (Base)</option>
+                <option value="diff">Differential (Since Full)</option>
+                <option value="inc">Incremental (Since Last)</option>
+            </select>
+        </div>
+
+        <div class="setting-row">
+            <span class="setting-label">Frequency (RPO Control)</span>
+            <select id="cfg-freq">
+                <option value="24h">Daily (Low Cost)</option>
+                <option value="1h">Hourly (Standard)</option>
+                <option value="15m">15 Minutes (High Availability)</option>
+            </select>
+        </div>
+
+        <button class="btn-backup" onclick="createBackup()">💾 Run Manual Backup</button>
+
+        <div class="section-title" style="margin-top:20px;">2. Simulation</div>
+        <button class="btn-attack" onclick="runRansomware()">💀 Execute Ransomware</button>
+        <button class="btn-drill" onclick="runDisasterDrill()">⏱️ Run RTO/RPO Drill</button>
+
+        <div class="section-title" style="margin-top:20px;">3. Recovery</div>
+        <button class="btn-restore" id="btn-restore" onclick="runRestore()" disabled>♻️ Restore System</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- PRODUCTION SERVER -->
+        <div class="server-rack">
+            <div class="server online" id="srv-prod">
+                <div id="srv-icon">🖥️</div>
+                <div style="font-size:0.8rem; margin-top:10px;">PROD DB</div>
+                <div id="data-status" style="font-size:0.7rem;">DATA: OK</div>
+            </div>
+            
+            <div style="width:200px; margin-left:20px;">
+                <div style="color:#aaa; font-size:0.8rem; margin-bottom:5px;">Storage Consumption:</div>
+                <div class="type-viz" id="storage-viz">
+                    <!-- Blocks injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- BACKUP TIMELINE -->
+        <div class="timeline-box" id="timeline">
+            <div class="timeline-track"></div>
+            <!-- Backups injected here -->
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Set Policy and Run Backup.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let backupCount = 0;
+    let backups = []; 
+    let isInfected = false;
+    let lastBackupTime = 0; // Timestamp
+
+    // Init storage viz with placeholder
+    updateTypeViz();
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':(type==='warn'?'log-warn':'log-sys'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function updateTypeViz() {
+        const type = document.getElementById('cfg-type').value;
+        const cont = document.getElementById('storage-viz');
+        cont.innerHTML = "";
+
+        // Base Full
+        const full = document.createElement('div');
+        full.className = "block block-full";
+        full.innerText = "FULL";
+        cont.appendChild(full);
+
+        if(type === 'diff') {
+            const b1 = document.createElement('div'); b1.className = "block block-diff"; b1.style.height="30px"; b1.innerText = "D1";
+            const b2 = document.createElement('div'); b2.className = "block block-diff"; b2.style.height="50px"; b2.innerText = "D2";
+            cont.appendChild(b1); cont.appendChild(b2);
+        }
+        else if (type === 'inc') {
+            const b1 = document.createElement('div'); b1.className = "block block-inc"; b1.style.height="20px"; b1.innerText = "I1";
+            const b2 = document.createElement('div'); b2.className = "block block-inc"; b2.style.height="20px"; b2.innerText = "I2";
+            cont.appendChild(b1); cont.appendChild(b2);
+        }
+    }
+
+    function createBackup() {
+        if (isInfected) {
+            log("ERROR: Cannot backup infected system. Clean first.", "err");
+            return;
+        }
+
+        const isWorm = document.getElementById('cfg-worm').value === 'on';
+        const type = document.getElementById('cfg-type').value;
+        backupCount++;
+        lastBackupTime = Date.now();
+        
+        const backup = {
+            id: backupCount,
+            immutable: isWorm,
+            type: type,
+            encrypted: false
+        };
+        backups.push(backup);
+
+        // Viz
+        const tl = document.getElementById('timeline');
+        const point = document.createElement('div');
+        let typeClass = "";
+        let label = "F";
+        if(type === 'diff') { typeClass = "diff"; label = "D"; }
+        if(type === 'inc') { typeClass = "inc"; label = "I"; }
+
+        point.className = `backup-point ${isWorm ? 'immutable' : ''} ${typeClass}`;
+        point.id = `bkp-${backupCount}`;
+        point.innerHTML = isWorm ? "🔒" : label;
+        
+        // Tooltip logic simplified for demo
+        log(`BACKUP #${backupCount} (${type.toUpperCase()}): Complete. Protection: ${isWorm?'WORM':'None'}.`, "ok");
+
+        tl.appendChild(point);
+        checkRestoreCapability();
+    }
+
+    function runDisasterDrill() {
+        if(backups.length === 0) {
+            log("DRILL FAILED: No backups exist.", "err");
+            return;
+        }
+
+        const freq = document.getElementById('cfg-freq').value;
+        const requiredRPO = (freq === '15m') ? 15 : (freq === '1h' ? 60 : 1440); // minutes
+        
+        // Simulating a crash "now"
+        const now = Date.now();
+        const timeSinceLast = (now - lastBackupTime) / 1000 / 60; // minutes
+        
+        // In this sim, we pretend time passes much faster or we just check logic
+        // Let's assume for the drill that 45 minutes have passed since last backup
+        const simulatedGap = 45; 
+
+        log(`DRILL: Simulating Crash... Time since last backup: ${simulatedGap} min.`, "warn");
+        log(`DRILL: Business Requirement (RPO): ${requiredRPO} min max loss.`, "sys");
+
+        if (simulatedGap > requiredRPO) {
+            log(`DRILL RESULT: ❌ FAIL. You lost ${simulatedGap} min of data. RPO (${requiredRPO}m) violated. Increase frequency!`, "err");
+        } else {
+            log(`DRILL RESULT: ✅ PASS. Data loss (${simulatedGap}m) is within acceptable limits.`, "ok");
+        }
+    }
+
+    function runRansomware() {
+        if (backups.length === 0 && !isInfected) {
+            log("ATTACK: Ransomware executed. No data to encrypt.", "err");
+            infectServer();
+            return;
+        }
+
+        log("ATTACK: Ransomware detected! Encrypting Production Data...", "err");
+        infectServer();
+
+        setTimeout(() => {
+            log("ATTACK: Lateral movement to Backup Server...", "err");
+            
+            backups.forEach(bkp => {
+                const el = document.getElementById(`bkp-${bkp.id}`);
+                
+                if (bkp.immutable) {
+                    log(`DEFENSE: Backup #${bkp.id} is IMMUTABLE. Write denied.`, "ok");
+                    el.style.transform = "scale(1.2)";
+                    setTimeout(() => el.style.transform = "scale(1)", 200);
+                } else {
+                    bkp.encrypted = true;
+                    el.classList.add('encrypted');
+                    el.innerHTML = "💀";
+                    log(`FAILURE: Backup #${bkp.id} encrypted/deleted.`, "err");
+                }
+            });
+            checkRestoreCapability();
+        }, 1000);
+    }
+
+    function infectServer() {
+        isInfected = true;
+        const srv = document.getElementById('srv-prod');
+        srv.className = "server hacked";
+        document.getElementById('srv-icon').innerText = "☠️";
+        document.getElementById('data-status').innerText = "DATA: ENCRYPTED";
+    }
+
+    function checkRestoreCapability() {
+        const validBackups = backups.filter(b => !b.encrypted);
+        const btn = document.getElementById('btn-restore');
+        
+        if (validBackups.length > 0 && isInfected) {
+            btn.disabled = false;
+            // Logic: To restore Incremental #3, we need Full #1 + Inc #2 + Inc #3.
+            // Simplified here: Just checking if the latest point is valid.
+            const latest = validBackups[validBackups.length-1];
+            btn.innerText = `♻️ Restore to Point #${latest.id}`;
+        } else {
+            btn.disabled = true;
+            if (isInfected) btn.innerText = "⛔ Data Lost Forever";
+            else btn.innerText = "♻️ Restore System";
+        }
+    }
+
+    function runRestore() {
+        const validBackups = backups.filter(b => !b.encrypted);
+        if (validBackups.length === 0) return;
+
+        const target = validBackups[validBackups.length-1];
+        
+        let msg = `RECOVERY: Restoring Full Backup...`;
+        if(target.type === 'diff') msg += ` + Differential #${target.id}`;
+        if(target.type === 'inc') msg += ` + Replaying Incremental Chain up to #${target.id}`;
+
+        log(msg, "sys");
+        
+        setTimeout(() => {
+            isInfected = false;
+            const srv = document.getElementById('srv-prod');
+            srv.className = "server online";
+            document.getElementById('srv-icon').innerText = "🖥️";
+            document.getElementById('data-status').innerText = "DATA: OK";
+            
+            log("SUCCESS: System Online.", "ok");
+            document.getElementById('btn-restore').disabled = true;
+        }, 1500);
+    }
+
+</script>
+
+</body>
+</html>

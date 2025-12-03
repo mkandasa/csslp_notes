@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Database View Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --db-orange: #f97316;
+            --view-blue: #3b82f6;
+            --secure-green: #22c55e;
+            --danger: #ef4444;
+            --text: #f1f5f9;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--view-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--view-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .sql-box {
+            background: #000;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #ccc;
+            min-height: 80px;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+        .sql-hl { color: var(--view-blue); font-weight: bold; }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-create { background: var(--view-blue); }
+        .btn-query { background: var(--db-orange); color: black; }
+        .btn-attack { background: var(--danger); }
+        
+        button:hover { filter: brightness(1.2); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Schema Visualization */
+        .schema-container {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: #0f172a;
+            border-radius: 8px;
+            border: 1px dashed #334155;
+        }
+
+        .db-entity {
+            width: 180px;
+            background: #1e293b;
+            border: 2px solid #475569;
+            border-radius: 6px;
+            overflow: hidden;
+            transition: 0.3s;
+        }
+        .entity-header {
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #475569;
+        }
+        .entity-cols {
+            padding: 10px;
+            font-size: 0.8rem;
+        }
+        .col-item { padding: 4px 0; border-bottom: 1px solid #333; display: flex; justify-content: space-between; }
+        .col-sensitive { color: var(--danger); }
+        .col-safe { color: var(--secure-green); }
+
+        #ent-table { border-color: var(--db-orange); }
+        #ent-view { border-color: var(--view-blue); opacity: 0.3; } /* Hidden initially */
+
+        /* Projection Lines */
+        .arrow { font-size: 2rem; color: #475569; }
+
+        /* Result Grid */
+        .result-grid {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 150px;
+        }
+        table { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 0.9rem; }
+        th { text-align: left; color: #94a3b8; border-bottom: 1px solid #475569; padding: 5px; }
+        td { padding: 8px 5px; border-bottom: 1px solid #333; }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 120px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: var(--view-blue); }
+        .log-db { color: var(--db-orange); }
+        .log-err { color: var(--danger); }
+        .log-ok { color: var(--secure-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Database View Architecture Lab</h1>
+    <p>Column Security, Row Isolation & Virtual Tables</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. View Definition (DDL)</div>
+        <div class="sql-box" id="ddl-box">
+-- Define View
+CREATE VIEW public_directory AS
+SELECT id, name, dept
+FROM employees
+WHERE dept = 'IT';
+        </div>
+        <button class="btn-create" onclick="createView()">Deploy View</button>
+
+        <div class="section-title" style="margin-top:20px;">2. Application Query (DML)</div>
+        <button class="btn-query" id="btn-run" onclick="runQuery()" disabled>SELECT * FROM public_directory</button>
+        
+        <div class="section-title" style="margin-top:20px;">3. Unauthorized Access</div>
+        <button class="btn-attack" onclick="runAttack()">SELECT salary FROM public_directory</button>
+        <div style="font-size:0.75rem; color:#888; margin-top:5px;">Attempting to read 'Salary' through View.</div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- SCHEMA VIZ -->
+        <div class="schema-container">
+            <!-- BASE TABLE -->
+            <div class="db-entity" id="ent-table">
+                <div class="entity-header" style="background:#431407; color:var(--db-orange)">BASE TABLE<br>(employees)</div>
+                <div class="entity-cols">
+                    <div class="col-item">id <span style="color:#aaa">INT</span></div>
+                    <div class="col-item">name <span style="color:#aaa">VARCHAR</span></div>
+                    <div class="col-item">dept <span style="color:#aaa">VARCHAR</span></div>
+                    <div class="col-item col-sensitive">salary <span style="color:#aaa">DECIMAL</span></div>
+                    <div class="col-item col-sensitive">ssn <span style="color:#aaa">CHAR(9)</span></div>
+                </div>
+            </div>
+
+            <div class="arrow">➔</div>
+
+            <!-- VIEW -->
+            <div class="db-entity" id="ent-view">
+                <div class="entity-header" style="background:#172554; color:var(--view-blue)">VIEW<br>(public_directory)</div>
+                <div class="entity-cols">
+                    <div class="col-item col-safe">id <span style="color:#aaa">Mapped</span></div>
+                    <div class="col-item col-safe">name <span style="color:#aaa">Mapped</span></div>
+                    <div class="col-item col-safe">dept <span style="color:#aaa">Filtered</span></div>
+                    <div class="col-item" style="color:#555; font-style:italic;">(Hidden)</div>
+                    <div class="col-item" style="color:#555; font-style:italic;">(Hidden)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULTS -->
+        <div class="result-grid">
+            <h3 style="color:#94a3b8; margin-top:0; border-bottom:1px solid #334155; padding-bottom:5px;">Query Result Set</h3>
+            <table id="result-table">
+                <thead>
+                    <tr><th>ID</th><th>NAME</th><th>DEPT</th><th>SALARY</th></tr>
+                </thead>
+                <tbody id="result-body">
+                    <tr><td colspan="4" style="text-align:center; color:#555;">No Data Loaded</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> DB Engine Ready. Base Table 'employees' loaded.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let viewCreated = false;
+
+    // Mock Data (Base Table)
+    const dbData = [
+        { id: 101, name: "Alice", dept: "IT", salary: 90000 },
+        { id: 102, name: "Bob", dept: "HR", salary: 75000 },
+        { id: 103, name: "Charlie", dept: "IT", salary: 88000 },
+        { id: 104, name: "Dave", dept: "Sales", salary: 120000 }
+    ];
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='sys'?'log-sys':(type==='db'?'log-db':(type==='err'?'log-err':'log-ok'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function createView() {
+        viewCreated = true;
+        const viewEnt = document.getElementById('ent-view');
+        viewEnt.style.opacity = "1";
+        viewEnt.style.boxShadow = "0 0 20px rgba(59, 130, 246, 0.3)";
+        
+        document.getElementById('btn-run').disabled = false;
+        log("DDL: VIEW 'public_directory' created successfully.", "sys");
+        log("CONFIG: Column Filter [id, name, dept]. Row Filter [dept='IT'].", "sys");
+    }
+
+    function runQuery() {
+        if(!viewCreated) return;
+        
+        log("EXEC: SELECT * FROM public_directory", "db");
+        
+        // Filter Data (Simulate View Logic)
+        const resultSet = dbData.filter(row => row.dept === 'IT');
+        
+        renderTable(resultSet, false);
+        log(`RESULT: Returned ${resultSet.length} rows. (HR/Sales rows hidden by View Logic).`, "ok");
+    }
+
+    function runAttack() {
+        if(!viewCreated) {
+            log("ERROR: View does not exist.", "err");
+            return;
+        }
+
+        log("ATTACK: SELECT salary FROM public_directory", "err");
+
+        setTimeout(() => {
+            log("DB ERROR: Column 'salary' does not exist in 'public_directory'.", "err");
+            log("SECURITY: Access Denied. The View acts as a firewall for the schema.", "ok");
+            
+            const tbody = document.getElementById('result-body');
+            tbody.innerHTML = `<tr><td colspan="4" style="color:var(--danger); text-align:center; font-weight:bold;">SQL Error: Invalid Column Name 'salary'</td></tr>`;
+        }, 600);
+    }
+
+    function renderTable(data, showSensitive) {
+        const tbody = document.getElementById('result-body');
+        tbody.innerHTML = "";
+
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            let salHtml = showSensitive ? row.salary : "<span style='color:#555; font-style:italic;'>[Restricted]</span>";
+            tr.innerHTML = `<td>${row.id}</td><td>${row.name}</td><td>${row.dept}</td><td>${salHtml}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: HTMM Threat Modeling Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --htmm-purple: #8b5cf6;
+            --square-teal: #14b8a6;
+            --stride-red: #ef4444;
+            --risk-yellow: #f59e0b;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--htmm-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--htmm-purple); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 600px;
+        }
+
+        /* NAVIGATION */
+        .nav-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .step-btn {
+            padding: 12px;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            color: #aaa;
+            cursor: pointer;
+            text-align: left;
+            border-radius: 4px;
+            transition: 0.2s;
+            font-size: 0.9rem;
+            position: relative;
+        }
+        .step-btn:hover { background: #334155; }
+        .step-btn.active {
+            background: rgba(139, 92, 246, 0.1);
+            color: white;
+            font-weight: bold;
+            border-color: var(--htmm-purple);
+        }
+        .step-btn.done::after {
+            content: "✓";
+            position: absolute;
+            right: 10px;
+            color: var(--square-teal);
+        }
+
+        /* WORKSPACE */
+        .workspace {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .stage-content { display: none; }
+        .stage-content.active { display: block; animation: fadeIn 0.3s; }
+
+        h2 { border-bottom: 1px solid #475569; padding-bottom: 10px; color: var(--htmm-purple); margin-top: 0; }
+        p.subtitle { color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px; }
+
+        /* INTERACTIVE ELEMENTS */
+        .req-card, .threat-card {
+            background: #0f172a;
+            border: 1px solid var(--border);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .req-card:hover, .threat-card:hover { border-color: var(--htmm-purple); }
+        .req-card.selected { border-color: var(--square-teal); background: rgba(20, 184, 166, 0.1); }
+        
+        .threat-card.kept { border-color: var(--risk-yellow); background: rgba(245, 158, 11, 0.1); }
+        .threat-card.dropped { opacity: 0.4; text-decoration: line-through; }
+
+        .tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: #333; }
+
+        /* LINKING VISUALIZATION */
+        .matrix-viz {
+            background: #000;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px dashed #555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 200px;
+            position: relative;
+        }
+        .matrix-col { width: 40%; display: flex; flex-direction: column; gap: 10px; }
+        .arrow { font-size: 2rem; color: #555; }
+
+        button.action-btn {
+            margin-top: 20px;
+            padding: 12px 20px;
+            background: var(--htmm-purple);
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            align-self: flex-start;
+        }
+        button.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>HTMM Threat Modeling Lab</h1>
+    <p>Hybrid: SQUARE Requirements + STRIDE Analysis</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- NAVIGATION -->
+    <div class="nav-panel">
+        <div class="step-btn active" id="btn-1">Step 1: SQUARE (Requirements)</div>
+        <div class="step-btn" id="btn-2">Step 2: Decomposition (DFD)</div>
+        <div class="step-btn" id="btn-3">Step 3: STRIDE (Threats)</div>
+        <div class="step-btn" id="btn-4">Step 4: Hybrid Filtering</div>
+        <div class="step-btn" id="btn-5">Step 5: Final Risk Plan</div>
+    </div>
+
+    <!-- WORKSPACE -->
+    <div class="workspace">
+        
+        <!-- STEP 1: SQUARE -->
+        <div class="stage-content active" id="stage-1">
+            <h2>Step 1: Security Quality Requirements (SQUARE)</h2>
+            <p class="subtitle">Interview Stakeholders. Select the TOP Priority requirement for this iteration.</p>
+            
+            <div class="req-card" onclick="selectReq('avail')">
+                <div>
+                    <strong>Req-A: High Availability</strong><br>
+                    <span style="font-size:0.8rem; color:#aaa">"System must handle 10k users/sec. No downtime > 1min."</span>
+                </div>
+                <span class="tag">Business</span>
+            </div>
+
+            <div class="req-card" onclick="selectReq('conf')">
+                <div>
+                    <strong>Req-B: Data Confidentiality</strong><br>
+                    <span style="font-size:0.8rem; color:#aaa">"Patient records must never be visible to unauthorized users."</span>
+                </div>
+                <span class="tag">Compliance</span>
+            </div>
+
+            <button class="action-btn" id="next-1" onclick="nextStage(2)" disabled>Confirm Requirements</button>
+        </div>
+
+        <!-- STEP 2: DECOMPOSITION -->
+        <div class="stage-content" id="stage-2">
+            <h2>Step 2: System Decomposition</h2>
+            <p class="subtitle">Visualizing the Architecture based on Requirements...</p>
+            
+            <div class="matrix-viz" style="justify-content:center;">
+                <div style="text-align:center; color:#ccc;">
+                    [ Web Server ] <br>⬇<br> [ API Gateway ] <br>⬇<br> [ Database Cluster ]
+                </div>
+            </div>
+            
+            <p style="font-size:0.9rem; margin-top:20px;">
+                <em>Architecture Diagram Generated. Ready for Threat Analysis.</em>
+            </p>
+            <button class="action-btn" onclick="nextStage(3)">Proceed to Threat ID</button>
+        </div>
+
+        <!-- STEP 3: STRIDE -->
+        <div class="stage-content" id="stage-3">
+            <h2>Step 3: Identification (STRIDE)</h2>
+            <p class="subtitle">The team brainstormed technical threats. Here is the raw list:</p>
+            
+            <div class="threat-card">
+                <div>
+                    <strong>T1: SQL Injection</strong> (Tampering/Info Disclosure)<br>
+                    <span style="font-size:0.8rem; color:#aaa">Attacker dumps database tables.</span>
+                </div>
+            </div>
+            <div class="threat-card">
+                <div>
+                    <strong>T2: SYN Flood / DDoS</strong> (Denial of Service)<br>
+                    <span style="font-size:0.8rem; color:#aaa">Attacker exhausts server connections.</span>
+                </div>
+            </div>
+            <div class="threat-card">
+                <div>
+                    <strong>T3: Weak Password Policy</strong> (Spoofing)<br>
+                    <span style="font-size:0.8rem; color:#aaa">Users set '123456'.</span>
+                </div>
+            </div>
+
+            <button class="action-btn" onclick="nextStage(4)">Proceed to Filtering</button>
+        </div>
+
+        <!-- STEP 4: HYBRID FILTERING -->
+        <div class="stage-content" id="stage-4">
+            <h2>Step 4: Hybrid Analysis (The "HTMM" Magic)</h2>
+            <p class="subtitle">Filter the threats. Only keep threats that violate the Requirement selected in Step 1.</p>
+            
+            <div id="filter-area">
+                <!-- Injected via JS -->
+            </div>
+
+            <button class="action-btn" id="next-4" onclick="nextStage(5)" style="display:none;">Finalize Analysis</button>
+        </div>
+
+        <!-- STEP 5: REPORT -->
+        <div class="stage-content" id="stage-5">
+            <h2>Step 5: Risk Plan</h2>
+            <div id="final-report">
+                <!-- Injected via JS -->
+            </div>
+            <button class="action-btn" onclick="location.reload()">Restart Lab</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let selectedReq = null; // 'avail' or 'conf'
+
+    function selectReq(req) {
+        selectedReq = req;
+        const cards = document.querySelectorAll('.req-card');
+        cards.forEach(c => c.classList.remove('selected'));
+        event.currentTarget.classList.add('selected');
+        document.getElementById('next-1').disabled = false;
+    }
+
+    function nextStage(target) {
+        // Nav Visuals
+        document.querySelectorAll('.step-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`btn-${target}`).classList.add('active');
+        document.getElementById(`btn-${target-1}`).classList.add('done');
+
+        // Content
+        document.querySelectorAll('.stage-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`stage-${target}`).classList.add('active');
+
+        // Stage 4 Logic Setup
+        if (target === 4) setupFiltering();
+        if (target === 5) generateReport();
+    }
+
+    function setupFiltering() {
+        const container = document.getElementById('filter-area');
+        const reqText = selectedReq === 'avail' ? "High Availability (Uptime)" : "Confidentiality (Privacy)";
+        
+        container.innerHTML = `<div style="background:#000; padding:10px; border-radius:4px; margin-bottom:15px; border:1px solid var(--square-teal);">
+            <strong>Active Requirement:</strong> ${reqText}
+        </div>
+        <p style="font-size:0.85rem;">Click threats to KEEP if they violate the requirement. Others will be dropped (Backlog).</p>`;
+
+        const threats = [
+            { id: 't1', title: 'T1: SQL Injection (Data Leak)', type: 'conf' },
+            { id: 't2', title: 'T2: DDoS (Service Down)', type: 'avail' },
+            { id: 't3', title: 'T3: Weak Passwords (Account Takeover)', type: 'conf' }
+        ];
+
+        threats.forEach(t => {
+            const div = document.createElement('div');
+            div.className = 'threat-card';
+            div.innerHTML = `<strong>${t.title}</strong>`;
+            
+            // Logic: Auto-suggest filtering based on HTMM principles
+            if (t.type === selectedReq) {
+                div.classList.add('kept');
+                div.innerHTML += ` <span style="color:var(--risk-yellow); font-weight:bold;">[VIOLATES REQ]</span>`;
+            } else {
+                div.classList.add('dropped');
+                div.innerHTML += ` <span style="color:#666;">[Out of Scope]</span>`;
+            }
+            container.appendChild(div);
+        });
+
+        document.getElementById('next-4').style.display = 'block';
+    }
+
+    function generateReport() {
+        const report = document.getElementById('final-report');
+        let msg = "";
+        
+        if(selectedReq === 'avail') {
+            msg = `
+            <h3 style="color:var(--risk-yellow)">Priority Threat: T2 (DDoS)</h3>
+            <p><strong>Rationale:</strong> The stakeholder requirement focused on Availability. While SQL Injection is bad, it does not violate the specific "Uptime" requirement prioritized in this sprint.</p>
+            <p><strong>Mitigation:</strong> Implement Rate Limiting and Autoscaling.</p>
+            `;
+        } else {
+            msg = `
+            <h3 style="color:var(--risk-yellow)">Priority Threat: T1 (SQLi) & T3 (Passwords)</h3>
+            <p><strong>Rationale:</strong> The stakeholder requirement focused on Confidentiality. DDoS was de-prioritized because service outage does not leak data.</p>
+            <p><strong>Mitigation:</strong> Implement WAF and Password Complexity Rules.</p>
+            `;
+        }
+
+        report.innerHTML = `<div style="background:#1e293b; padding:20px; border:1px solid #444; border-radius:8px;">${msg}</div>`;
+    }
+
+</script>
+
+</body>
+</html>

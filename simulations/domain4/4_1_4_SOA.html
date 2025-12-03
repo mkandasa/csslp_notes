@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: SOA & Microservices Security</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f8fafc;
+            --accent: #c084fc; /* Purple */
+            --esb: #fbbf24;    /* Amber */
+            --mesh: #38bdf8;   /* Blue */
+            --risk: #ef4444;   /* Red */
+            --secure: #10b981; /* Green */
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        
+        .tab-content { display: none; width: 100%; max-width: 1000px; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- BUTTONS --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; width: 100%; margin-top: 10px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-esb { background: var(--esb); color: black; }
+        .btn-mesh { background: var(--mesh); color: black; }
+        .btn-hack { background: var(--risk); color: white; width: auto; }
+        .btn-fix { background: var(--secure); color: white; width: auto; }
+
+        /* --- ESB STYLES --- */
+        .soa-layout {
+            display: grid; grid-template-columns: 100px 1fr 100px; gap: 10px; align-items: center; margin-top: 20px;
+        }
+        .legacy-client {
+            background: #222; padding: 10px; border: 2px solid #ccc; text-align: center; border-radius: 6px;
+        }
+        .mainframe {
+            background: #222; padding: 10px; border: 2px solid #ccc; text-align: center; border-radius: 6px;
+        }
+        .esb-hub {
+            height: 150px; background: #333; border: 4px double var(--esb); border-radius: 12px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            position: relative;
+        }
+        .esb-hub::after { content: 'Enterprise Service Bus'; color: var(--esb); font-weight: bold; position: absolute; top: 10px; }
+        
+        .xml-packet {
+            font-family: monospace; font-size: 0.7rem; padding: 5px; background: #000; color: #ccc;
+            border: 1px solid #555; position: absolute; left: 10px; opacity: 0; width: 80%;
+        }
+        
+        /* --- MESH STYLES --- */
+        .mesh-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px;
+        }
+        .pod {
+            background: #111; padding: 15px; border: 1px dashed #666; border-radius: 8px; text-align: center;
+            position: relative; transition: all 0.3s;
+        }
+        .sidecar {
+            position: absolute; bottom: 5px; right: 5px; background: #334155; color: #aaa;
+            font-size: 0.6rem; padding: 2px 4px; border-radius: 4px; border: 1px solid #555;
+        }
+        .pod.compromised { border-color: var(--risk); background: rgba(239, 68, 68, 0.1); }
+        .pod.secure { border-color: var(--secure); box-shadow: 0 0 10px var(--secure); }
+        
+        .connection-line { height: 2px; background: #444; margin: 10px 0; position: relative; }
+        .traffic-dot { width: 8px; height: 8px; background: #fff; border-radius: 50%; position: absolute; top: -3px; display: none; }
+
+        /* --- REGISTRY STYLES --- */
+        .registry-list {
+            background: #111; max-height: 200px; overflow-y: auto; border: 1px solid #333; border-radius: 4px;
+        }
+        .reg-item {
+            padding: 8px; border-bottom: 1px solid #222; cursor: pointer; display: flex; justify-content: space-between;
+        }
+        .reg-item:hover { background: #222; }
+        .reg-item.selected { background: var(--mesh); color: black; }
+        .policy-tag { font-size: 0.7rem; padding: 2px 5px; border-radius: 3px; background: #000; color: #aaa; }
+
+        /* --- LOGS --- */
+        .log-terminal {
+            grid-column: span 2; background: #000; height: 120px; 
+            padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem; width: 100%; box-sizing: border-box; margin-top: 20px;
+        }
+        .log-err { color: var(--risk); }
+        .log-ok { color: var(--secure); }
+        .log-info { color: var(--mesh); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: SOA & Microservices Architect</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('esb')">1. ESB (Legacy SOA)</button>
+        <button class="tab-btn" onclick="switchTab('mesh')">2. Service Mesh (Modern)</button>
+        <button class="tab-btn" onclick="switchTab('reg')">3. Service Registry</button>
+    </div>
+
+    <!-- TAB 1: ESB & SOAP SECURITY -->
+    <div id="esb" class="tab-content active">
+        <div class="card">
+            <h3>Enterprise Service Bus (ESB) Security</h3>
+            <p><strong>Architecture:</strong> Centralized Hub. <strong>Threat:</strong> XML Attacks (XXE/DoS).</p>
+            
+            <div class="soa-layout">
+                <div class="legacy-client">Legacy<br>Client</div>
+                
+                <div class="esb-hub" id="esbHub">
+                    <div class="xml-packet" id="soapMsg">&lt;soap:Envelope&gt;...</div>
+                </div>
+
+                <div class="mainframe">Mainframe<br>Backend</div>
+            </div>
+
+            <div style="margin-top:20px; display:flex; justify-content:center; gap:20px;">
+                <div style="text-align:center">
+                    <h4>Attack Simulation</h4>
+                    <button class="btn-hack" onclick="sendXXE()">Inject XXE (File Read)</button>
+                    <button class="btn-hack" onclick="sendBillionLaughs()">Billion Laughs (DoS)</button>
+                </div>
+                <div style="text-align:center">
+                    <h4>ESB Hardening</h4>
+                    <button class="btn-fix" onclick="enableXmlFilter()">Disable DTDs (Block XXE)</button>
+                    <button class="btn-fix" onclick="enableParserLimit()">Limit Parse Depth (Block DoS)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: SERVICE MESH (MTLS) -->
+    <div id="mesh" class="tab-content">
+        <div class="card">
+            <h3>Microservices Zero Trust (Service Mesh)</h3>
+            <p><strong>Scenario:</strong> Prevent Lateral Movement. If 'Frontend' is compromised, can it access 'Payment'?</p>
+            
+            <div class="mesh-grid">
+                <div class="pod" id="pod-front">
+                    <strong>Frontend</strong>
+                    <div class="sidecar">Envoy Proxy</div>
+                </div>
+                <div class="pod" id="pod-prod">
+                    <strong>Product</strong>
+                    <div class="sidecar">Envoy Proxy</div>
+                </div>
+                <div class="pod" id="pod-pay">
+                    <strong>Payment</strong>
+                    <div class="sidecar">Envoy Proxy</div>
+                </div>
+            </div>
+
+            <div style="margin-top:20px; display:flex; justify-content:center; gap:20px;">
+                <button class="btn-hack" onclick="hackPod()">Compromise Frontend Pod</button>
+                <button class="btn-fix" onclick="deployMtls()">Enforce mTLS (Mutual Auth)</button>
+                <button class="btn-fix" onclick="applyPolicy()">Apply RBAC Policy (Deny All)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: SERVICE REGISTRY -->
+    <div id="reg" class="tab-content">
+        <div class="card">
+            <h3>Service Discovery & Governance</h3>
+            <p>Manage the catalogue of available services. Mark them as Public/Private.</p>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                <div class="registry-list">
+                    <div class="reg-item" onclick="selectService('order')">
+                        <span>OrderService</span> <span class="policy-tag" id="tag-order">Internal</span>
+                    </div>
+                    <div class="reg-item" onclick="selectService('payment')">
+                        <span>PaymentGateway</span> <span class="policy-tag" id="tag-payment">Internal</span>
+                    </div>
+                    <div class="reg-item" onclick="selectService('search')">
+                        <span>SearchAPI</span> <span class="policy-tag" id="tag-search">Public</span>
+                    </div>
+                </div>
+
+                <div style="border:1px solid #444; padding:15px; border-radius:6px; display:none;" id="regConfig">
+                    <h4>Configure: <span id="svcName" style="color:var(--mesh)">--</span></h4>
+                    <label><input type="checkbox" id="chkPublic"> Expose to Internet</label><br>
+                    <label><input type="checkbox" id="chkAuth"> Require OIDC Token</label><br>
+                    <button class="btn-mesh" onclick="saveConfig()">Update Registry</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> SOA Security Console Ready.</div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'esb':0, 'mesh':1, 'reg':2};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : 'log-info');
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- ESB LOGIC --- */
+        let dtdDisabled = false;
+        let depthLimit = false;
+
+        function animatePacket(payload, isAttack) {
+            const pkt = document.getElementById('soapMsg');
+            pkt.innerText = payload;
+            pkt.style.color = isAttack ? 'var(--risk)' : '#ccc';
+            pkt.style.opacity = 1;
+            pkt.style.left = '10px';
+            
+            // Move to center
+            setTimeout(() => { pkt.style.left = '50%'; pkt.style.transform = 'translateX(-50%)'; }, 100);
+        }
+
+        function sendXXE() {
+            animatePacket('<!ENTITY xxe SYSTEM "file:///etc/passwd">', true);
+            setTimeout(() => {
+                if (dtdDisabled) {
+                    log("ESB BLOCKED: XXE rejected. DTDs are disabled.", 'ok');
+                } else {
+                    log("ESB COMPROMISED: Server file leaked via XXE!", 'err');
+                    document.getElementById('esbHub').style.borderColor = "var(--risk)";
+                }
+            }, 1000);
+        }
+
+        function sendBillionLaughs() {
+            animatePacket('<!ENTITY lol "lol">...<lolz>&lol;&lol;...</lolz>', true);
+            setTimeout(() => {
+                if (depthLimit) {
+                    log("ESB BLOCKED: XML Entity Expansion limit exceeded.", 'ok');
+                } else {
+                    log("ESB CRASHED: Denial of Service (Billion Laughs). Memory Exhausted.", 'err');
+                    document.getElementById('esbHub').style.opacity = 0.5;
+                }
+            }, 1000);
+        }
+
+        function enableXmlFilter() { dtdDisabled = true; log("Policy: XML DTDs Disabled.", 'ok'); document.getElementById('esbHub').style.borderColor = "var(--esb)"; }
+        function enableParserLimit() { depthLimit = true; log("Policy: XML Parser Limits Enforced.", 'ok'); document.getElementById('esbHub').style.opacity = 1; }
+
+        /* --- MESH LOGIC --- */
+        let mtlsActive = false;
+        let rbacActive = false;
+
+        function hackPod() {
+            document.getElementById('pod-front').classList.add('compromised');
+            log("Frontend Compromised! Attacker pivoting to Payment...", 'err');
+            
+            setTimeout(() => {
+                if (mtlsActive && rbacActive) {
+                    log("MESH BLOCK: Payment Service rejected connection (Deny Policy).", 'ok');
+                    document.getElementById('pod-pay').classList.add('secure');
+                } else if (mtlsActive) {
+                    log("MESH ALERT: Authenticated but Unauthorized access attempt.", 'ok');
+                } else {
+                    document.getElementById('pod-pay').classList.add('compromised');
+                    log("LATERAL MOVE SUCCESS: Payment Service breached!", 'err');
+                }
+            }, 1000);
+        }
+
+        function deployMtls() {
+            mtlsActive = true;
+            log("Sidecars updated: mTLS enforced globally.", 'ok');
+            document.querySelectorAll('.pod').forEach(p => {
+                p.classList.remove('compromised');
+                p.classList.add('secure');
+            });
+        }
+
+        function applyPolicy() {
+            rbacActive = true;
+            log("AuthorizationPolicy applied: Frontend CANNOT talk to Payment.", 'ok');
+        }
+
+        /* --- REGISTRY LOGIC --- */
+        let currentSvc = null;
+        const svcConfig = {
+            'order': { public: false, auth: true },
+            'payment': { public: false, auth: true },
+            'search': { public: true, auth: false }
+        };
+
+        function selectService(id) {
+            currentSvc = id;
+            document.getElementById('regConfig').style.display = 'block';
+            document.getElementById('svcName').innerText = id;
+            document.getElementById('chkPublic').checked = svcConfig[id].public;
+            document.getElementById('chkAuth').checked = svcConfig[id].auth;
+            
+            document.querySelectorAll('.reg-item').forEach(el => el.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+        }
+
+        function saveConfig() {
+            if(!currentSvc) return;
+            svcConfig[currentSvc].public = document.getElementById('chkPublic').checked;
+            svcConfig[currentSvc].auth = document.getElementById('chkAuth').checked;
+            
+            const tag = document.getElementById(`tag-${currentSvc}`);
+            tag.innerText = svcConfig[currentSvc].public ? "Public" : "Internal";
+            tag.style.color = svcConfig[currentSvc].public ? "#ccc" : "var(--mesh)";
+            
+            log(`Registry Updated: ${currentSvc} [Public:${svcConfig[currentSvc].public}] [Auth:${svcConfig[currentSvc].auth}]`, 'info');
+        }
+
+    </script>
+</body>
+</html>

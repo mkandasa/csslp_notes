@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Database Trigger Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --db-orange: #f97316;
+            --trigger-purple: #a855f7;
+            --log-green: #22c55e;
+            --danger: #ef4444;
+            --text: #f1f5f9;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--trigger-purple);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--trigger-purple); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .code-editor {
+            background: #000;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #ccc;
+            height: 150px;
+            margin-bottom: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .keyword { color: #f97316; }
+        .string { color: #22c55e; }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-deploy { background: var(--trigger-purple); }
+        .btn-update { background: var(--db-orange); color: black; }
+        .btn-malicious { background: var(--danger); }
+        button:hover { filter: brightness(1.2); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Tables View */
+        .schema-view {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .db-table {
+            background: #1e293b;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 0;
+            overflow: hidden;
+        }
+        .table-header {
+            background: #334155;
+            padding: 10px;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #475569;
+        }
+        .table-content {
+            padding: 10px;
+            font-size: 0.85rem;
+        }
+        
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            padding: 5px;
+            border-bottom: 1px solid #334155;
+        }
+        .row.header { color: #94a3b8; font-size: 0.75rem; }
+        
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 150px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: var(--trigger-purple); }
+        .log-db { color: var(--db-orange); }
+        .log-audit { color: var(--log-green); }
+        .log-err { color: var(--danger); }
+
+        /* Animation Classes */
+        .flash-update { animation: flashOrange 1s; }
+        .flash-insert { animation: flashGreen 1s; }
+        
+        @keyframes flashOrange {
+            0% { background: rgba(249, 115, 22, 0.5); }
+            100% { background: transparent; }
+        }
+        @keyframes flashGreen {
+            0% { background: rgba(34, 197, 94, 0.5); }
+            100% { background: transparent; }
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Database Trigger Architecture Lab</h1>
+    <p>Audit Logging, Logic Bombs & Data Integrity</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Trigger Definition (DDL)</div>
+        <div class="code-editor" id="ddl-editor">
+-- Default: Audit Trigger
+CREATE TRIGGER log_salary_change
+AFTER UPDATE ON employees
+FOR EACH ROW
+BEGIN
+  INSERT INTO audit_log 
+  VALUES (USER(), OLD.salary, NEW.salary, NOW());
+END;
+        </div>
+        <button class="btn-deploy" onclick="deployTrigger('audit')">Deploy Audit Trigger</button>
+        <button class="btn-malicious" onclick="deployTrigger('bomb')">Deploy Logic Bomb Trigger</button>
+
+        <div class="section-title" style="margin-top:20px;">2. Operation (DML)</div>
+        <button class="btn-update" onclick="runUpdate()">UPDATE employees SET salary = salary + 5000</button>
+        <div style="font-size:0.75rem; color:#888; margin-top:5px;">Simulates User Action via App or SQL Console</div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- DB SCHEMA -->
+        <div class="schema-view">
+            
+            <!-- TABLE: EMPLOYEES -->
+            <div class="db-table" id="table-emp">
+                <div class="table-header" style="color:var(--db-orange)">TABLE: employees</div>
+                <div class="table-content">
+                    <div class="row header">
+                        <div>ID</div>
+                        <div>NAME</div>
+                        <div>SALARY</div>
+                    </div>
+                    <div class="row" id="emp-row-1">
+                        <div>101</div>
+                        <div>Alice</div>
+                        <div id="sal-1">50000</div>
+                    </div>
+                    <div class="row" id="emp-row-2">
+                        <div>102</div>
+                        <div>Bob</div>
+                        <div id="sal-2">55000</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLE: AUDIT_LOG -->
+            <div class="db-table" id="table-audit">
+                <div class="table-header" style="color:var(--log-green)">TABLE: audit_log</div>
+                <div class="table-content" id="audit-rows">
+                    <div class="row header">
+                        <div>USER</div>
+                        <div>OLD_VAL</div>
+                        <div>NEW_VAL</div>
+                    </div>
+                    <!-- Log rows go here -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> DB Engine Ready. No triggers active.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let activeTrigger = null; // 'audit', 'bomb'
+    let salaryAlice = 50000;
+    let salaryBob = 55000;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='sys'?'log-sys':(type==='db'?'log-db':(type==='audit'?'log-audit':'log-err'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function deployTrigger(type) {
+        const editor = document.getElementById('ddl-editor');
+        
+        if (type === 'audit') {
+            activeTrigger = 'audit';
+            editor.innerHTML = `-- Audit Trigger Active\nCREATE TRIGGER log_salary_change\nAFTER UPDATE ON employees...`;
+            log("DDL: Trigger 'log_salary_change' created successfully.", "sys");
+        } else {
+            activeTrigger = 'bomb';
+            editor.innerHTML = `-- MALICIOUS TRIGGER\nCREATE TRIGGER hidden_bomb\nBEFORE UPDATE ON employees\nFOR EACH ROW\nBEGIN\n  IF NEW.salary > 100000 THEN\n    DELETE FROM employees;\n  END IF;\nEND;`;
+            editor.style.borderColor = "var(--danger)";
+            log("DDL: Trigger 'hidden_bomb' created. (WARNING: Logic hidden in Schema)", "err");
+        }
+    }
+
+    function runUpdate() {
+        if (!activeTrigger) {
+            log("EXEC: Update ran. No triggers defined.", "db");
+            performUpdate(5000);
+            return;
+        }
+
+        log("EXEC: Update Statement Received...", "db");
+
+        // Logic Bomb Check
+        if (activeTrigger === 'bomb') {
+            // Check condition (Simulation: if salary goes high)
+            // Let's pretend this update pushes it over the edge
+            if (salaryAlice + 5000 > 60000) { // Threshold for simulation
+                 log("TRIGGER: 'hidden_bomb' Condition Met!", "err");
+                 log("ACTION: DELETE FROM employees executed by Trigger.", "err");
+                 document.getElementById('emp-row-1').style.display = 'none';
+                 document.getElementById('emp-row-2').style.display = 'none';
+                 return; 
+            }
+        }
+
+        // Standard Update
+        const oldSal = salaryAlice;
+        performUpdate(5000);
+
+        // Audit Trigger Logic
+        if (activeTrigger === 'audit') {
+            log("TRIGGER: 'log_salary_change' Fired.", "sys");
+            setTimeout(() => {
+                addAuditRow('admin', oldSal, salaryAlice);
+                log("ACTION: Audit record inserted.", "audit");
+            }, 500);
+        }
+    }
+
+    function performUpdate(amount) {
+        salaryAlice += amount;
+        
+        const row1 = document.getElementById('emp-row-1');
+        const sal1 = document.getElementById('sal-1');
+        
+        row1.classList.remove('flash-update');
+        void row1.offsetWidth; // trigger reflow
+        row1.classList.add('flash-update');
+        
+        sal1.innerText = salaryAlice;
+    }
+
+    function addAuditRow(user, oldVal, newVal) {
+        const container = document.getElementById('audit-rows');
+        const div = document.createElement('div');
+        div.className = "row flash-insert";
+        div.innerHTML = `<div>${user}</div><div>${oldVal}</div><div>${newVal}</div>`;
+        container.prepend(div);
+    }
+
+</script>
+
+</body>
+</html>

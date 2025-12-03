@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Threat Intelligence Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --intel-cyan: #06b6d4;
+            --alert-red: #ef4444;
+            --safe-green: #22c55e;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--intel-cyan);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--intel-cyan); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 600px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .toggle-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+            text-align: left;
+            padding-left: 15px;
+        }
+        .btn-filter { background: #334155; border: 1px solid #555; color: #ccc; }
+        .btn-filter.active { background: var(--intel-cyan); color: black; border-color: var(--intel-cyan); }
+        
+        .btn-action { background: var(--alert-red); text-align: center; margin-top: 5px; }
+        .btn-patch { background: var(--safe-green); text-align: center; margin-top: 5px; color: black; }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        /* FEED STREAM */
+        .feed-container {
+            background: #000;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            height: 250px;
+            padding: 10px;
+            overflow-y: auto;
+            position: relative;
+        }
+        .feed-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: #1e293b;
+            border-left: 4px solid #555;
+            font-size: 0.85rem;
+            animation: slideIn 0.3s;
+            display: flex;
+            justify-content: space-between;
+        }
+        .feed-item.relevant { border-left-color: var(--alert-red); background: rgba(239, 68, 68, 0.1); }
+        .feed-item.irrelevant { opacity: 0.4; }
+        
+        .tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: #000; color: #aaa; }
+
+        /* ASSET MAP */
+        .asset-map {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 150px;
+        }
+        .asset {
+            width: 100px; height: 100px;
+            background: #333;
+            border-radius: 8px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 2rem;
+            position: relative;
+            transition: 0.3s;
+        }
+        .asset-label { font-size: 0.8rem; margin-top: 5px; color: #aaa; }
+        
+        .asset.target { border: 2px solid var(--alert-red); box-shadow: 0 0 15px var(--alert-red); }
+        .asset.protected { border: 2px solid var(--safe-green); box-shadow: 0 0 15px var(--safe-green); }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 100px;
+            border-top: 1px solid #333;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #aaa;
+            overflow-y: auto;
+        }
+        .log-sys { color: var(--intel-cyan); }
+        .log-err { color: var(--alert-red); }
+        .log-ok { color: var(--safe-green); }
+
+        @keyframes slideIn { from { transform: translateX(-10px); opacity: 0; } to { opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Threat Intelligence Lab</h1>
+    <p>Collection, Analysis & Predictive Defense</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Feed Configuration</div>
+        <p style="font-size:0.8rem; color:#aaa;">Your Stack: <strong>Node.js API</strong> (Banking).</p>
+        <button class="btn-filter" id="btn-filter" onclick="toggleFilter()">
+            🌪️ Relevance Filter (OFF)
+        </button>
+        <div style="font-size:0.75rem; color:#666; margin-top:5px;">
+            Filters out PHP/Wordpress noise.
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">2. Operational Intel</div>
+        <button class="btn-action" onclick="simulateAttack()">
+            🚀 Simulate Attack Wave
+        </button>
+        
+        <div class="section-title" style="margin-top:20px;">3. Tactical Response</div>
+        <button class="btn-patch" id="btn-patch" onclick="applyPatch()" disabled>
+            🛡️ Apply Predictive Patch
+        </button>
+        <div style="font-size:0.75rem; color:#666; margin-top:5px;">
+            Requires actionable Intel to enable.
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- INTEL FEED -->
+        <div class="feed-container" id="feed-stream">
+            <div style="position:absolute; top:0; right:0; background:#000; padding:5px; font-size:0.7rem; color:#666;">LIVE FEED</div>
+            <!-- Items injected here -->
+        </div>
+
+        <!-- ASSETS -->
+        <div class="asset-map">
+            <div class="asset" id="asset-wp">
+                📝
+                <div class="asset-label">Legacy Blog</div>
+            </div>
+            <div class="asset" id="asset-api">
+                🏦
+                <div class="asset-label">Banking API</div>
+            </div>
+            <div class="asset" id="asset-fw">
+                🧱
+                <div class="asset-label">Firewall</div>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> Threat Intel Platform (TIP) Online. Waiting for feeds...</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let filterActive = false;
+    let isPatched = false;
+    let intelFound = false;
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='ok'?'log-ok':(type==='err'?'log-err':'log-sys')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function toggleFilter() {
+        filterActive = !filterActive;
+        const btn = document.getElementById('btn-filter');
+        if(filterActive) {
+            btn.classList.add('active');
+            btn.innerText = "🌪️ Relevance Filter (ON)";
+            log("TIP: Filtering enabled. Creating context-aware feed.", "sys");
+        } else {
+            btn.classList.remove('active');
+            btn.innerText = "🌪️ Relevance Filter (OFF)";
+            log("TIP: Showing raw firehose feed.", "sys");
+        }
+        // Clear current feed
+        document.getElementById('feed-stream').innerHTML = '';
+        generateFeed();
+    }
+
+    function generateFeed() {
+        const feed = document.getElementById('feed-stream');
+        const items = [
+            { txt: "Wordpress Plugin 'X' SQLi", tag: "CMS", rel: false },
+            { txt: "PHP Deserialization Vulnerability", tag: "Lang", rel: false },
+            { txt: "Drupal Remote Code Execution", tag: "CMS", rel: false },
+            { txt: "APT-29 targeting Finance APIs", tag: "Actor", rel: true },
+            { txt: "Node.js 'vm' module Sandbox Escape", tag: "Runtime", rel: true },
+            { txt: "Adobe Reader Buffer Overflow", tag: "Desktop", rel: false },
+            { txt: "IOC: 192.168.1.55 scanning Port 443", tag: "Network", rel: true }
+        ];
+
+        let delay = 0;
+        items.forEach(item => {
+            if (filterActive && !item.rel) return; // Skip noise
+
+            setTimeout(() => {
+                const div = document.createElement('div');
+                div.className = `feed-item ${item.rel ? 'relevant' : 'irrelevant'}`;
+                div.innerHTML = `<span>${item.txt}</span> <span class="tag">${item.tag}</span>`;
+                feed.prepend(div);
+
+                if(item.rel) {
+                    intelFound = true;
+                    document.getElementById('btn-patch').disabled = false;
+                    log(`INTEL MATCH: ${item.txt}`, "sys");
+                }
+            }, delay);
+            delay += 500;
+        });
+    }
+
+    function applyPatch() {
+        isPatched = true;
+        document.getElementById('asset-api').classList.add('protected');
+        document.getElementById('asset-fw').classList.add('protected');
+        document.getElementById('btn-patch').innerText = "🛡️ Defenses Active";
+        log("ACTION: API hardened against Sandbox Escape. Firewall blocked IOC IP.", "ok");
+    }
+
+    function simulateAttack() {
+        log("ALERT: Attack wave incoming...", "err");
+        
+        const api = document.getElementById('asset-api');
+        
+        setTimeout(() => {
+            if(isPatched) {
+                log("DEFENSE: Attack blocked by proactive measures. Zero Impact.", "ok");
+                api.style.transform = "scale(1.1)";
+                setTimeout(() => api.style.transform = "scale(1)", 200);
+            } else {
+                api.classList.add('target');
+                log("FAILURE: API Compromised. Threat Intel was ignored.", "err");
+            }
+        }, 1500);
+    }
+
+    // Start feed on load
+    generateFeed();
+
+</script>
+
+</body>
+</html>

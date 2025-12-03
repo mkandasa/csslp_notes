@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Distributed Computing Architectures</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #f8fafc;
+            --accent: #38bdf8; /* Light Blue */
+            --p2p: #a78bfa;    /* Purple */
+            --mq: #fbbf24;     /* Amber */
+            --ntier: #10b981;  /* Green */
+            --risk: #ef4444;   /* Red */
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+
+        .container {
+            display: grid; grid-template-columns: 1fr; gap: 20px;
+            width: 100%; max-width: 1000px;
+        }
+
+        .card {
+            background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--border); margin-bottom: 20px;
+        }
+        .card h3 { margin-top: 0; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+        /* --- TABS --- */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .tab-btn {
+            background: var(--panel); color: #9ca3af;
+            border: 1px solid var(--border); padding: 10px 20px;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold; transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #374151; }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- CS STYLES --- */
+        .network-pipe {
+            height: 60px; background: #111; border: 1px dashed #555; margin: 20px 0;
+            display: flex; align-items: center; position: relative; overflow: hidden;
+        }
+        .packet {
+            padding: 5px 10px; background: #fff; color: #000; border-radius: 4px; font-size: 0.8rem; font-weight: bold;
+            position: absolute; left: 0; transition: left 2s linear;
+        }
+        .packet.encrypted { background: var(--ntier); color: white; }
+        .sniffer {
+            position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+            background: var(--risk); color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;
+            display: none;
+        }
+
+        /* --- P2P STYLES --- */
+        .p2p-mesh {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 20px 0;
+        }
+        .p2p-node {
+            background: #222; padding: 15px; border-radius: 50%; text-align: center;
+            border: 3px solid #555; cursor: pointer; transition: all 0.3s; width: 60px; height: 60px;
+            display: flex; align-items: center; justify-content: center; margin: 0 auto;
+        }
+        .p2p-node.good { border-color: var(--ntier); color: var(--ntier); }
+        .p2p-node.bad { border-color: var(--risk); color: var(--risk); }
+        .p2p-node.banned { opacity: 0.2; border-color: #333; cursor: not-allowed; }
+
+        /* --- MQ STYLES --- */
+        .queue-box {
+            border: 2px solid var(--mq); padding: 10px; min-height: 50px; display: flex; gap: 10px; overflow-x: auto;
+            background: #1a1a1a; margin: 20px 0; align-items: center;
+        }
+        .msg {
+            background: var(--mq); color: black; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem;
+            min-width: 80px; text-align: center; animation: slideIn 0.3s;
+        }
+        @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .wallet-display { font-size: 2rem; text-align: center; color: var(--ntier); margin-bottom: 10px; }
+
+        /* --- N-TIER STYLES --- */
+        .tier-diagram {
+            display: flex; justify-content: space-between; align-items: center; margin-top: 20px;
+        }
+        .tier {
+            padding: 20px; border: 2px solid #555; border-radius: 8px; width: 100px; text-align: center;
+            position: relative;
+        }
+        .firewall {
+            width: 10px; height: 80px; background: var(--risk); margin: 0 10px; cursor: pointer;
+            transition: background 0.3s; position: relative;
+        }
+        .firewall::after { content: 'FW'; position: absolute; top: -20px; left: -5px; font-size: 0.7rem; }
+        .firewall.secure { background: var(--ntier); }
+
+        /* --- BUTTONS --- */
+        button {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; transition: opacity 0.2s; margin-top: 10px; width: 100%;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-action { background: var(--accent); color: #000; }
+        .btn-risk { background: var(--risk); color: white; }
+        .btn-secure { background: var(--ntier); color: black; }
+
+        /* --- LOGS --- */
+        .log-terminal {
+            background: #000; height: 150px; padding: 10px; overflow-y: auto; font-family: monospace; 
+            border: 1px solid var(--border); color: #a6e3a1; font-size: 0.9rem; width: 100%; box-sizing: border-box; margin-top: 20px;
+        }
+        .log-err { color: var(--risk); }
+        .log-warn { color: var(--mq); }
+
+    </style>
+</head>
+<body>
+
+    <h1>CSSLP: Distributed Computing Models</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('cs')">1. Client-Server</button>
+        <button class="tab-btn" onclick="switchTab('p2p')">2. Peer-to-Peer</button>
+        <button class="tab-btn" onclick="switchTab('mq')">3. Message Queue</button>
+        <button class="tab-btn" onclick="switchTab('ntier')">4. N-Tier</button>
+    </div>
+
+    <!-- TAB 1: CLIENT-SERVER -->
+    <div id="cs" class="tab-content active">
+        <div class="card">
+            <h3>Client-Server: Sniffing Risk</h3>
+            <p>If traffic isn't encrypted, intermediaries can read it.</p>
+            
+            <div class="network-pipe">
+                <div id="sniffer" class="sniffer">👁️ HACKER SNIFFING</div>
+                <div id="csPacket" class="packet">Pass: 12345</div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; font-size:0.9rem; color:#aaa; margin-bottom:20px;">
+                <span>Client (Browser)</span>
+                <span>Internet</span>
+                <span>Server</span>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <button class="btn-risk" onclick="sendCS('http')">Send via HTTP (Cleartext)</button>
+                <button class="btn-secure" onclick="sendCS('https')">Send via HTTPS (TLS)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: P2P -->
+    <div id="p2p" class="tab-content">
+        <div class="card">
+            <h3>P2P: Poisoned Node</h3>
+            <p>A malicious node is distributing corrupted files. Identify and ban it.</p>
+            
+            <div class="p2p-mesh">
+                <div class="p2p-node good" id="node1" onclick="checkNode(1)">Node 1</div>
+                <div class="p2p-node bad" id="node2" onclick="checkNode(2)">Node 2</div>
+                <div class="p2p-node good" id="node3" onclick="checkNode(3)">Node 3</div>
+            </div>
+
+            <p style="text-align:center; font-size:0.8rem; color:#aaa">Click a node to verify its file Hash.</p>
+            <button class="btn-action" onclick="resetP2P()">Reset Mesh</button>
+        </div>
+    </div>
+
+    <!-- TAB 3: MESSAGE QUEUE -->
+    <div id="mq" class="tab-content">
+        <div class="card">
+            <h3>MQ: Replay Attack</h3>
+            <p>An attacker captured a valid "Deposit $100" message and is replaying it.</p>
+            
+            <div class="wallet-display">Balance: $<span id="walletBal">100</span></div>
+
+            <div class="queue-box" id="mqContainer">
+                <!-- Messages appear here -->
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <button class="btn-action" onclick="sendMqMsg('Legit')">Send Legit Deposit</button>
+                <button class="btn-risk" onclick="replayMqMsg()">⚠️ Replay Attack (Duplicate)</button>
+            </div>
+            
+            <div style="margin-top:15px; border-top:1px solid #444; padding-top:10px;">
+                <label><input type="checkbox" id="mqNonce"> <strong>Enable Nonce/Timestamp Check</strong></label>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: N-TIER -->
+    <div id="ntier" class="tab-content">
+        <div class="card">
+            <h3>N-Tier: Network Segmentation</h3>
+            <p>Can the Web Server talk directly to the DB? (It shouldn't).</p>
+            
+            <div class="tier-diagram">
+                <div class="tier" style="border-color:var(--accent)">WEB<br>(DMZ)</div>
+                
+                <!-- FW 1 -->
+                <div class="firewall secure" id="fw1" onclick="toggleFw(1)"></div>
+                
+                <div class="tier" style="border-color:var(--ntier)">APP<br>(Internal)</div>
+                
+                <!-- FW 2 -->
+                <div class="firewall" id="fw2" onclick="toggleFw(2)"></div>
+                
+                <div class="tier" style="border-color:var(--risk)">DB<br>(Secure)</div>
+            </div>
+
+            <div style="margin-top:20px; text-align:center">
+                <button class="btn-risk" onclick="testDirectAccess()">Test Direct Access (Web -> DB)</button>
+                <p style="font-size:0.8rem; color:#aaa; margin-top:5px;">Click Firewalls to toggle rules (Red = Open/Bad, Green = Block/Good).</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="log-terminal" id="logs">
+        <div>> Distributed Architecture Lab Ready.</div>
+    </div>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const map = {'cs':0, 'p2p':1, 'mq':2, 'ntier':3};
+            document.querySelectorAll('.tab-btn')[map[id]].classList.add('active');
+        }
+
+        function log(msg, type='info') {
+            const term = document.getElementById('logs');
+            const cls = type === 'err' ? 'log-err' : (type === 'ok' ? 'log-ok' : (type === 'warn' ? 'log-warn' : ''));
+            term.innerHTML += `<div class="${cls}">> ${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        /* --- CS LOGIC --- */
+        function sendCS(proto) {
+            const pkt = document.getElementById('csPacket');
+            const sniff = document.getElementById('sniffer');
+            
+            pkt.style.transition = 'none';
+            pkt.style.left = '0';
+            sniff.style.display = 'block';
+
+            if (proto === 'https') {
+                pkt.classList.add('encrypted');
+                pkt.innerText = "Gibberish (Encrypted)";
+                log("HTTPS: Traffic encrypted via TLS.", 'ok');
+            } else {
+                pkt.classList.remove('encrypted');
+                pkt.innerText = "Pass: 12345";
+                log("HTTP: Traffic sent in Cleartext!", 'err');
+            }
+
+            setTimeout(() => {
+                pkt.style.transition = 'left 1.5s linear';
+                pkt.style.left = '80%';
+                
+                setTimeout(() => {
+                    if(proto === 'http') log("SNIFFER: Captured Password '12345'", 'err');
+                    else log("SNIFFER: Failed. Could not decrypt packet.", 'ok');
+                    sniff.style.display = 'none';
+                }, 1500);
+            }, 100);
+        }
+
+        /* --- P2P LOGIC --- */
+        function checkNode(id) {
+            const node = document.getElementById(`node${id}`);
+            if (node.classList.contains('banned')) return;
+
+            if (id === 2) {
+                // Bad Node
+                log(`Node 2 Check: Hash Mismatch! File Corrupted.`, 'err');
+                node.classList.remove('bad');
+                node.classList.add('banned');
+                node.innerText = "BANNED";
+                log("Action: Node 2 banned from mesh.", 'ok');
+            } else {
+                log(`Node ${id} Check: Hash Verified. File Good.`, 'ok');
+            }
+        }
+        
+        function resetP2P() {
+            const n2 = document.getElementById('node2');
+            n2.className = "p2p-node bad"; n2.innerText = "Node 2";
+            log("P2P Mesh Reset.");
+        }
+
+        /* --- MQ LOGIC --- */
+        let mqMsgs = [];
+        let wallet = 100;
+        let lastMsgId = 0;
+
+        function sendMqMsg(type) {
+            processMsg(type, Date.now());
+        }
+
+        function replayMqMsg() {
+            if (mqMsgs.length === 0) { log("No messages to replay.", 'warn'); return; }
+            const original = mqMsgs[mqMsgs.length - 1];
+            log("Attacker replaying last message...", 'err');
+            processMsg("Replay", original.id); // Reusing old ID
+        }
+
+        function processMsg(type, id) {
+            const container = document.getElementById('mqContainer');
+            const isSecure = document.getElementById('mqNonce').checked;
+            
+            // Check Replay
+            if (isSecure && mqMsgs.some(m => m.id === id)) {
+                log(`BLOCKED: Replay detected! Message ID ${id} already processed.`, 'ok');
+                return;
+            }
+
+            // Process
+            mqMsgs.push({type, id});
+            wallet += 100;
+            document.getElementById('walletBal').innerText = wallet;
+            
+            const el = document.createElement('div');
+            el.className = 'msg';
+            el.innerText = `+$100 (ID:${id.toString().slice(-4)})`;
+            container.appendChild(el);
+            container.scrollLeft = container.scrollWidth;
+
+            if (type === 'Replay') log("REPLAY SUCCESS: Wallet double-credited!", 'err');
+            else log("Deposit Processed.", 'ok');
+        }
+
+        /* --- N-TIER LOGIC --- */
+        let fw2Secure = false; // FW2 defaults to open/bad
+
+        function toggleFw(id) {
+            const el = document.getElementById(`fw${id}`);
+            if (id === 2) {
+                fw2Secure = !fw2Secure;
+                if (fw2Secure) {
+                    el.classList.add('secure');
+                    log("FW2: Configured to BLOCK direct Web->DB traffic.", 'ok');
+                } else {
+                    el.classList.remove('secure');
+                    log("FW2: Configured to ALLOW Any-Any (Risky).", 'err');
+                }
+            } else {
+                log("FW1 is managed by Edge team. Focus on FW2 (Internal).");
+            }
+        }
+
+        function testDirectAccess() {
+            log("Attempting Direct Connection: WEB -> DB...", 'warn');
+            if (fw2Secure) {
+                log("BLOCKED: Firewall 2 dropped the packet. Segmentation Success.", 'ok');
+            } else {
+                log("SUCCESS: Web Server accessed DB directly! Segmentation Failure.", 'err');
+            }
+        }
+
+    </script>
+</body>
+</html>

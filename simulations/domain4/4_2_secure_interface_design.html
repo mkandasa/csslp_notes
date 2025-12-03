@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Secure Interface Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --api-blue: #3b82f6;
+            --admin-red: #ef4444;
+            --vault-gold: #f59e0b;
+            --text: #f8fafc;
+            --success: #10b981;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 2px solid var(--api-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--api-blue); }
+        
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 25px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        .lab-card {
+            background: var(--panel-bg);
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .card-header {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #475569;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .interface-mock {
+            background: #020617;
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 15px;
+            border: 1px solid #475569;
+            min-height: 120px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            background: #475569;
+            color: white;
+        }
+        button:hover { background: #64748b; }
+        button.active { background: var(--api-blue); }
+        button.danger { background: var(--admin-red); }
+        
+        .status-pill {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: #475569;
+        }
+        .status-pill.secure { background: var(--success); color: #020617; }
+        .status-pill.risk { background: var(--admin-red); color: white; }
+
+        input {
+            background: #334155;
+            border: 1px solid #475569;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .viz-network {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+        .viz-node {
+            background: #334155;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        .connection-line {
+            flex-grow: 1;
+            height: 2px;
+            background: #475569;
+            margin: 0 10px;
+            position: relative;
+        }
+        .packet {
+            width: 8px; height: 8px;
+            background: var(--api-blue);
+            border-radius: 50%;
+            position: absolute;
+            top: -3px;
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure Interface Design Lab</h1>
+    <p>Management Planes, API Dependencies & Authorization Models</p>
+</header>
+
+<div class="container">
+
+    <!-- 1. MANAGEMENT INTERFACE -->
+    <div class="lab-card">
+        <div class="card-header">
+            <span>Management Interface</span>
+            <span id="mgmt-status" class="status-pill risk">IN-BAND (RISKY)</span>
+        </div>
+        
+        <div class="viz-network">
+            <div class="viz-node">User (Public IP)</div>
+            <div class="connection-line"><div id="mgmt-packet" class="packet"></div></div>
+            <div class="viz-node" id="target-sys">Admin Console</div>
+        </div>
+
+        <div class="interface-mock" id="mgmt-console">
+            > SYSTEM READY.<br>
+            > LISTENING ON PORT 443 (PUBLIC)<br>
+            > LOGIN ATTEMPT FROM 203.0.113.1...
+        </div>
+
+        <div class="controls">
+            <div style="display:flex; gap:5px;">
+                <button onclick="setMgmtMode('public')" id="btn-pub" class="active">Public Internet</button>
+                <button onclick="setMgmtMode('oob')" id="btn-oob">Out-of-Band (VPN)</button>
+            </div>
+            <button class="danger" onclick="attemptBruteForce()">Simulate Brute Force Attack</button>
+        </div>
+    </div>
+
+    <!-- 2. UPSTREAM DEPENDENCY -->
+    <div class="lab-card">
+        <div class="card-header">
+            <span>Dependency (API Keys)</span>
+            <span id="key-status" class="status-pill risk">EXPOSED IN URL</span>
+        </div>
+
+        <div class="interface-mock" id="api-req-view">
+            GET /upstream/data?api_key=12345<br>
+            Host: partner-api.com<br>
+            <br>
+            <span style="color:#aaa">// Keys visible in proxy logs!</span>
+        </div>
+
+        <div class="controls">
+            <label>Interface Design Pattern:</label>
+            <button onclick="setApiDesign('query')" id="btn-query" class="danger">Query Param (Insecure)</button>
+            <button onclick="setApiDesign('header')" id="btn-header">Header + Vault (Secure)</button>
+            <button onclick="sendApiRequest()">Execute Upstream Request</button>
+        </div>
+    </div>
+
+    <!-- 3. PROTOCOL: BOLA / IDOR -->
+    <div class="lab-card">
+        <div class="card-header">
+            <span>API Protocol (BOLA)</span>
+            <span id="bola-status" class="status-pill risk">AUTHZ MISSING</span>
+        </div>
+
+        <div class="interface-mock">
+            <div style="margin-bottom:5px;">LOGGED IN AS: <strong>User_A (ID: 100)</strong></div>
+            <div style="display:flex; gap:5px; align-items:center;">
+                <span>GET /api/receipts/</span>
+                <input type="text" id="bola-input" value="100" style="width:60px;">
+            </div>
+            <div id="bola-response" style="margin-top:10px; border-top:1px dashed #555; padding-top:5px; color:#10b981;">
+                { "id": 100, "item": "Coffee", "card": "**** 4242" }
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="runBolaRequest()" class="danger">Send Request</button>
+            <button onclick="toggleBolaFix()" id="btn-bola-fix">Apply Authorization Check</button>
+            <div style="font-size:0.8rem; color:#94a3b8; margin-top:5px;">
+                *Try changing ID to 101 to steal User_B's data.
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- LAB 1: MGMT INTERFACE ---
+    let mgmtMode = 'public';
+    
+    function setMgmtMode(mode) {
+        mgmtMode = mode;
+        const console = document.getElementById('mgmt-console');
+        const status = document.getElementById('mgmt-status');
+        const target = document.getElementById('target-sys');
+        
+        document.getElementById('btn-pub').classList.toggle('active', mode === 'public');
+        document.getElementById('btn-oob').classList.toggle('active', mode === 'oob');
+
+        if(mode === 'public') {
+            status.innerText = "IN-BAND (RISKY)";
+            status.className = "status-pill risk";
+            target.style.border = "1px solid var(--admin-red)";
+            console.innerHTML = "> LISTENING ON 0.0.0.0 (PUBLIC)<br>> DASHBOARD EXPOSED.";
+        } else {
+            status.innerText = "OUT-OF-BAND (SECURE)";
+            status.className = "status-pill secure";
+            target.style.border = "1px solid var(--success)";
+            console.innerHTML = "> LISTENING ON 10.10.0.5 (MGMT VLAN ONLY)<br>> PUBLIC TRAFFIC DROPPED.";
+        }
+    }
+
+    function attemptBruteForce() {
+        const console = document.getElementById('mgmt-console');
+        const pkt = document.getElementById('mgmt-packet');
+        
+        // Animation
+        pkt.style.display = 'block';
+        pkt.style.left = '0%';
+        let pos = 0;
+        let anim = setInterval(() => {
+            if(pos >= 100) {
+                clearInterval(anim);
+                pkt.style.display = 'none';
+                
+                if(mgmtMode === 'public') {
+                    console.innerHTML += "<br><span style='color:var(--admin-red)'>! WARN: 10,000 FAILED LOGINS/SEC.</span>";
+                    console.innerHTML += "<br><span style='color:var(--admin-red)'>! ALERT: ROOT PASSWORD CRACKED.</span>";
+                } else {
+                    console.innerHTML += "<br><span style='color:var(--success)'># INFO: Attack dropped by Firewall. Mgmt interface unreachable.</span>";
+                }
+                console.scrollTop = console.scrollHeight;
+            } else {
+                pos+=2;
+                pkt.style.left = pos + '%';
+            }
+        }, 10);
+    }
+
+    // --- LAB 2: API KEYS ---
+    let apiDesign = 'query';
+
+    function setApiDesign(type) {
+        apiDesign = type;
+        const view = document.getElementById('api-req-view');
+        const status = document.getElementById('key-status');
+        
+        document.getElementById('btn-query').classList.toggle('active', type === 'query');
+        document.getElementById('btn-header').classList.toggle('active', type === 'header');
+
+        if(type === 'query') {
+            status.innerText = "EXPOSED IN URL";
+            status.className = "status-pill risk";
+            view.innerHTML = `GET /upstream/data?api_key=12345<br>Host: partner-api.com<br><br><span style='color:#aaa'>// Keys visible in Proxy/History</span>`;
+        } else {
+            status.innerText = "SECURE HEADER";
+            status.className = "status-pill secure";
+            view.innerHTML = `GET /upstream/data<br>Host: partner-api.com<br>Authorization: Bearer [VAULT_FETCHED_TOKEN]<br><br><span style='color:var(--success)'>// Key hidden from URL logs</span>`;
+        }
+    }
+
+    function sendApiRequest() {
+        const view = document.getElementById('api-req-view');
+        view.innerHTML += "<br>> Sending...";
+        setTimeout(() => {
+            view.innerHTML += " 200 OK";
+            if(apiDesign === 'query') {
+                 view.innerHTML += "<br><span style='color:var(--admin-red)'>! LOGGED: URL containing secret saved to SIEM/Proxy logs.</span>";
+            } else {
+                 view.innerHTML += "<br><span style='color:var(--success)'># SECURE: Secret transmitted in encrypted header only.</span>";
+            }
+        }, 500);
+    }
+
+    // --- LAB 3: BOLA ---
+    let bolaFixed = false;
+
+    function toggleBolaFix() {
+        bolaFixed = !bolaFixed;
+        const btn = document.getElementById('btn-bola-fix');
+        const status = document.getElementById('bola-status');
+        
+        if(bolaFixed) {
+            btn.classList.add('active');
+            btn.innerText = "Disable Fix";
+            status.innerText = "AUTHZ ACTIVE";
+            status.className = "status-pill secure";
+        } else {
+            btn.classList.remove('active');
+            btn.innerText = "Apply Authorization Check";
+            status.innerText = "AUTHZ MISSING";
+            status.className = "status-pill risk";
+        }
+    }
+
+    function runBolaRequest() {
+        const id = document.getElementById('bola-input').value;
+        const resp = document.getElementById('bola-response');
+        
+        resp.style.color = "#ccc";
+        resp.innerText = "Loading...";
+
+        setTimeout(() => {
+            if(id === "100") {
+                resp.style.color = "#10b981";
+                resp.innerText = `{ "id": 100, "item": "Coffee", "card": "**** 4242" }`;
+            } else {
+                if(bolaFixed) {
+                    resp.style.color = "#ef4444";
+                    resp.innerText = `403 FORBIDDEN - User_A cannot access Resource ${id}`;
+                } else {
+                    resp.style.color = "#ef4444";
+                    resp.innerText = `{ "id": ${id}, "item": "DIAMOND RING", "card": "**** 9999" }`;
+                    resp.innerHTML += "<br><strong>! DATA LEAKED (BOLA)</strong>";
+                }
+            }
+        }, 400);
+    }
+
+</script>
+
+</body>
+</html>

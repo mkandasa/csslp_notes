@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Container Security Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --panel-bg: #161b22;
+            --docker-blue: #2496ed;
+            --kernel-red: #da3633;
+            --user-green: #2ea043;
+            --text-main: #c9d1d9;
+            --border: #30363d;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #010409;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--docker-blue);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--docker-blue); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS (LEFT) */
+        .controls {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 20px;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        
+        select, button {
+            width: 100%;
+            padding: 10px;
+            background: #21262d;
+            border: 1px solid var(--border);
+            color: white;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        button:hover { background: #30363d; }
+        
+        .btn-build { background: var(--docker-blue); border-color: var(--docker-blue); }
+        .btn-attack { background: #8e1515; border-color: #8e1515; }
+        
+        /* VISUALIZATION (RIGHT) */
+        .viz-panel {
+            background: #010409;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 500px;
+            overflow: hidden;
+        }
+
+        /* Host Kernel Layer */
+        .host-kernel {
+            width: 100%;
+            height: 80px;
+            background: #333;
+            border-top: 4px solid var(--kernel-red);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #aaa;
+            position: relative;
+            z-index: 10;
+        }
+        .host-file {
+            position: absolute;
+            bottom: 10px; right: 20px;
+            font-size: 2rem;
+            color: white;
+            z-index: 20;
+        }
+
+        /* Container Stack */
+        .container-box {
+            width: 200px;
+            border: 2px solid var(--docker-blue);
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            background: rgba(36, 150, 237, 0.1);
+            display: flex;
+            flex-direction: column-reverse; /* Stack bottom up */
+            align-items: center;
+            padding-top: 20px;
+            transition: 0.3s;
+            position: relative;
+            margin-bottom: -2px; /* Connect to kernel */
+            z-index: 15;
+        }
+
+        .layer {
+            width: 90%;
+            height: 40px;
+            margin-bottom: 5px;
+            background: #30363d;
+            border: 1px solid #8b949e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: 0.5s;
+        }
+        .layer.visible { opacity: 1; transform: translateY(0); }
+        .layer.app { background: var(--docker-blue); color: white; border: none; }
+        .layer.base-heavy { background: #555; height: 80px; }
+        .layer.base-light { background: var(--user-green); }
+
+        /* User Avatar */
+        .user-avatar {
+            font-size: 2rem;
+            position: absolute;
+            top: -20px;
+            background: #000;
+            border-radius: 50%;
+            padding: 5px;
+            z-index: 20;
+        }
+
+        /* Attack Animation */
+        .exploit-particle {
+            position: absolute;
+            width: 10px; height: 10px;
+            background: var(--kernel-red);
+            border-radius: 50%;
+            display: none;
+            box-shadow: 0 0 10px red;
+        }
+
+        /* LOGS */
+        .console {
+            width: 100%;
+            height: 150px;
+            background: #0d1117;
+            border-top: 1px solid var(--border);
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+            color: #8b949e;
+            font-size: 0.85rem;
+        }
+        .log-err { color: #f85149; }
+        .log-succ { color: #3fb950; }
+        .log-info { color: var(--docker-blue); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Container Architecture Simulator</h1>
+    <p>Layers, Isolation & Kernel Sharing</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="control-group">
+            <h3>1. Dockerfile Config</h3>
+            <label>Base Image:</label>
+            <select id="base-img">
+                <option value="ubuntu">Ubuntu (Heavy: 700MB, Many Libs)</option>
+                <option value="alpine">Alpine (Light: 5MB, Few Libs)</option>
+            </select>
+            
+            <label>User Context:</label>
+            <select id="user-ctx">
+                <option value="root">ROOT (UID 0) - Dangerous</option>
+                <option value="appuser">APPUSER (UID 1000) - Secure</option>
+            </select>
+
+            <button class="btn-build" onclick="buildContainer()">Build & Run Container</button>
+        </div>
+
+        <div class="control-group">
+            <h3>2. Attack Simulation</h3>
+            <p style="font-size:0.8rem; color:#8b949e;">Attempt to write to the Host File System (`/etc/shadow`) via a Kernel Exploit.</p>
+            <button class="btn-attack" onclick="runBreakout()">Attempt Container Breakout</button>
+        </div>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-panel">
+        
+        <!-- CONTAINER -->
+        <div class="container-box" id="container-viz" style="height:0px; border:none;">
+            <div class="user-avatar" id="avatar" style="display:none">👤</div>
+            <!-- Layers injected here -->
+        </div>
+
+        <!-- HOST KERNEL -->
+        <div class="host-kernel">
+            SHARED HOST KERNEL (Linux 5.4)
+            <div class="host-file" id="target-file">📄</div>
+        </div>
+
+        <!-- Exploit Dot -->
+        <div class="exploit-particle" id="exploit-dot"></div>
+        
+    </div>
+
+</div>
+
+<!-- LOGS -->
+<div class="console" id="logger">
+    <div>> Docker Daemon Ready. Build an image to start.</div>
+</div>
+
+<script>
+    let containerBuilt = false;
+    let isRoot = false;
+    let baseType = 'ubuntu';
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='err'?'log-err':(type==='succ'?'log-succ':'log-info')}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function buildContainer() {
+        const viz = document.getElementById('container-viz');
+        const base = document.getElementById('base-img').value;
+        const user = document.getElementById('user-ctx').value;
+        
+        // Reset
+        viz.innerHTML = '<div class="user-avatar" id="avatar"></div>';
+        viz.style.height = "0px";
+        viz.style.border = "none";
+        
+        baseType = base;
+        isRoot = (user === 'root');
+
+        log("Building Image...", 'info');
+
+        setTimeout(() => {
+            viz.style.height = "250px";
+            viz.style.border = "2px solid var(--docker-blue)";
+            viz.style.borderBottom = "none";
+
+            // Add Base Layer
+            const l1 = document.createElement('div');
+            l1.className = `layer ${base === 'ubuntu' ? 'base-heavy' : 'base-light'}`;
+            l1.innerText = base.toUpperCase() + " BASE OS";
+            viz.appendChild(l1);
+
+            // Add Lib Layer
+            const l2 = document.createElement('div');
+            l2.className = "layer";
+            l2.innerText = "LIBRARIES (glibc/musl)";
+            viz.appendChild(l2);
+
+            // Add App Layer
+            const l3 = document.createElement('div');
+            l3.className = "layer app";
+            l3.innerText = "NODE.JS APP";
+            viz.appendChild(l3);
+
+            // Animate Layers
+            setTimeout(() => l1.classList.add('visible'), 100);
+            setTimeout(() => l2.classList.add('visible'), 300);
+            setTimeout(() => l3.classList.add('visible'), 500);
+
+            // Set Avatar
+            const av = document.getElementById('avatar');
+            av.style.display = 'block';
+            av.innerText = isRoot ? "👑" : "👤";
+            av.style.color = isRoot ? "red" : "white";
+            
+            containerBuilt = true;
+            log(`Container Started. PID: 1. User: ${user.toUpperCase()}. Base: ${base.toUpperCase()}.`, 'succ');
+        }, 500);
+    }
+
+    function runBreakout() {
+        if (!containerBuilt) {
+            log("Error: No container running.", "err");
+            return;
+        }
+
+        log("ATTACK: Exploiting kernel vulnerability (Dirty COW)...", 'err');
+        
+        const dot = document.getElementById('exploit-dot');
+        const av = document.getElementById('avatar');
+        const target = document.getElementById('target-file');
+
+        // Start Pos (Avatar)
+        const avRect = av.getBoundingClientRect();
+        const startTop = avRect.top;
+        const startLeft = avRect.left + 15;
+
+        dot.style.display = 'block';
+        dot.style.top = startTop + 'px';
+        dot.style.left = startLeft + 'px';
+
+        // Animate Down
+        let currentTop = startTop;
+        const endTop = target.getBoundingClientRect().top + 10;
+        
+        const anim = setInterval(() => {
+            currentTop += 5;
+            dot.style.top = currentTop + 'px';
+
+            // Hit Kernel Boundary?
+            // Container bottom is approx startTop + 250
+            if (currentTop > (startTop + 230)) {
+                // Check Security Context
+                if (!isRoot) {
+                    clearInterval(anim);
+                    log("BLOCKED: Kernel denied access. User 'appuser' lacks CAP_SYS_ADMIN capabilities.", 'succ');
+                    dot.style.display = 'none';
+                    return;
+                }
+            }
+
+            // Hit Target?
+            if (currentTop >= endTop) {
+                clearInterval(anim);
+                
+                if (isRoot) {
+                    log("CRITICAL: Container Breakout Successful! Root user modified Host filesystem.", 'err');
+                    target.innerText = "🔥"; // Burn file
+                    dot.style.display = 'none';
+                }
+            }
+
+        }, 10);
+
+        // Reset file after a bit
+        setTimeout(() => target.innerText = "📄", 4000);
+    }
+
+</script>
+
+</body>
+</html>

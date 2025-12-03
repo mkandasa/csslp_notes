@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Operational Interface Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --console-black: #000;
+            --ops-green: #10b981;
+            --alert-red: #ef4444;
+            --cmd-yellow: #facc15;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--ops-green);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--ops-green); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+            height: 600px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #0f172a;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--ops-green); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Actions */
+        button.cmd-btn {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+            text-align: left;
+            background: #334155;
+            color: var(--cmd-yellow);
+            transition: 0.2s;
+        }
+        button.cmd-btn:hover { background: #475569; }
+        
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* TERMINAL */
+        .terminal {
+            background: var(--console-black);
+            border: 2px solid #334155;
+            border-radius: 8px;
+            flex-grow: 1;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #ccc;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .term-line { margin-bottom: 5px; word-break: break-all; }
+        .term-prompt { color: var(--ops-green); font-weight: bold; }
+        .term-cmd { color: white; }
+        .term-err { color: var(--alert-red); }
+        .term-warn { color: var(--cmd-yellow); }
+        
+        /* AUDIT LOG */
+        .audit-log {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            height: 150px;
+            padding: 10px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        .audit-entry { border-bottom: 1px solid #333; padding: 2px 0; display: flex; justify-content: space-between; }
+        .audit-user { color: var(--ops-green); }
+        .audit-action { color: #aaa; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure Operational Interface Lab</h1>
+    <p>CLI Security: Authentication, Input Validation & Auditing</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. Interface Configuration</div>
+        
+        <div class="toggle-row">
+            <span>Secure Mode (MFA + RBAC)</span>
+            <label class="switch">
+                <input type="checkbox" id="cfg-secure" onchange="toggleSecure()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">2. Execute Commands</div>
+        <button class="cmd-btn" onclick="exec('status')">> systemctl status app</button>
+        <button class="cmd-btn" onclick="exec('backup')">> backup_db.sh</button>
+        <button class="cmd-btn" onclick="exec('inject')">> view_log.sh "; rm -rf /"</button>
+        <button class="cmd-btn" onclick="exec('restart')">> restart_service (Requires Auth)</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- TERMINAL -->
+        <div class="terminal" id="terminal">
+            <div class="term-line">Welcome to OpsConsole v1.0</div>
+            <div class="term-line">Type 'help' for commands.</div>
+            <div class="term-line">&nbsp;</div>
+        </div>
+
+        <!-- AUDIT LOG -->
+        <div class="audit-log" id="audit-log">
+            <div style="font-weight:bold; color:#aaa; margin-bottom:5px;">SECURE AUDIT TRAIL</div>
+            <!-- Logs go here -->
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let isSecure = false;
+    let user = "admin"; // Default insecure user
+
+    function termLog(msg, type) {
+        const term = document.getElementById('terminal');
+        const div = document.createElement('div');
+        div.className = "term-line " + (type === 'err' ? 'term-err' : (type === 'warn' ? 'term-warn' : ''));
+        div.innerHTML = msg;
+        term.appendChild(div);
+        term.scrollTop = term.scrollHeight;
+    }
+
+    function audit(action, status) {
+        const log = document.getElementById('audit-log');
+        const entry = document.createElement('div');
+        entry.className = 'audit-entry';
+        
+        const timestamp = new Date().toLocaleTimeString();
+        let userStr = isSecure ? "admin_mfa_verified" : "admin";
+        if (!isSecure) userStr = "unknown_user"; // Insecure often lacks attribution
+
+        entry.innerHTML = `
+            <span class="audit-user">[${timestamp}] ${userStr}</span>
+            <span class="audit-action">${action} -> ${status}</span>
+        `;
+        log.prepend(entry);
+    }
+
+    function toggleSecure() {
+        isSecure = document.getElementById('cfg-secure').checked;
+        const term = document.getElementById('terminal');
+        term.innerHTML = ""; // Clear screen
+        
+        if (isSecure) {
+            termLog("System Rebooting in SECURE MODE...", "warn");
+            setTimeout(() => {
+                termLog("Verifying Integrity...", "warn");
+                termLog("MFA Challenge: [******]", "warn");
+                termLog("Access Granted. Session Encrypted (SSHv2).");
+                termLog("Input Validation: STRICT.");
+            }, 500);
+        } else {
+            termLog("System Rebooting in LEGACY MODE...", "err");
+            setTimeout(() => {
+                termLog("WARNING: Telnet connection insecure.", "err");
+                termLog("Input Validation: OFF (Dangerous).");
+            }, 500);
+        }
+    }
+
+    function exec(cmdType) {
+        const prompt = `<span class="term-prompt">${isSecure ? 'admin@secure-box' : 'root@legacy'} #</span>`;
+        
+        if (cmdType === 'status') {
+            termLog(`${prompt} systemctl status app`);
+            termLog("Active: active (running) since Mon 2023-10-27");
+            audit("READ_STATUS", "SUCCESS");
+        } 
+        else if (cmdType === 'backup') {
+            termLog(`${prompt} backup_db.sh`);
+            termLog("Backing up DB to /mnt/backup... Done.");
+            audit("EXEC_BACKUP", "SUCCESS");
+        }
+        else if (cmdType === 'inject') {
+            const payload = `view_log.sh "daily.log; rm -rf /"`;
+            termLog(`${prompt} ${payload}`);
+            
+            if (isSecure) {
+                termLog("ERROR: Invalid character ';' detected in input.", "err");
+                termLog("Security Violation blocked by input sanitizer.", "err");
+                audit("CMD_INJECTION_ATTEMPT", "BLOCKED");
+            } else {
+                termLog("Showing daily.log...", "");
+                setTimeout(() => {
+                    termLog("DELETING ROOT FILESYSTEM...", "err");
+                    termLog("Kernel Panic: Init not found.", "err");
+                    document.getElementById('terminal').style.opacity = "0.5";
+                }, 800);
+                audit("CMD_INJECTION", "EXECUTED");
+            }
+        }
+        else if (cmdType === 'restart') {
+            termLog(`${prompt} sudo systemctl restart app`);
+            
+            if (isSecure) {
+                termLog("SUDO: Authentication required.", "warn");
+                setTimeout(() => {
+                    termLog("Password: *****");
+                    termLog("Restarting service...", "");
+                    audit("SVC_RESTART", "SUCCESS (AUTH VERIFIED)");
+                }, 600);
+            } else {
+                termLog("Restarting service... (No Auth Required)", "");
+                audit("SVC_RESTART", "SUCCESS (NO AUTH)");
+            }
+        }
+    }
+
+</script>
+
+</body>
+</html>

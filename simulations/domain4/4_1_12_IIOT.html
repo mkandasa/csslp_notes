@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: IIoT Safety Lab</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --industrial-orange: #ff9800;
+            --medical-blue: #00bcd4;
+            --auto-red: #f44336;
+            --text: #e0e0e0;
+            --success: #4caf50;
+            --danger: #d32f2f;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid #555;
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: #fff; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        .control-panel {
+            background: var(--panel-bg);
+            border-radius: 8px;
+            border: 1px solid #333;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .panel-title { font-weight: bold; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        
+        /* VISUALIZATION WINDOWS */
+        .viz-window {
+            height: 200px;
+            background: #000;
+            border: 2px solid #333;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* SCADA STYLES */
+        .centrifuge {
+            width: 100px; height: 100px;
+            border: 10px solid #555;
+            border-radius: 50%;
+            border-top-color: var(--industrial-orange);
+            transition: transform 0.1s linear;
+        }
+        .scada-readout {
+            position: absolute; bottom: 10px; right: 10px;
+            font-family: monospace; color: var(--industrial-orange);
+        }
+
+        /* AUTO STYLES */
+        .car-road {
+            width: 100%; height: 100%;
+            background: linear-gradient(#333 0%, #333 45%, #fff 50%, #333 55%, #333 100%);
+            background-size: 100% 20px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .car-obj {
+            width: 80px; height: 40px;
+            background: var(--auto-red);
+            border-radius: 6px;
+            position: relative;
+            transition: left 0.5s;
+            box-shadow: 0 0 15px var(--auto-red);
+        }
+        .car-readout {
+            position: absolute; top: 10px; left: 10px;
+            font-family: monospace; background: rgba(0,0,0,0.7); padding: 5px;
+        }
+
+        /* MEDICAL STYLES */
+        .heart-monitor {
+            width: 100%; height: 100%;
+            background: #000;
+            position: relative;
+        }
+        .ecg-line {
+            stroke: var(--medical-blue);
+            stroke-width: 2;
+            fill: none;
+        }
+        .pump-status {
+            position: absolute; top: 10px; right: 10px;
+            background: #111; border: 1px solid var(--medical-blue);
+            padding: 5px 10px; font-size: 0.8rem; color: var(--medical-blue);
+        }
+
+        /* CONTROLS */
+        .log-box {
+            height: 100px;
+            background: #111;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #aaa;
+            padding: 10px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border: 1px solid #333;
+        }
+        .log-entry.attack { color: var(--danger); }
+        .log-entry.safe { color: var(--success); }
+
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 5px;
+            transition: 0.2s;
+        }
+        .btn-attack { background: #551111; color: #ff9999; border: 1px solid var(--danger); }
+        .btn-attack:hover { background: var(--danger); color: white; }
+        .btn-fix { background: #113311; color: #99ff99; border: 1px solid var(--success); }
+        .btn-fix.active { background: var(--success); color: black; }
+
+        /* STATUS BADGE */
+        .status-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #333;
+            color: #aaa;
+        }
+        .status-badge.secure { background: var(--success); color: black; }
+        .status-badge.vuln { background: var(--danger); color: white; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>IIoT Safety Architecture Lab</h1>
+    <p>Operational Technology (OT) & Kinetic Impact Simulation</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- 1. SCADA / ICS -->
+    <div class="control-panel" style="border-top: 4px solid var(--industrial-orange);">
+        <div class="panel-header">
+            <div class="panel-title">🏭 Smart Factory (PLC)</div>
+            <span id="scada-status" class="status-badge vuln">VULNERABLE: NO BOUNDS CHECK</span>
+        </div>
+        
+        <div class="viz-window">
+            <div id="centrifuge" class="centrifuge"></div>
+            <div class="scada-readout">RPM: <span id="rpm-val">1000</span></div>
+            <div id="scada-boom" style="position:absolute; display:none; font-size:5rem;">💥</div>
+        </div>
+
+        <div class="log-box" id="scada-log">SYSTEM: PLC Online. Normal Ops.</div>
+
+        <button class="btn-attack" onclick="attackScada()">Inject: SET_RPM = 99999</button>
+        <button class="btn-fix" id="btn-scada-fix" onclick="toggleScadaFix()">Apply Fix: Safety Limit Logic</button>
+    </div>
+
+    <!-- 2. AUTOMOTIVE -->
+    <div class="control-panel" style="border-top: 4px solid var(--auto-red);">
+        <div class="panel-header">
+            <div class="panel-title">🚗 Connected Car (CAN)</div>
+            <span id="auto-status" class="status-badge vuln">VULNERABLE: NO AUTH</span>
+        </div>
+        
+        <div class="viz-window">
+            <div class="car-road">
+                <div id="car" class="car-obj"></div>
+            </div>
+            <div class="car-readout">
+                BRAKE: <span id="brake-status">OFF</span><br>
+                SPEED: <span id="speed-status">65 MPH</span>
+            </div>
+        </div>
+
+        <div class="log-box" id="auto-log">CAN BUS: Traffic Normal. ID:0x101 OK.</div>
+
+        <button class="btn-attack" onclick="attackAuto()">Inject: ID:0x000 BRAKE_LOCK</button>
+        <button class="btn-fix" id="btn-auto-fix" onclick="toggleAutoFix()">Apply Fix: Gateway ID Filtering</button>
+    </div>
+
+    <!-- 3. MEDICAL -->
+    <div class="control-panel" style="border-top: 4px solid var(--medical-blue);">
+        <div class="panel-header">
+            <div class="panel-title">🏥 IoMT (Insulin Pump)</div>
+            <span id="med-status" class="status-badge vuln">VULNERABLE: REPLAYABLE</span>
+        </div>
+        
+        <div class="viz-window">
+            <svg class="heart-monitor">
+                <path id="ecg-path" class="ecg-line" d="M0,100 L50,100 L60,50 L70,150 L80,100 L300,100" />
+            </svg>
+            <div class="pump-status">
+                Last Dose: 10u (08:00 AM)<br>
+                Queue: Empty
+            </div>
+            <div id="med-alert" style="position:absolute; color:red; font-weight:bold; display:none;">PATIENT CRITICAL</div>
+        </div>
+
+        <div class="log-box" id="med-log">PUMP: Idle. RF Receiver Active.</div>
+
+        <button class="btn-attack" onclick="attackMed()">Replay: "Dose 10u" (Recorded Yesterday)</button>
+        <button class="btn-fix" id="btn-med-fix" onclick="toggleMedFix()">Apply Fix: Nonce/Timestamp Check</button>
+    </div>
+
+</div>
+
+<script>
+    // --- SCADA LOGIC ---
+    let scadaSafe = false;
+    let centrifugeRot = 0;
+    let centrifugeInt = setInterval(() => {
+        centrifugeRot += 10;
+        document.getElementById('centrifuge').style.transform = `rotate(${centrifugeRot}deg)`;
+    }, 50);
+
+    function logScada(msg, type) {
+        const box = document.getElementById('scada-log');
+        box.innerHTML += `<div class="log-entry ${type}">> ${msg}</div>`;
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function toggleScadaFix() {
+        scadaSafe = !scadaSafe;
+        const btn = document.getElementById('btn-scada-fix');
+        const badge = document.getElementById('scada-status');
+        if(scadaSafe) {
+            btn.classList.add('active');
+            btn.innerText = "Fix Applied: Limits Active";
+            badge.className = "status-badge secure";
+            badge.innerText = "SECURE: LOGIC CHECKS ON";
+            // Reset viz
+            document.getElementById('scada-boom').style.display = 'none';
+            document.getElementById('centrifuge').style.opacity = '1';
+        } else {
+            btn.classList.remove('active');
+            btn.innerText = "Apply Fix: Safety Limit Logic";
+            badge.className = "status-badge vuln";
+            badge.innerText = "VULNERABLE: NO BOUNDS CHECK";
+        }
+    }
+
+    function attackScada() {
+        if(scadaSafe) {
+            logScada("Input 99999 rejected. Max allowed: 5000.", "safe");
+            document.getElementById('rpm-val').innerText = "1000";
+        } else {
+            logScada("Writing Register 4001: 99999 RPM...", "attack");
+            document.getElementById('rpm-val').innerText = "99999";
+            setTimeout(() => {
+                logScada("CRITICAL FAILURE: Motor Disintegration.", "attack");
+                document.getElementById('scada-boom').style.display = 'block';
+                document.getElementById('centrifuge').style.opacity = '0.2';
+            }, 800);
+        }
+    }
+
+
+    // --- AUTOMOTIVE LOGIC ---
+    let autoSafe = false;
+    
+    function logAuto(msg, type) {
+        const box = document.getElementById('auto-log');
+        box.innerHTML += `<div class="log-entry ${type}">> ${msg}</div>`;
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function toggleAutoFix() {
+        autoSafe = !autoSafe;
+        const btn = document.getElementById('btn-auto-fix');
+        const badge = document.getElementById('auto-status');
+        if(autoSafe) {
+            btn.classList.add('active');
+            btn.innerText = "Fix Applied: Gateway Filter";
+            badge.className = "status-badge secure";
+            badge.innerText = "SECURE: ID FILTERING";
+        } else {
+            btn.classList.remove('active');
+            btn.innerText = "Apply Fix: Gateway ID Filtering";
+            badge.className = "status-badge vuln";
+            badge.innerText = "VULNERABLE: NO AUTH";
+        }
+    }
+
+    function attackAuto() {
+        const car = document.getElementById('car');
+        const brake = document.getElementById('brake-status');
+        const speed = document.getElementById('speed-status');
+
+        if(autoSafe) {
+            logAuto("Gateway dropped frame ID:0x000 (Unauthorized Source).", "safe");
+        } else {
+            logAuto("Injecting Priority Frame ID:0x000...", "attack");
+            brake.innerText = "LOCKED";
+            speed.innerText = "0 MPH";
+            car.style.transform = "rotate(30deg) translateX(50px)";
+            logAuto("ECU accepted brake command. Loss of control.", "attack");
+            setTimeout(() => {
+                car.style.transform = "none";
+                brake.innerText = "OFF";
+                speed.innerText = "65 MPH";
+            }, 2000);
+        }
+    }
+
+
+    // --- MEDICAL LOGIC ---
+    let medSafe = false;
+
+    function logMed(msg, type) {
+        const box = document.getElementById('med-log');
+        box.innerHTML += `<div class="log-entry ${type}">> ${msg}</div>`;
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function toggleMedFix() {
+        medSafe = !medSafe;
+        const btn = document.getElementById('btn-med-fix');
+        const badge = document.getElementById('med-status');
+        if(medSafe) {
+            btn.classList.add('active');
+            btn.innerText = "Fix Applied: Nonce Check";
+            badge.className = "status-badge secure";
+            badge.innerText = "SECURE: ANTI-REPLAY";
+        } else {
+            btn.classList.remove('active');
+            btn.innerText = "Apply Fix: Nonce/Timestamp Check";
+            badge.className = "status-badge vuln";
+            badge.innerText = "VULNERABLE: REPLAYABLE";
+        }
+    }
+
+    function attackMed() {
+        const alert = document.getElementById('med-alert');
+        const path = document.getElementById('ecg-path');
+
+        if(medSafe) {
+            logMed("Packet Rejected: Timestamp/Nonce expired.", "safe");
+        } else {
+            logMed("Receiving CMD: Dose 10u...", "attack");
+            logMed("Command Executed. Total Dose: 20u.", "attack");
+            alert.style.display = 'block';
+            path.setAttribute('d', "M0,100 L300,100"); // Flatline
+            setTimeout(() => {
+                alert.style.display = 'none';
+                path.setAttribute('d', "M0,100 L50,100 L60,50 L70,150 L80,100 L300,100");
+                logMed("System Reset.", "safe");
+            }, 2000);
+        }
+    }
+
+</script>
+
+</body>
+</html>

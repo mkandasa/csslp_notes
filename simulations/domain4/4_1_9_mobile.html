@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Mobile Privacy Simulator</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --phone-frame: #1a1a1a;
+            --screen-bg: #ffffff;
+            --app-primary: #007aff;
+            --app-danger: #ff3b30;
+            --app-malicious: #5856d6;
+            --text-main: #333;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #2c3e50;
+            color: white;
+            width: 100%;
+            padding: 1rem 0;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .lab-workspace {
+            display: flex;
+            gap: 40px;
+            margin-top: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* PHONE SIMULATOR */
+        .phone-frame {
+            width: 320px;
+            height: 600px;
+            background: var(--phone-frame);
+            border-radius: 30px;
+            padding: 15px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .phone-notch {
+            width: 150px;
+            height: 20px;
+            background: var(--phone-frame);
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 0 0 15px 15px;
+            z-index: 10;
+        }
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: var(--screen-bg);
+            border-radius: 20px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        /* APP UI inside Phone */
+        .app-header {
+            background: var(--app-primary);
+            color: white;
+            padding: 40px 15px 15px 15px;
+            font-weight: bold;
+        }
+        .app-content {
+            padding: 15px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        .data-bubble {
+            background: #e1f5fe;
+            border-left: 4px solid var(--app-primary);
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            animation: slideIn 0.3s ease-out;
+        }
+        .malicious-bubble {
+            background: #ede7f6;
+            border-left: 4px solid var(--app-malicious);
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            display: none; /* Hidden by default */
+        }
+
+        /* CONTROLS */
+        .controls-panel {
+            width: 400px;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        .control-group {
+            margin-bottom: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+        }
+        h3 { color: #2c3e50; margin-top: 0; }
+        
+        button {
+            background: var(--app-primary);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 0.9rem;
+            margin-top: 5px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #0056b3; }
+        button.toggle-btn {
+            background: #e0e0e0;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button.toggle-btn.active {
+            background: var(--app-primary);
+            color: white;
+        }
+        
+        /* VISUALIZATIONS */
+        .meter-container {
+            margin-top: 10px;
+        }
+        .meter-label { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 5px; }
+        .meter-bar {
+            height: 10px;
+            background: #eee;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .meter-fill {
+            height: 100%;
+            background: var(--app-danger);
+            width: 0%;
+            transition: width 0.5s;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Status Tags */
+        .tag {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .tag-safe { background: #d4edda; color: #155724; }
+        .tag-danger { background: #f8d7da; color: #721c24; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>CSSLP Mobile Architect Lab</h1>
+    <p>Simulating Implicit Data Collection & IPC Leaks</p>
+</header>
+
+<div class="lab-workspace">
+    
+    <!-- CONTROLS PANEL -->
+    <div class="controls-panel">
+        
+        <!-- LAB 1: FINGERPRINTING -->
+        <div class="control-group">
+            <h3>1. Implicit Fingerprinting</h3>
+            <p style="font-size:0.9rem; color:#666;">Malicious apps collect "non-permission" data to uniquely identify users.</p>
+            
+            <button id="btn-collect" onclick="runFingerprinting()">Run Data Collector</button>
+            
+            <div class="meter-container">
+                <div class="meter-label">
+                    <span>Fingerprint Uniqueness</span>
+                    <span id="entropy-val">0%</span>
+                </div>
+                <div class="meter-bar">
+                    <div class="meter-fill" id="entropy-bar"></div>
+                </div>
+            </div>
+            
+            <button id="btn-priv-mode" class="toggle-btn" onclick="togglePrivacyMode()">
+                <span>Privacy Mode (Data Generalization)</span>
+                <span id="priv-status">OFF</span>
+            </button>
+        </div>
+
+        <!-- LAB 2: IPC LEAKAGE -->
+        <div class="control-group">
+            <h3>2. IPC / Intent Leakage</h3>
+            <p style="font-size:0.9rem; color:#666;">Apps communicate via Intents. Implicit intents broadcast data to EVERY app.</p>
+            
+            <button onclick="sendSensitiveData()">Broadcast "User Token"</button>
+            
+            <div style="margin-top:10px;">
+                <label style="font-size:0.9rem; font-weight:bold;">Architecture Fix:</label>
+                <select id="ipc-mode" style="width:100%; padding:8px; margin-top:5px; border-radius:4px;">
+                    <option value="implicit">Implicit Intent (Insecure)</option>
+                    <option value="explicit">Explicit Intent (Secure)</option>
+                    <option value="local">LocalBroadcastManager (Internal)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="control-group" style="border:none;">
+            <h3>3. Sensor Side-Channel</h3>
+            <p style="font-size:0.9rem; color:#666;">High-freq sensor data can reveal keystrokes.</p>
+            <button onclick="toggleSensorAttack()">Toggle Accelerometer Sniffer</button>
+        </div>
+
+    </div>
+
+    <!-- PHONE SIMULATOR -->
+    <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+            <div class="app-header">
+                My Banking App
+                <div style="font-size:0.8rem; font-weight:normal; opacity:0.8;">Running in Sandbox 10045</div>
+            </div>
+            <div class="app-content" id="phone-logs">
+                <div style="text-align:center; color:#999; margin-top:50px;">
+                    <i>System Logs & Data Traffic</i>
+                </div>
+            </div>
+            
+            <!-- Hidden Malicious App Overlay -->
+            <div id="malicious-app" style="background:#5856d6; color:white; padding:10px; font-size:0.8rem; display:none;">
+                <strong>👾 SpyWare App (Sandbox 99999)</strong>
+                <div id="spy-logs">Listening...</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const logs = document.getElementById('phone-logs');
+    const spyLogs = document.getElementById('spy-logs');
+    const maliciousApp = document.getElementById('malicious-app');
+    let privacyMode = false;
+    let sensorInterval = null;
+
+    function addLog(msg, type='normal') {
+        const div = document.createElement('div');
+        div.className = 'data-bubble';
+        if(type === 'leak') div.style.borderLeftColor = '#ff3b30';
+        div.innerHTML = msg;
+        logs.prepend(div); // Add to top
+    }
+
+    // --- LAB 1: FINGERPRINTING ---
+    function runFingerprinting() {
+        logs.innerHTML = ''; // Clear
+        
+        let uniqueness = 0;
+        let data = [];
+
+        if (!privacyMode) {
+            // High Entropy Data (Exact values)
+            data.push("<b>Battery:</b> 87.4% (Charging)");
+            data.push("<b>Screen:</b> 1170x2532 @ 60Hz");
+            data.push("<b>Timezone:</b> America/New_York (GMT-5)");
+            data.push("<b>User-Agent:</b> Mozilla/5.0 (iPhone; CPU...)");
+            data.push("<b>Sensor Calibration:</b> X:0.0023, Y:-0.001");
+            
+            uniqueness = 98; // High probability of unique ID
+            addLog("Collecting Exact Device Metrics...", "leak");
+        } else {
+            // Low Entropy Data (Generalized)
+            data.push("<b>Battery:</b> > 80%");
+            data.push("<b>Screen:</b> High Density");
+            data.push("<b>Timezone:</b> UTC-5");
+            data.push("<b>User-Agent:</b> Generic Mobile");
+            
+            uniqueness = 15; // Low probability
+            addLog("Collecting Generalized Metrics...");
+        }
+
+        // Visualize Data
+        setTimeout(() => {
+            data.forEach((item, index) => {
+                setTimeout(() => addLog(item), index * 300);
+            });
+        }, 500);
+
+        // Update Meter
+        const bar = document.getElementById('entropy-bar');
+        const val = document.getElementById('entropy-val');
+        
+        setTimeout(() => {
+            bar.style.width = uniqueness + '%';
+            val.innerText = uniqueness + '% (Probability of Tracking)';
+            if(uniqueness > 50) {
+                bar.style.background = '#ff3b30';
+            } else {
+                bar.style.background = '#28a745';
+            }
+        }, 1000);
+    }
+
+    function togglePrivacyMode() {
+        privacyMode = !privacyMode;
+        const btn = document.getElementById('btn-priv-mode');
+        const status = document.getElementById('priv-status');
+        
+        if(privacyMode) {
+            btn.classList.add('active');
+            status.innerText = "ON";
+        } else {
+            btn.classList.remove('active');
+            status.innerText = "OFF";
+        }
+    }
+
+    // --- LAB 2: IPC LEAKAGE ---
+    function sendSensitiveData() {
+        const mode = document.getElementById('ipc-mode').value;
+        const token = "AuthToken_X92_Secret";
+        
+        maliciousApp.style.display = 'block';
+
+        if(mode === 'implicit') {
+            addLog(`Broadcasting Intent: ACTION_LOGIN_SUCCESS <br>Payload: ${token}`, "leak");
+            
+            setTimeout(() => {
+                spyLogs.innerHTML = `INTERCEPTED: ${token}`;
+                spyLogs.style.background = 'rgba(0,0,0,0.2)';
+            }, 800);
+            
+        } else if (mode === 'explicit') {
+            addLog(`Sending Explicit Intent to: <b>com.mybank.wallet</b> <br>Payload: ${token}`);
+            
+            setTimeout(() => {
+                spyLogs.innerHTML = `Blocked by OS (Package Name Mismatch)`;
+            }, 800);
+        } else {
+             addLog(`Sending LocalBroadcast (Internal Only) <br>Payload: ${token}`);
+             
+             setTimeout(() => {
+                spyLogs.innerHTML = `... (No Signal Detected)`;
+            }, 800);
+        }
+    }
+
+    // --- LAB 3: SENSOR ATTACK ---
+    function toggleSensorAttack() {
+        if(sensorInterval) {
+            clearInterval(sensorInterval);
+            sensorInterval = null;
+            maliciousApp.style.display = 'none';
+            return;
+        }
+
+        maliciousApp.style.display = 'block';
+        addLog("Typing PIN: 1 - 2 - 3 - 4");
+
+        let step = 0;
+        sensorInterval = setInterval(() => {
+            const x = (Math.random() - 0.5).toFixed(3);
+            const y = (Math.random() - 0.5).toFixed(3);
+            const z = (9.8 + Math.random()).toFixed(2);
+            
+            spyLogs.innerHTML = `ACCEL: X:${x} Y:${y} Z:${z}<br>`;
+            
+            // Inferring
+            if(step % 5 === 0) {
+                spyLogs.innerHTML += `<strong style="color:#ff9">INFERRED: Key Press detected!</strong>`;
+            }
+            step++;
+
+        }, 200);
+    }
+
+</script>
+
+</body>
+</html>

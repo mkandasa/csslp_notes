@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSSLP Domain 4: Secure DB Connection Lab</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --db-orange: #f97316;
+            --net-cyan: #06b6d4;
+            --secure-green: #22c55e;
+            --danger: #ef4444;
+            --text: #f1f5f9;
+        }
+        body {
+            font-family: 'Segoe UI', monospace;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background: #000;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 3px solid var(--net-cyan);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--net-cyan); }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1400px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        /* Toggle Switches */
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #0f172a;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .toggle-label { font-weight: bold; font-size: 0.9rem; }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px; height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #555; transition: .4s; border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute; content: "";
+            height: 14px; width: 14px; left: 3px; bottom: 3px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--secure-green); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Actions */
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: 0.2s;
+        }
+        .btn-connect { background: var(--net-cyan); color: black; }
+        .btn-sniff { background: var(--danger); }
+        .btn-rogue { background: #f59e0b; color: black; }
+        
+        button:hover { filter: brightness(1.2); }
+
+        /* VISUALIZATION */
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Network Map */
+        .network-map {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #000;
+            padding: 30px 50px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            position: relative;
+            height: 150px;
+        }
+
+        .node {
+            width: 100px; height: 100px;
+            border-radius: 8px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-size: 0.8rem;
+            text-align: center;
+            z-index: 10;
+            border: 2px solid #555;
+            background: #222;
+            transition: 0.3s;
+        }
+        #node-app { border-color: var(--net-cyan); }
+        #node-db { border-color: var(--db-orange); }
+        #node-hacker { border-color: var(--danger); position: absolute; top: 10px; left: 50%; transform: translateX(-50%); opacity: 0.3; }
+
+        .cable {
+            position: absolute;
+            height: 4px;
+            background: #334155;
+            top: 50%; left: 100px; right: 100px;
+            z-index: 0;
+        }
+        
+        /* Moving Packet */
+        .packet {
+            position: absolute;
+            width: 140px; height: 30px;
+            background: white;
+            color: black;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            top: 50%; transform: translateY(-50%);
+            left: 120px;
+            opacity: 0;
+            box-shadow: 0 0 10px white;
+        }
+        .pkt-enc { background: var(--secure-green); color: white; border: 1px solid white; box-shadow: 0 0 10px var(--secure-green); }
+
+        /* Sniffer Output */
+        .sniffer-box {
+            background: #1e1e1e;
+            border: 1px dashed var(--danger);
+            border-radius: 8px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: var(--danger);
+            min-height: 60px;
+        }
+
+        /* LOGS */
+        .console {
+            background: #000;
+            height: 120px;
+            border: 1px solid #334155;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            color: #aaa;
+        }
+        .log-sys { color: var(--net-cyan); }
+        .log-db { color: var(--db-orange); }
+        .log-err { color: var(--danger); }
+        .log-ok { color: var(--secure-green); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Secure DB Connection Lab</h1>
+    <p>TLS Encryption & Mutual Authentication (mTLS)</p>
+</header>
+
+<div class="dashboard">
+
+    <!-- CONTROLS -->
+    <div class="controls">
+        <div class="section-title">1. DB Configuration</div>
+        
+        <div class="toggle-row">
+            <span class="toggle-label">Require TLS (SSL)</span>
+            <label class="switch">
+                <input type="checkbox" id="cfg-tls" onchange="updateConfig()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="toggle-row">
+            <span class="toggle-label">Require Client Cert (mTLS)</span>
+            <label class="switch">
+                <input type="checkbox" id="cfg-mtls" onchange="updateConfig()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="section-title" style="margin-top:20px;">2. Client Actions</div>
+        <button class="btn-connect" onclick="connectApp()">Legit App Connection</button>
+        <button class="btn-rogue" onclick="connectRogue()">Rogue App (Stolen Pass)</button>
+        <button class="btn-sniff" onclick="sniffNetwork()">Wiretap / Sniffer</button>
+    </div>
+
+    <!-- VISUALIZATION -->
+    <div class="viz-area">
+        
+        <!-- NETWORK MAP -->
+        <div class="network-map">
+            <div class="node" id="node-app">
+                APP SERVER<br>
+                <span style="font-size:0.6rem; color:#aaa">Cert: Valid</span>
+            </div>
+            
+            <div class="node" id="node-hacker">
+                SNIFFER<br>
+                <span style="font-size:0.6rem;">(Man-in-the-Middle)</span>
+            </div>
+
+            <div class="node" id="node-db">
+                DB SERVER<br>
+                <span id="db-status" style="font-size:0.6rem; color:#aaa">Mode: Unsecure</span>
+            </div>
+
+            <div class="cable"></div>
+            <div class="packet" id="packet">DATA</div>
+        </div>
+
+        <!-- SNIFFER OUTPUT -->
+        <div class="sniffer-box">
+            <div style="border-bottom:1px solid #333; margin-bottom:5px; color:#aaa;">WIRETAP OUTPUT (Port 5432)</div>
+            <div id="sniff-data">Listening...</div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="console" id="logger">
+            <div>> System Ready. Default: TCP/IP Plaintext.</div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let isSniffing = false;
+    let lastData = "";
+
+    function log(msg, type) {
+        const box = document.getElementById('logger');
+        const div = document.createElement('div');
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        div.innerHTML = `<span style="color:#555">[${time}]</span> <span class="${type==='sys'?'log-sys':(type==='db'?'log-db':(type==='err'?'log-err':'log-ok'))}">${msg}</span>`;
+        box.prepend(div);
+    }
+
+    function updateConfig() {
+        const tls = document.getElementById('cfg-tls').checked;
+        const mtls = document.getElementById('cfg-mtls').checked;
+        const status = document.getElementById('db-status');
+        const node = document.getElementById('node-db');
+
+        if (mtls) {
+            document.getElementById('cfg-tls').checked = true; // mTLS requires TLS
+            status.innerText = "Mode: mTLS (Strict)";
+            status.style.color = "var(--secure-green)";
+            node.style.borderColor = "var(--secure-green)";
+            node.style.boxShadow = "0 0 15px rgba(34, 197, 94, 0.2)";
+        } else if (tls) {
+            status.innerText = "Mode: TLS Encrypted";
+            status.style.color = "var(--net-cyan)";
+            node.style.borderColor = "var(--net-cyan)";
+            node.style.boxShadow = "none";
+        } else {
+            status.innerText = "Mode: Unsecure";
+            status.style.color = "#aaa";
+            node.style.borderColor = "var(--db-orange)";
+            node.style.boxShadow = "none";
+        }
+        log("CONFIG: Database Security Policy Updated.", "sys");
+    }
+
+    function connectApp() {
+        const tls = document.getElementById('cfg-tls').checked;
+        const mtls = document.getElementById('cfg-mtls').checked;
+        
+        log("APP: Initiating Connection...", "sys");
+        
+        // Packet Visual
+        const pkt = document.getElementById('packet');
+        pkt.style.left = "120px";
+        pkt.style.opacity = "1";
+        
+        if (tls) {
+            pkt.className = "packet pkt-enc";
+            pkt.innerText = "🔒 [Encrypted]";
+            lastData = "x86^f9#a1... (Ciphertext)";
+        } else {
+            pkt.className = "packet";
+            pkt.innerText = "USER=admin PASS=1234";
+            lastData = "USER=admin PASS=1234 (Plaintext)";
+        }
+
+        // Animate
+        setTimeout(() => {
+            pkt.style.left = "50%"; // Midpoint
+            if(isSniffing) updateSniffer(lastData);
+            
+            setTimeout(() => {
+                pkt.style.left = "calc(100% - 120px)"; // Dest
+                
+                // DB Logic
+                if (mtls) {
+                    log("DB: Verifying Client Certificate...", "db");
+                    setTimeout(() => {
+                        log("DB: Cert Valid (CN=AppServer). Access Granted.", "ok");
+                        pkt.style.opacity = 0;
+                    }, 500);
+                } else {
+                    log("DB: Password Accepted. Access Granted.", "ok");
+                    pkt.style.opacity = 0;
+                }
+
+            }, 800);
+        }, 800);
+    }
+
+    function connectRogue() {
+        const mtls = document.getElementById('cfg-mtls').checked;
+        
+        log("ROGUE: Attempting connection with stolen password...", "err");
+
+        const pkt = document.getElementById('packet');
+        pkt.style.left = "120px"; // Simulating coming from network
+        pkt.style.opacity = "1";
+        pkt.className = "packet";
+        pkt.innerText = "USER=admin PASS=1234";
+        lastData = "USER=admin PASS=1234";
+
+        setTimeout(() => {
+            pkt.style.left = "calc(100% - 120px)";
+            
+            if (mtls) {
+                log("DB: Requesting Client Cert...", "db");
+                setTimeout(() => {
+                    log("DB: ALERT! No Client Cert presented. Connection Dropped.", "err");
+                    pkt.style.backgroundColor = "var(--danger)";
+                    pkt.innerText = "REJECTED";
+                    setTimeout(() => pkt.style.opacity = 0, 500);
+                }, 500);
+            } else {
+                log("DB: Password Accepted. Access Granted to Rogue!", "err");
+                pkt.style.opacity = 0;
+            }
+        }, 1000);
+    }
+
+    function sniffNetwork() {
+        isSniffing = !isSniffing;
+        const hacker = document.getElementById('node-hacker');
+        const box = document.getElementById('sniff-data');
+        
+        if(isSniffing) {
+            hacker.style.opacity = "1";
+            hacker.style.boxShadow = "0 0 20px var(--danger)";
+            log("ATTACK: Packet Sniffer Active on Switch.", "err");
+            box.innerText = "Waiting for packets...";
+        } else {
+            hacker.style.opacity = "0.3";
+            hacker.style.boxShadow = "none";
+            log("ATTACK: Sniffer Disabled.", "sys");
+            box.innerText = "Offline.";
+        }
+    }
+
+    function updateSniffer(data) {
+        const box = document.getElementById('sniff-data');
+        box.innerText = `CAPTURED: ${data}`;
+        if (data.includes("Plaintext")) {
+            box.style.color = "var(--danger)";
+            log("SNIFFER: Credentials Stolen!", "err");
+        } else {
+            box.style.color = "var(--secure-green)";
+            log("SNIFFER: Capture failed (Data is encrypted).", "ok");
+        }
+    }
+
+</script>
+
+</body>
+</html>
